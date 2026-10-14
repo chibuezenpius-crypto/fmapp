@@ -1,4 +1,5 @@
 import type { Player, PlayerAttributes, PlayerAchievement } from './types/game'
+import { findGeneratedClub } from './data/clubSquads'
 import { squad } from './data/mockData'
 import Flag from './Flag'
 
@@ -24,6 +25,8 @@ interface PlayerProfileProps {
 const money = (amount: number) => `£${new Intl.NumberFormat('en-GB').format(amount)}`
 const displayDate = (date: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`))
 const ratingTone = (rating: number) => rating >= 15 ? 'positive' : rating < 9 ? 'negative' : 'neutral'
+
+const playerClubName = (player: Player) => findGeneratedClub(player.contract.clubId)?.clubName ?? 'Northbridge FC'
 
 function ClubReference({ name, selectedClubName, onSelectClub }: { name: string; selectedClubName: string | null; onSelectClub: (name: string) => void }) {
   return <button aria-pressed={selectedClubName === name} className={`entity-link ${selectedClubName === name ? 'selected' : ''}`} onClick={() => onSelectClub(name)} type="button">{name}</button>
@@ -54,7 +57,7 @@ export default function PlayerProfile({ player, section, selectedClubName, onSec
     <section className="profile-hero">
       <img alt={`Portrait of ${player.name}`} className="profile-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80" />
       <div className="profile-player-info"><span className="eyebrow">{player.position} · {player.age} YEARS</span><h1>{player.name}</h1>
-        <div className="profile-clubline"><ClubReference name="Northbridge FC" selectedClubName={selectedClubName} onSelectClub={onSelectClub} /><span>·</span><span>{player.contract.squadRole}</span></div>
+        <div className="profile-clubline"><ClubReference name={playerClubName(player)} selectedClubName={selectedClubName} onSelectClub={onSelectClub} /><span>·</span><span>{player.contract.squadRole}</span></div>
       </div>
       <div className="profile-overall"><strong>{player.overall}</strong><span>OVR</span></div>
     </section>
@@ -92,7 +95,7 @@ export default function PlayerProfile({ player, section, selectedClubName, onSec
       </div>}
 
       {section === 'Contracts' && <>
-        <section className="profile-card contract-card"><div className="contract-card-heading"><div><span className="eyebrow">ACTIVE CONTRACT</span><h3><ClubReference name="Northbridge FC" selectedClubName={selectedClubName} onSelectClub={onSelectClub} /></h3></div><span className="active-pill">ACTIVE</span></div>
+        <section className="profile-card contract-card"><div className="contract-card-heading"><div><span className="eyebrow">ACTIVE CONTRACT</span><h3><ClubReference name={playerClubName(player)} selectedClubName={selectedClubName} onSelectClub={onSelectClub} /></h3></div><span className="active-pill">ACTIVE</span></div>
           <div className="contract-facts"><div><span>WEEKLY WAGE</span><strong>{money(contract.weeklyWage)}</strong></div><div><span>EXPIRES</span><strong>{displayDate(contract.endDate)}</strong></div><div><span>SQUAD ROLE</span><strong>{contract.squadRole}</strong></div>{contract.releaseClause && <div><span>RELEASE CLAUSE</span><strong>{money(contract.releaseClause)}</strong></div>}</div>
           {contract.sponsor ? <div className="sponsor-panel"><span className="sponsor-star">✦</span><div><span>ACTIVE SPONSOR</span><strong>{contract.sponsor.brand}</strong><small>{money(contract.sponsor.annualValue)} / year · ends {displayDate(contract.sponsor.endDate)}</small></div></div> : <div className="sponsor-panel no-sponsor"><div><span>SPONSORSHIP</span><strong>No active sponsor</strong><small>No personal sponsor contract on record</small></div></div>}
         </section>

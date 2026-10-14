@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { leagueCompetitions } from './data/mockData'
 import rawGlobalLeagues from './data/globalLeaguesAndTeams.json'
 import rawInternationalTournaments from './data/internationalTournaments.json'
-import type { GlobalLeaguesDatabase, GlobalCountryLeague, InternationalTournament, InternationalTournamentsDatabase, LeagueCategory, LeagueCompetition, LeagueStanding, TournamentGroup } from './types/game'
+import LeagueClubSquad from './LeagueClubSquad'
+import type { Player, GlobalLeaguesDatabase, GlobalCountryLeague, InternationalTournament, InternationalTournamentsDatabase, LeagueCategory, LeagueCompetition, LeagueStanding, TournamentGroup } from './types/game'
 import Flag from './Flag'
 import ClubBadge from './ClubBadge'
 import KnockoutBracket from './KnockoutBracket'
@@ -110,11 +111,11 @@ function TournamentStages({ tournament, stageId, onStageChange, onSelectCountry 
   </section>
 }
 
-function LeagueTable({ competition, renderClub }: { competition: LeagueCompetition; renderClub?: (clubId: string) => React.ReactNode }) {
+function LeagueTable({ competition, renderClub, onSelectClub }: { competition: LeagueCompetition; renderClub?: (clubId: string) => React.ReactNode; onSelectClub?: (clubId: string) => void }) {
   return <div className="table-wrap league-table-wrap">
     <div className="table-head"><span>CLUB</span><span>P</span><span>W-D-L</span><span>GF</span><span>GA</span><span>GD</span><span>PTS</span></div>
     {competition.standings.map((standing) => <div className={`table-row league-standing ${standing.clubName === 'Northbridge FC' ? 'own-club' : ''}`} key={standing.clubId}>
-      <span className="table-club"><i>{String(standing.position).padStart(2, '0')}</i>{renderClub?.(standing.clubId)}{standing.clubName}</span><span>{standing.played}</span><span>{standing.won}-{standing.drawn}-{standing.lost}</span><span>{standing.goalsFor}</span><span>{standing.goalsAgainst}</span><span>{standing.goalDifference > 0 ? `+${standing.goalDifference}` : standing.goalDifference}</span><strong>{standing.points}</strong>
+      <span className="table-club"><i>{String(standing.position).padStart(2, '0')}</i>{renderClub?.(standing.clubId)}{onSelectClub ? <button aria-label={`Open ${standing.clubName} squad`} className="entity-link" onClick={() => onSelectClub(standing.clubId)} type="button">{standing.clubName}</button> : standing.clubName}</span><span>{standing.played}</span><span>{standing.won}-{standing.drawn}-{standing.lost}</span><span>{standing.goalsFor}</span><span>{standing.goalsAgainst}</span><span>{standing.goalDifference > 0 ? `+${standing.goalDifference}` : standing.goalDifference}</span><strong>{standing.points}</strong>
     </div>)}
   </div>
 }
@@ -123,9 +124,12 @@ interface LeagueHubProps {
   selectedCompetitionId: string | null
   onSelectCompetition: (id: string) => void
   onSelectCountry: (country: string) => void
+  selectedClubId: string | null
+  onSelectClub: (clubId: string) => void
+  onSelectPlayer: (player: Player) => void
 }
 
-export default function LeagueHub({ selectedCompetitionId, onSelectCompetition, onSelectCountry }: LeagueHubProps) {
+export default function LeagueHub({ selectedCompetitionId, onSelectCompetition, onSelectCountry, selectedClubId, onSelectClub, onSelectPlayer }: LeagueHubProps) {
   const [category, setCategory] = useState<LeagueCategory>('Domestic Leagues')
   const [openRegion, setOpenRegion] = useState('England')
   const [section, setSection] = useState<LeagueSection>('Standings')
@@ -151,6 +155,8 @@ export default function LeagueHub({ selectedCompetitionId, onSelectCompetition, 
     setSection('Standings')
   }
 
+  if (selectedClubId) return <LeagueClubSquad clubId={selectedClubId} onSelectPlayer={onSelectPlayer} />
+
   return <div className="league-hub">
     {!currentCompetition && <>
       <div className="page-intro"><span className="eyebrow">LEAGUES & COMPETITIONS</span><h1>Global football</h1><p>Explore tables, form, and competition records.</p></div>
@@ -175,7 +181,7 @@ export default function LeagueHub({ selectedCompetitionId, onSelectCompetition, 
         <div className="league-detail-heading"><div><span className="eyebrow">{currentCompetition.country.toUpperCase()} · {currentCompetition.category.toUpperCase()}</span><h2>{currentCompetition.name}</h2><p>Matchday {currentCompetition.matchday} of {currentCompetition.totalMatchdays}</p></div><label className="league-season-select">SEASON<select aria-label="League season" onChange={(event) => setSeason(event.target.value)} value={season}><option>2026/27</option><option>2025/26</option><option>2024/25</option></select></label></div>
         <nav className="league-view-tabs" aria-label="League information sections">{leagueSections.map((item) => <button aria-current={section === item ? 'page' : undefined} className={section === item ? 'league-view-tab active' : 'league-view-tab'} key={item} onClick={() => setSection(item)} type="button">{item}</button>)}</nav>
 
-        {section === 'Standings' && currentTournament ? <TournamentStages tournament={currentTournament} stageId={tournamentStageId} onStageChange={setTournamentStageId} onSelectCountry={onSelectCountry} /> : section === 'Standings' && isDomesticCup && currentCompetition ? <KnockoutBracket title={currentCompetition.name} season={currentCompetition.season} roundNames={['Round of 16', 'Quarter-finals', 'Semi-finals', 'Final']} participants={globalLeagues.countries.find((country) => country.countryName === currentCompetition.country)?.teams.map((team) => ({ code: team.id, name: team.name, badge: team.badge })) ?? []} /> : section === 'Standings' && currentCompetition && <LeagueTable competition={currentCompetition} renderClub={(clubId) => {
+        {section === 'Standings' && currentTournament ? <TournamentStages tournament={currentTournament} stageId={tournamentStageId} onStageChange={setTournamentStageId} onSelectCountry={onSelectCountry} /> : section === 'Standings' && isDomesticCup && currentCompetition ? <KnockoutBracket title={currentCompetition.name} season={currentCompetition.season} roundNames={['Round of 16', 'Quarter-finals', 'Semi-finals', 'Final']} participants={globalLeagues.countries.find((country) => country.countryName === currentCompetition.country)?.teams.map((team) => ({ code: team.id, name: team.name, badge: team.badge })) ?? []} /> : section === 'Standings' && currentCompetition && <LeagueTable competition={currentCompetition} onSelectClub={selectedGlobalCountry ? onSelectClub : undefined} renderClub={(clubId) => {
           const team = selectedGlobalCountry?.teams.find((item) => item.id === clubId)
           return team ? <ClubBadge badge={team.badge} name={team.name} /> : null
         }} />}

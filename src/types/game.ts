@@ -124,6 +124,7 @@ export interface Player {
   fitness: number
   form: number
   morale: 'Very Good' | 'Good' | 'Okay' | 'Poor'
+  moodBadges?: string[]
   attributes: PlayerAttributes
   personalInfo: PlayerPersonalInfo
   contract: PlayerContract

@@ -42,6 +42,7 @@ function App() {
   const [selectedClubName, setSelectedClubName] = useState<string | null>(null)
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null)
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null)
+  const [selectedLeagueClubId, setSelectedLeagueClubId] = useState<string | null>(null)
   const [selectedCountryName, setSelectedCountryName] = useState<string | null>(null)
   const [countryReturnLabel, setCountryReturnLabel] = useState('previous view')
   const [screenSize, setScreenSize] = useState(SCREEN_SIZES[0])
@@ -49,8 +50,9 @@ function App() {
   const [clubReturnTab, setClubReturnTab] = useState<TabId>('Home')
   const position = league.standings.find((standing) => standing.clubId === club.id)
   const selectedMatch = matchFixtures.find((match) => match.id === selectedMatchId)
-  const detailOpen = selectedCountryName !== null || selectedPlayer !== null || selectedPersonnel !== null || selectedLeagueId !== null || activeTab === 'Club' || selectedMatch !== undefined
+  const detailOpen = selectedCountryName !== null || selectedPlayer !== null || selectedPersonnel !== null || selectedLeagueId !== null || selectedLeagueClubId !== null || activeTab === 'Club' || selectedMatch !== undefined
   const backLabel = selectedCountryName ? `Back to ${countryReturnLabel}` : selectedPlayer || selectedPersonnel ? (activeTab === 'Club' ? 'Back to club' : `Back to ${activeTab.toLowerCase()}`)
+    : selectedLeagueClubId ? 'Back to league table'
     : selectedLeagueId ? 'Back to leagues'
     : activeTab === 'Club' ? `Back to ${clubReturnTab.toLowerCase()}` : `Back to ${activeTab.toLowerCase()}`
   const selectPlayer = (player: Player) => {
@@ -89,6 +91,10 @@ function App() {
     }
     if (selectedPlayer) {
       setSelectedPlayer(null)
+      return
+    }
+    if (selectedLeagueClubId) {
+      setSelectedLeagueClubId(null)
       return
     }
     if (selectedLeagueId) {
@@ -133,7 +139,7 @@ function App() {
             {activeTab === 'Squad' && <SquadView selectedClubName={selectedClubName} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} />}
             {activeTab === 'Tactics' && <TacticsHub />}
             {activeTab === 'Transfers' && <TransferMarket onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />}
-            {activeTab === 'League' && <LeagueHub selectedCompetitionId={selectedLeagueId} onSelectCompetition={setSelectedLeagueId} onSelectCountry={openCountryOverview} />}
+            {activeTab === 'League' && <LeagueHub selectedCompetitionId={selectedLeagueId} onSelectCompetition={setSelectedLeagueId} onSelectCountry={openCountryOverview} selectedClubId={selectedLeagueClubId} onSelectClub={setSelectedLeagueClubId} onSelectPlayer={selectPlayer} />}
             {activeTab === 'Matches' && <MatchesList matches={matchFixtures} onSelectMatch={setSelectedMatchId} />}
           </>}
         </main>
@@ -142,7 +148,7 @@ function App() {
           {tabs.map((tab) => (
             <button aria-current={activeTab === tab.id ? 'page' : undefined} aria-label={tab.label}
               className={activeTab === tab.id ? 'nav-item active' : 'nav-item'} key={tab.id}
-              onClick={() => { if (tab.id === 'Club' && activeTab !== 'Club') setClubReturnTab(activeTab); if (tab.id !== 'Club') setSelectedMatchId(null); if (tab.id !== 'League') setSelectedLeagueId(null); setSelectedCountryName(null); setSelectedPlayer(null); setSelectedPersonnel(null); setActiveTab(tab.id) }} type="button">
+              onClick={() => { if (tab.id === 'Club' && activeTab !== 'Club') setClubReturnTab(activeTab); if (tab.id !== 'Club') setSelectedMatchId(null); if (tab.id !== 'League') { setSelectedLeagueId(null); setSelectedLeagueClubId(null) }; setSelectedCountryName(null); setSelectedPlayer(null); setSelectedPersonnel(null); setActiveTab(tab.id) }} type="button">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d={tab.icon} /></svg>
               <span>{tab.label}</span>
             </button>
