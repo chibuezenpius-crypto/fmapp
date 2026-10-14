@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Player } from './types/game'
 import { club } from './data/mockData'
 
-const sections = ['Overview', 'Player Roles', 'Set Pieces', 'Captains & Leadership', 'Formations & Style'] as const
+const sections = ['Overview', 'Player Roles', 'Set Pieces', 'Captains & Leadership', 'Tactics Styles', 'Tactics Setup'] as const
 type TacticsSection = (typeof sections)[number]
 type TacticSlot = { label: string; position: string; x: number; y: number; role: string }
 type AssignmentKey = 'leftCorner' | 'rightCorner' | 'shortFreeKick' | 'longFreeKick' | 'penaltyOne' | 'penaltyTwo' | 'penaltyThree'
@@ -87,6 +87,75 @@ const leadershipLabels: { key: LeadershipKey; label: string }[] = [
   { key: 'viceThree', label: 'Vice-Captain · 4th choice' },
 ]
 
+const tacticalPatterns: Record<string, { points: string; kind: string }[]> = {
+  Gegenpress: [
+    { points: '25,35 25,22', kind: 'press' }, { points: '50,33 50,18', kind: 'press' }, { points: '75,35 75,22', kind: 'press' },
+    { points: '32,58 32,46', kind: 'press' }, { points: '68,58 68,46', kind: 'press' },
+  ],
+  'Tiki-Taka': [
+    { points: '50,24 34,40 52,50 67,38 50,24', kind: 'pass' }, { points: '34,40 24,59 47,65 52,50', kind: 'pass' },
+    { points: '52,50 73,58 67,38', kind: 'pass' }, { points: '47,65 50,78 73,58', kind: 'pass' },
+  ],
+  'Counter-Attack': [
+    { points: '30,77 29,55 39,40 50,23', kind: 'counter' }, { points: '70,77 71,56 62,40 50,23', kind: 'counter' },
+    { points: '50,64 50,45 50,24', kind: 'counter' },
+  ],
+  'Direct Passing': [
+    { points: '50,77 28,49 22,30', kind: 'direct' }, { points: '50,77 71,47 78,29', kind: 'direct' },
+    { points: '50,62 51,39 50,22', kind: 'direct' },
+  ],
+  'Park the Bus': [
+    { points: '25,36 25,48', kind: 'block' }, { points: '38,33 38,48', kind: 'block' }, { points: '50,32 50,48', kind: 'block' },
+    { points: '62,33 62,48', kind: 'block' }, { points: '75,36 75,48', kind: 'block' }, { points: '50,62 50,53', kind: 'block' },
+  ],
+}
+
+interface TacticalStyleGuidance {
+  advantages: string[]
+  disadvantages: string[]
+  score: (player: Player) => number
+  excelReason: (player: Player) => string
+  struggleReason: (player: Player) => string
+}
+
+const styleGuidance: Record<string, TacticalStyleGuidance> = {
+  Gegenpress: {
+    advantages: ['Wins possession close to goal', 'Creates pressure through coordinated movement'],
+    disadvantages: ['High physical load across the squad', 'Space can open behind the defensive line'],
+    score: (player) => (player.attributes.stamina + player.attributes.workRate + player.attributes.determination) / 3,
+    excelReason: (player) => `Stamina ${player.attributes.stamina} and Work Rate ${player.attributes.workRate} sustain repeated pressing`,
+    struggleReason: (player) => `Stamina ${player.attributes.stamina} and Work Rate ${player.attributes.workRate} may fade under a high press`,
+  },
+  'Tiki-Taka': {
+    advantages: ['Keeps the ball and controls tempo', 'Short combinations create passing lanes'],
+    disadvantages: ['Needs secure first touch and passing', 'Can struggle against a compact low block'],
+    score: (player) => (player.attributes.passing + player.attributes.firstTouch + player.attributes.technique + player.attributes.vision) / 4,
+    excelReason: (player) => `Passing ${player.attributes.passing} and Technique ${player.attributes.technique} suit quick combinations`,
+    struggleReason: (player) => `First Touch ${player.attributes.firstTouch} and Passing ${player.attributes.passing} may invite turnovers`,
+  },
+  'Counter-Attack': {
+    advantages: ['Turns transitions into fast attacks', 'Uses space behind an advanced defence'],
+    disadvantages: ['Can concede possession for long spells', 'Requires pace and timing on the break'],
+    score: (player) => (player.attributes.pace + player.attributes.acceleration + player.attributes.offTheBall) / 3,
+    excelReason: (player) => `Pace ${player.attributes.pace} and Off the Ball ${player.attributes.offTheBall} threaten space behind`,
+    struggleReason: (player) => `Pace ${player.attributes.pace} and Acceleration ${player.attributes.acceleration} limit transition threat`,
+  },
+  'Direct Passing': {
+    advantages: ['Moves the ball forward quickly', 'Makes strong use of aerial targets'],
+    disadvantages: ['Can give away possession under pressure', 'Midfield support must arrive quickly'],
+    score: (player) => (player.attributes.passing + player.attributes.strength + player.attributes.heading) / 3,
+    excelReason: (player) => `Strength ${player.attributes.strength} and Heading ${player.attributes.heading} help win direct balls`,
+    struggleReason: (player) => `Strength ${player.attributes.strength} and Heading ${player.attributes.heading} make aerial duels difficult`,
+  },
+  'Park the Bus': {
+    advantages: ['Protects central space with a compact block', 'Makes the box difficult to attack'],
+    disadvantages: ['Invites sustained pressure near your area', 'Can leave the attack isolated after regaining possession'],
+    score: (player) => (player.attributes.positioning + player.attributes.marking + player.attributes.determination + player.attributes.teamwork) / 4,
+    excelReason: (player) => `Positioning ${player.attributes.positioning} and Marking ${player.attributes.marking} hold the defensive shape`,
+    struggleReason: (player) => `Positioning ${player.attributes.positioning} and Marking ${player.attributes.marking} can leave gaps in a deep block`,
+  },
+}
+
 const initialLineup = ['p-01', 'p-02', 'p-04', 'p-05', 'p-03', 'p-06', 'p-08', 'p-10', 'p-07', 'p-09', 'p-11']
 const influenceFor = (player: Player) => player.attributes.leadership >= 17 ? 'Very High' : player.attributes.leadership >= 14 ? 'High' : 'Influential'
 interface SavedTacticsState {
@@ -95,6 +164,13 @@ interface SavedTacticsState {
   roles?: Record<number, string>
   mentality?: string
   tacticalDNA?: string
+  matchTempo?: string
+  aggressionLevel?: string
+  pitchWidth?: string
+  attackFocus?: string
+  defensiveLine?: string
+  pressingIntensity?: string
+  creativeFreedom?: string
   setPieceTakers?: Partial<Record<AssignmentKey, string>>
   leadership?: Partial<Record<LeadershipKey, string>>
 }
@@ -128,6 +204,24 @@ function positionFit(playerPosition: string, slotPosition: string) {
   return 0
 }
 
+function positionFamiliarity(playerPosition: string, slotPosition: string) {
+  if (playerPosition === slotPosition) return 100
+  const playerGroup = roleGroup(playerPosition)
+  const slotGroup = roleGroup(slotPosition)
+  if (playerGroup === 'GK' || slotGroup === 'GK') return 10
+  if (playerGroup === slotGroup && playerGroup === 'DEF') return 82
+  if (playerGroup === slotGroup && playerGroup === 'MID') return 78
+  if (playerGroup === slotGroup && playerGroup === 'FWD') return 76
+  if (playerGroup === 'DEF' && slotGroup === 'FWD') return 40
+  if (playerGroup === 'FWD' && slotGroup === 'DEF') return 35
+  if (playerGroup === 'DEF' || slotGroup === 'DEF') return 58
+  return 62
+}
+
+function familiarityTone(familiarity: number) {
+  return familiarity < 50 ? 'poor' : familiarity < 75 ? 'warning' : 'good'
+}
+
 function fitPlayersToSlots(slots: TacticSlot[], availablePlayers: Player[], preferredIds: Set<string> = new Set()) {
   const remaining = [...availablePlayers]
   return slots.map((slot) => {
@@ -147,12 +241,16 @@ function PlayerSelect({ label, players, value, onChange }: { label: string; play
   return <label className="tactics-assignment"><span>{label}</span><select aria-label={label} onChange={(event) => onChange(event.target.value)} value={value}><option value="">Unassigned</option>{players.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label>
 }
 
-function TacticalPitch({ formation, slots, players, selectedSlot, onSelectSlot, preview = false }: { formation: string; slots: TacticSlot[]; players: (Player | null)[]; selectedSlot: number | null; onSelectSlot: (index: number) => void; preview?: boolean }) {
+function TacticalPitch({ formation, slots, players, selectedSlot, onSelectSlot, preview = false, tacticalDNA = 'Gegenpress' }: { formation: string; slots: TacticSlot[]; players: (Player | null)[]; selectedSlot: number | null; onSelectSlot: (index: number) => void; preview?: boolean; tacticalDNA?: string }) {
+  const arrows = tacticalPatterns[tacticalDNA] ?? tacticalPatterns.Gegenpress
   return <div className={`pitch tactics-pitch ${preview ? 'tactics-pitch-preview' : ''}`} aria-label={`${formation} tactical pitch`}><span className="pitch-line halfway" /><span className="pitch-circle" />{slots.map((slot, index) => {
     const player = players[index]
+    const familiarity = player ? positionFamiliarity(player.position, slot.position) : 0
+    const penalty = 100 - familiarity
     const classes = `pitch-player tactics-player-slot ${player ? '' : 'empty'} ${selectedSlot === index ? 'selected' : ''}`
-    return <button aria-label={player ? `${player.name}, ${slot.label}, ${slot.role}` : `Empty ${slot.label} position`} aria-pressed={selectedSlot === index} className={classes} key={`${formation}-${slot.label}-${index}`} onClick={() => player && onSelectSlot(index)} style={{ left: `${slot.x}%`, top: `${slot.y}%` }} type="button">{player ? <><b>{String(player.shirtNumber).padStart(2, '0')}</b><span>{player.name.split(' ')[0]}</span><small>{slot.label}</small></> : <><b>+</b><span>{slot.label}</span></>}</button>
-  })}</div>
+    if (preview) return <div aria-hidden="true" className={`${classes} tactics-preview-dot`} key={`${formation}-${slot.label}-${index}`} style={{ left: `${slot.x}%`, top: `${slot.y}%` }}><b>{String(index + 1).padStart(2, '0')}</b><span>{slot.label}</span></div>
+    return <button aria-label={player ? `${player.position} at ${slot.label}: ${familiarity}% Familiarity${penalty ? ` (-${penalty}% Penalty)` : ''}` : `Empty ${slot.label} position`} aria-pressed={selectedSlot === index} className={classes} key={`${formation}-${slot.label}-${index}`} onClick={() => player && onSelectSlot(index)} style={{ left: `${slot.x}%`, top: `${slot.y}%` }} type="button">{player ? <><b>{String(player.shirtNumber).padStart(2, '0')}</b><span>{player.name.split(' ')[0]}</span><small>{slot.label}</small><em className={`position-familiarity ${familiarityTone(familiarity)}`}>{familiarity}%<small>FAM{penalty ? ` · -${penalty}%` : ''}</small></em></> : <><b>+</b><span>{slot.label}</span></>}</button>
+  })}{preview && <svg aria-hidden="true" className={`tactical-arrow-overlay ${tacticalDNA.toLowerCase().replace(/[^a-z]+/g, '-')}`} preserveAspectRatio="none" viewBox="0 0 100 100"><defs><marker id="tactical-arrowhead" markerHeight="5" markerWidth="5" orient="auto" refX="4" refY="2.5"><path d="M0 0 5 2.5 0 5z" /></marker></defs>{arrows.map((arrow, index) => <polyline className={`movement-line ${arrow.kind}`} key={`${tacticalDNA}-${index}`} markerEnd="url(#tactical-arrowhead)" points={arrow.points} />)}</svg>}</div>
 }
 
 export default function TacticsHub() {
@@ -162,8 +260,14 @@ export default function TacticsHub() {
   const [lineup, setLineup] = useState<string[]>(() => savedTactics?.lineup?.filter((id) => club.squad.some((player) => player.id === id)) ?? initialLineup)
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null)
   const [swapMessage, setSwapMessage] = useState('Select a starter, then choose a bench player to swap.')
-  const [mentality, setMentality] = useState(() => ['Attacking', 'Balanced', 'Defensive'].includes(savedTactics?.mentality ?? '') ? savedTactics!.mentality! : 'Balanced')
-  const [tacticalDNA, setTacticalDNA] = useState(() => ['Gegenpress', 'Tiki-Taka', 'Counter-Attack', 'Direct Passing'].includes(savedTactics?.tacticalDNA ?? '') ? savedTactics!.tacticalDNA! : 'Gegenpress')
+  const [tacticalDNA, setTacticalDNA] = useState(() => Object.keys(styleGuidance).includes(savedTactics?.tacticalDNA ?? '') ? savedTactics!.tacticalDNA! : 'Gegenpress')
+  const [matchTempo, setMatchTempo] = useState(savedTactics?.matchTempo ?? 'Balanced')
+  const [aggressionLevel, setAggressionLevel] = useState(savedTactics?.aggressionLevel ?? 'Normal')
+  const [pitchWidth, setPitchWidth] = useState(savedTactics?.pitchWidth ?? 'Balanced')
+  const [attackFocus, setAttackFocus] = useState(savedTactics?.attackFocus ?? 'Both Wings')
+  const [defensiveLine, setDefensiveLine] = useState(savedTactics?.defensiveLine ?? 'Mid Block')
+  const [pressingIntensity, setPressingIntensity] = useState(savedTactics?.pressingIntensity ?? 'Standard')
+  const [creativeFreedom, setCreativeFreedom] = useState(savedTactics?.creativeFreedom ?? 'Disciplined')
   const [roles, setRoles] = useState<Record<number, string>>(() => ({ ...Object.fromEntries(formations[savedTactics?.formation && formations[savedTactics.formation] ? savedTactics.formation : '4-3-3'].map((slot, index) => [index, slot.role])), ...savedTactics?.roles }))
   const [setPieceTakers, setSetPieceTakers] = useState<Record<AssignmentKey, string>>({
     ...{
@@ -175,14 +279,32 @@ export default function TacticsHub() {
   const slots = formations[formation]
   const startingPlayers = lineup.map((id) => club.squad.find((player) => player.id === id) ?? null)
   const reserves = club.squad.filter((player) => !lineup.includes(player.id))
+  const guidance = styleGuidance[tacticalDNA] ?? styleGuidance.Gegenpress
+  const compatibility = lineup.length ? Math.round(startingPlayers.reduce((total, player) => total + (player ? guidance.score(player) * 5 : 0), 0) / lineup.length) : 0
+  const formationRatings = Object.keys(formations).map((formationName) => {
+    const pickedIds = fitPlayersToSlots(formations[formationName], club.squad)
+    const familiarityTotal = formations[formationName].reduce((total, slot, index) => {
+      const player = club.squad.find((candidate) => candidate.id === pickedIds[index])
+      return total + (player ? positionFamiliarity(player.position, slot.position) : 0)
+    }, 0)
+    return { name: formationName, rating: Math.round(familiarityTotal / formations[formationName].length) }
+  })
+  const recommendedFormation = [...formationRatings].sort((first, second) => second.rating - first.rating)[0]
+  const recommendedStyle = Object.keys(styleGuidance).map((style) => ({
+    style,
+    score: club.squad.reduce((sum, player) => sum + styleGuidance[style].score(player), 0) / club.squad.length,
+  })).sort((first, second) => second.score - first.score)[0].style
+  const suitability = [...club.squad].sort((first, second) => guidance.score(second) - guidance.score(first))
+  const excellingPlayers = suitability.slice(0, 3).map((player) => ({ player, reason: guidance.excelReason(player) }))
+  const strugglingPlayers = suitability.slice(-2).reverse().map((player) => ({ player, reason: guidance.struggleReason(player) }))
 
   useEffect(() => {
     try {
-      window.localStorage.setItem('fmapp-tactics', JSON.stringify({ formation, lineup, roles, mentality, tacticalDNA, setPieceTakers, leadership }))
+      window.localStorage.setItem('fmapp-tactics', JSON.stringify({ formation, lineup, roles, tacticalDNA, matchTempo, aggressionLevel, pitchWidth, attackFocus, defensiveLine, pressingIntensity, creativeFreedom, setPieceTakers, leadership }))
     } catch {
       return
     }
-  }, [formation, lineup, roles, mentality, tacticalDNA, setPieceTakers, leadership])
+  }, [formation, lineup, roles, tacticalDNA, matchTempo, aggressionLevel, pitchWidth, attackFocus, defensiveLine, pressingIntensity, creativeFreedom, setPieceTakers, leadership])
 
   const autoPick = () => {
     setLineup(fitPlayersToSlots(slots, club.squad))
@@ -218,6 +340,30 @@ export default function TacticsHub() {
     setSwapMessage(`${reserve.name} replaces ${outgoingPlayer?.name ?? 'the selected player'}.`)
   }
 
+  const selectStartingSlot = (targetSlot: number) => {
+    if (selectedSlot === null) {
+      setSelectedSlot(targetSlot)
+      const player = startingPlayers[targetSlot]
+      setSwapMessage(player ? `${player.name} selected. Choose another starter to swap positions.` : 'Select a starter, then choose a bench player to swap.')
+      return
+    }
+    if (selectedSlot === targetSlot) {
+      setSelectedSlot(null)
+      setSwapMessage('Starter selection cleared.')
+      return
+    }
+    const firstPlayerId = lineup[selectedSlot]
+    const secondPlayerId = lineup[targetSlot]
+    const nextLineup = [...lineup]
+    nextLineup[selectedSlot] = secondPlayerId
+    nextLineup[targetSlot] = firstPlayerId
+    setLineup(nextLineup)
+    setSelectedSlot(null)
+    const firstName = club.squad.find((player) => player.id === firstPlayerId)?.name ?? 'Starter'
+    const secondName = club.squad.find((player) => player.id === secondPlayerId)?.name ?? 'Starter'
+    setSwapMessage(`${firstName} and ${secondName} swapped positions.`)
+  }
+
   const setRole = (slotIndex: number, value: string) => setRoles((current) => ({ ...current, [slotIndex]: value }))
   const setTaker = (key: AssignmentKey, playerId: string) => setSetPieceTakers((current) => ({ ...current, [key]: playerId }))
   const setLeader = (key: LeadershipKey, playerId: string) => setLeadership((current) => ({ ...current, [key]: playerId }))
@@ -228,7 +374,7 @@ export default function TacticsHub() {
 
     {section === 'Overview' && <div className="tactics-section-content">
       <div className="tactics-toolbar"><div><span className="eyebrow">STARTING XI</span><strong>{formation}</strong></div><div className="tactics-actions"><button className="tactics-action primary" onClick={autoPick} type="button">Auto Pick</button><button className="tactics-action" onClick={clearPitch} type="button">Clear Pitch</button></div></div>
-      <TacticalPitch formation={formation} slots={slots} players={startingPlayers} selectedSlot={selectedSlot} onSelectSlot={(index) => setSelectedSlot(selectedSlot === index ? null : index)} />
+      <TacticalPitch formation={formation} slots={slots} players={startingPlayers} selectedSlot={selectedSlot} onSelectSlot={selectStartingSlot} />
       <div className="bench-panel"><div className="bench-heading"><div><span className="eyebrow">SQUAD ROTATION</span><h2>Bench & Reserves</h2></div><span>{reserves.length} AVAILABLE</span></div><p className="swap-guidance">{swapMessage}</p><div className="tactics-reserves">{reserves.map((player) => <button aria-label={`Swap in ${player.name}`} aria-pressed={false} className="reserve-player-card" key={player.id} onClick={() => swapReserve(player)} type="button"><span>{String(player.shirtNumber).padStart(2, '0')}</span><div><strong>{player.name}</strong><small>{player.position} · FIT {player.fitness}%</small></div><b>{player.overall}</b></button>)}</div></div>
     </div>}
 
@@ -244,6 +390,16 @@ export default function TacticsHub() {
 
     {section === 'Captains & Leadership' && <div className="tactics-section-content"><div className="tactics-subhead"><span className="eyebrow">DRESSING ROOM</span><h2>Leadership group</h2><p>Set the matchday captain and three deputies.</p></div><section className="tactics-assignments-panel">{leadershipLabels.map(({ key, label }) => <PlayerSelect key={key} label={label} players={club.squad} value={leadership[key]} onChange={(value) => setLeader(key, value)} />)}</section><section className="leadership-influence-panel"><div className="bench-heading"><div><span className="eyebrow">SQUAD LEADERS</span><h2>Leadership influence</h2></div></div>{club.squad.filter((player) => player.attributes.leadership >= 14).sort((first, second) => second.attributes.leadership - first.attributes.leadership).map((player) => <article className="leadership-player-row" key={player.id}><div><strong>{player.name}</strong><small>Leadership {player.attributes.leadership} · {player.shirtNumber === 4 ? 'Organizes the back line' : player.shirtNumber === 8 ? 'Sets training standards' : 'Supports squad morale'}</small></div><span className={`influence-badge ${influenceFor(player).toLowerCase().replace(' ', '-')}`}>{influenceFor(player)}</span></article>)}</section></div>}
 
-    {section === 'Formations & Style' && <div className="tactics-section-content"><div className="tactics-subhead"><span className="eyebrow">TEAM IDENTITY</span><h2>Formations & style</h2><p>Change the formation and tactical approach.</p></div><section className="formation-library"><span className="eyebrow">FORMATION LIBRARY</span><div className="formation-options">{Object.keys(formations).map((item) => <button aria-pressed={formation === item} className={formation === item ? 'formation-option active' : 'formation-option'} key={item} onClick={() => changeFormation(item)} type="button">{item}</button>)}</div></section><section className="mentality-panel"><span className="eyebrow">TACTICAL MENTALITY</span><div className="mentality-options">{['Attacking', 'Balanced', 'Defensive'].map((item) => <button aria-pressed={mentality === item} className={mentality === item ? 'mentality-option active' : 'mentality-option'} key={item} onClick={() => setMentality(item)} type="button">{item}</button>)}</div></section><section className="mentality-panel"><span className="eyebrow">TACTICAL DNA</span><div className="style-options">{['Gegenpress', 'Tiki-Taka', 'Counter-Attack', 'Direct Passing'].map((item) => <button aria-pressed={tacticalDNA === item} className={tacticalDNA === item ? 'style-option active' : 'style-option'} key={item} onClick={() => setTacticalDNA(item)} type="button">{item}</button>)}</div></section><TacticalPitch formation={formation} slots={slots} players={startingPlayers} selectedSlot={selectedSlot} onSelectSlot={(index) => setSelectedSlot(selectedSlot === index ? null : index)} preview /></div>}
+    {section === 'Tactics Styles' && <div className="tactics-section-content"><div className="tactics-subhead"><span className="eyebrow">PRESET TACTICAL DNA</span><h2>Tactics styles</h2><p>Choose a preset to see how it fits your squad.</p></div><div className="preset-style-grid">{Object.keys(styleGuidance).map((style) => <button aria-pressed={tacticalDNA === style} className={tacticalDNA === style ? 'preset-style-option active' : 'preset-style-option'} key={style} onClick={() => setTacticalDNA(style)} type="button"><span>{style}</span>{style === recommendedStyle && <b aria-label="Assistant Manager recommended" title="Assistant Manager recommended">★</b>}</button>)}</div><TacticalPitch formation={formation} slots={slots} players={startingPlayers} selectedSlot={null} onSelectSlot={() => undefined} preview tacticalDNA={tacticalDNA} /><AssistantAdvice compatibility={compatibility} recommendedFormation={recommendedFormation} recommendedStyle={recommendedStyle} tacticalDNA={tacticalDNA} advantages={guidance.advantages} disadvantages={guidance.disadvantages} excellingPlayers={excellingPlayers} strugglingPlayers={strugglingPlayers} /></div>}
+
+    {section === 'Tactics Setup' && <div className="tactics-section-content"><div className="tactics-subhead"><span className="eyebrow">MANUAL CONTROLS</span><h2>Tactics setup</h2><p>Fine-tune your match approach without applying a preset.</p></div><section className="formation-library"><span className="eyebrow">FORMATION</span><div className="formation-options">{Object.keys(formations).map((item) => <button aria-pressed={formation === item} className={formation === item ? 'formation-option active' : 'formation-option'} key={item} onClick={() => changeFormation(item)} type="button">{item}</button>)}</div></section><ManualChoice title="Match Tempo" options={['Slow', 'Balanced', 'Fast', 'Extreme']} value={matchTempo} onChange={setMatchTempo} /><ManualChoice title="Aggression Level" options={['Cautious', 'Normal', 'Hard']} value={aggressionLevel} onChange={setAggressionLevel} /><ManualChoice title="Pitch Width" options={['Narrow', 'Balanced', 'Wide']} value={pitchWidth} onChange={setPitchWidth} /><ManualChoice title="Attack Focus" options={['Left Wing', 'Right Wing', 'Both Wings', 'Center']} value={attackFocus} onChange={setAttackFocus} /><ManualChoice title="Defensive Line" options={['Deep Block', 'Mid Block', 'High Line']} value={defensiveLine} onChange={setDefensiveLine} /><ManualChoice title="Pressing Intensity" options={['Low', 'Standard', 'High']} value={pressingIntensity} onChange={setPressingIntensity} /><ManualChoice title="Creative Freedom" options={['Disciplined', 'Expressive']} value={creativeFreedom} onChange={setCreativeFreedom} /></div>}
   </div>
+}
+
+function ManualChoice({ title, options, value, onChange }: { title: string; options: string[]; value: string; onChange: (value: string) => void }) {
+  return <section className="mentality-panel manual-tactics-choice"><span className="eyebrow">{title.toUpperCase()}</span><div className="style-options">{options.map((item) => <button aria-pressed={value === item} className={value === item ? 'style-option active' : 'style-option'} key={item} onClick={() => onChange(item)} type="button">{item}</button>)}</div></section>
+}
+
+function AssistantAdvice({ compatibility, recommendedFormation, recommendedStyle, tacticalDNA, advantages, disadvantages, excellingPlayers, strugglingPlayers }: { compatibility: number; recommendedFormation: { name: string; rating: number }; recommendedStyle: string; tacticalDNA: string; advantages: string[]; disadvantages: string[]; excellingPlayers: { player: Player; reason: string }[]; strugglingPlayers: { player: Player; reason: string }[] }) {
+  return <section className="assistant-advice-card"><div className="assistant-advice-header"><div><span className="eyebrow">ASSISTANT MANAGER</span><h2>Tactical advice</h2></div><span className="advice-compatibility">{compatibility}% FIT</span></div><p className="advice-recommendation"><strong>{recommendedFormation.name} suits your squad best</strong><span>{recommendedFormation.rating}% compatibility</span></p><div className="advice-style-label">CURRENT STYLE · {tacticalDNA.toUpperCase()}</div><div className="advice-pros-cons"><div><strong>Advantages</strong>{advantages.map((advantage) => <span key={advantage}>{advantage}</span>)}</div><div><strong>Disadvantages</strong>{disadvantages.map((disadvantage) => <span key={disadvantage}>{disadvantage}</span>)}</div></div><div className="advice-suitability"><section><strong>Players who will excel</strong>{excellingPlayers.map(({ player, reason }) => <span className="advice-player" key={player.id}><b>{player.name}</b><i>{reason}</i></span>)}</section><section><strong>Players who might struggle</strong>{strugglingPlayers.map(({ player, reason }) => <span className="advice-player" key={player.id}><b>{player.name}</b><i>{reason}</i></span>)}</section></div><div className="assistant-recommended-style"><span>RECOMMENDED PRESET</span><strong>★ {recommendedStyle}</strong></div></section>
 }
