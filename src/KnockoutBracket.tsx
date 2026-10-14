@@ -1,9 +1,7 @@
-import rawGlobalLeagues from './data/globalLeaguesAndTeams.json'
+import { findWorldCountry } from './worldCountries'
 import Flag from './Flag'
-import type { GlobalLeaguesDatabase, InternationalTournament, ProceduralClubBadge } from './types/game'
+import type { InternationalTournament, ProceduralClubBadge } from './types/game'
 import ClubBadge from './ClubBadge'
-
-const globalLeagues = rawGlobalLeagues as unknown as GlobalLeaguesDatabase
 
 interface BracketTeam {
   code: string
@@ -26,6 +24,7 @@ interface BracketMatch {
   homeScore: number
   awayScore: number
   status: string
+  date: string
   winner: BracketTeam
 }
 
@@ -35,12 +34,20 @@ interface BracketRound {
 }
 
 function tournamentCountry(code: string): BracketTeam {
-  const country = globalLeagues.countries.find((entry) => entry.countryCode === code)
-  return { code: country?.flagCode ?? code, name: country?.countryName ?? code }
+  const country = findWorldCountry(code)
+  return { code: country?.flagCode ?? code, name: country?.name ?? code }
 }
 
 function scoreSeed(value: string) {
   return [...value].reduce((sum, character) => sum + character.charCodeAt(0), 0)
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function matchDate(roundIndex: number, matchIndex: number) {
+  const date = new Date(Date.UTC(2026, 5, 28 + roundIndex * 4 + (matchIndex % 3)))
+  return `${MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}, ${WEEKDAYS[date.getUTCDay()]}`
 }
 
 function simulateRound(teams: BracketTeam[], name: string, roundIndex: number): BracketRound {
@@ -58,7 +65,8 @@ function simulateRound(teams: BracketTeam[], name: string, roundIndex: number): 
       away,
       homeScore: resolvedHomeScore,
       awayScore: resolvedAwayScore,
-      status: 'SIM',
+      status: 'FT',
+      date: matchDate(roundIndex, index / 2),
       winner: resolvedHomeScore >= resolvedAwayScore ? home : away,
     })
   }
@@ -67,13 +75,22 @@ function simulateRound(teams: BracketTeam[], name: string, roundIndex: number): 
 
 function qualifiedCountries(tournament: InternationalTournament, bracketSize: number) {
   const groups = tournament.stages.find((stage) => stage.format === 'groups')?.groups ?? []
-  const perGroup = groups.length ? Math.ceil(bracketSize / groups.length) : 1
-  const qualified = groups.flatMap((group) => group.countryCodes.slice(0, perGroup))
-  for (const code of tournament.eligibleCountryCodes) {
+  const qualified: string[] = []
+  const deepest = Math.max(0, ...groups.map((group) => group.countryCodes.length))
+  // Take every group's winner first, then runners-up, and so on until the bracket is full
+  for (let rank = 0; rank < deepest && qualified.length < bracketSize; rank += 1) {
+    for (const group of groups) {
+      const code = group.countryCodes[rank]
+      if (code && qualified.length < bracketSize) qualified.push(code)
+    }
+  }
+  for (const code of tournament.qualifiedCountryCodes ?? tournament.eligibleCountryCodes) {
     if (qualified.length >= bracketSize) break
     if (!qualified.includes(code)) qualified.push(code)
   }
-  return qualified.slice(0, bracketSize).map(tournamentCountry)
+  // Pair the strongest qualifiers with the weakest so winners don't meet early
+  const paired = Array.from({ length: Math.floor(qualified.length / 2) }, (_, index) => [qualified[index], qualified[qualified.length - 1 - index]]).flat()
+  return paired.map(tournamentCountry)
 }
 
 function buildBranch(teams: BracketTeam[], roundNames: string[]) {
@@ -87,16 +104,57 @@ function buildBranch(teams: BracketTeam[], roundNames: string[]) {
   return { rounds, finalist: advancing[0] }
 }
 
-function FlagTeam({ team, onSelectCountry }: { team: BracketTeam; onSelectCountry?: (country: string) => void }) {
-  return <span className="bracket-team">{team.badge ? <ClubBadge badge={team.badge} name={team.name} /> : <Flag code={team.code} countryName={team.name} onSelectCountry={() => onSelectCountry?.(team.name)} />}<strong>{team.name}</strong></span>
+function TeamRow({ team, score, won, onSelectCountry }: { team: BracketTeam; score: number; won: boolean; onSelectCountry?: (country: string) => void }) {
+  return <div className={`flex items-center gap-2 ${won ? 'font-bold' : 'text-slate-500'}`}>
+    {team.badge ? <ClubBadge badge={team.badge} name={team.name} /> : <Flag code={team.code} countryName={team.name} onSelectCountry={(name) => onSelectCountry?.(name)} />}
+    <span className="min-w-0 flex-1 truncate text-xs">{team.name}</span>
+    <b className="text-sm tabular-nums">{score}</b>
+  </div>
 }
 
 function BracketMatchCard({ match, onSelectCountry }: { match: BracketMatch; onSelectCountry?: (country: string) => void }) {
-  return <article className="bracket-match-card"><div className={match.winner.code === match.home.code ? 'bracket-match-team winner' : 'bracket-match-team'}><FlagTeam team={match.home} onSelectCountry={onSelectCountry} /><b>{match.homeScore}</b></div><div className={match.winner.code === match.away.code ? 'bracket-match-team winner' : 'bracket-match-team'}><FlagTeam team={match.away} onSelectCountry={onSelectCountry} /><b>{match.awayScore}</b></div><span className="bracket-match-status">{match.status}</span></article>
+  return <article className="w-40 shrink-0 rounded-2xl border border-[#e2e6d9] bg-white p-3 text-slate-800 shadow-sm">
+    <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-slate-400"><span>{match.date}</span><span>{match.status}</span></div>
+    <div className="space-y-1.5">
+      <TeamRow team={match.home} score={match.homeScore} won={match.winner.code === match.home.code} onSelectCountry={onSelectCountry} />
+      <TeamRow team={match.away} score={match.awayScore} won={match.winner.code === match.away.code} onSelectCountry={onSelectCountry} />
+    </div>
+  </article>
+}
+
+function Trophy() {
+  return <svg aria-hidden="true" className="h-20 w-20 drop-shadow-[0_2px_6px_rgba(202,138,4,0.35)]" viewBox="0 0 64 64">
+    <path d="M18 8h28v14c0 10-6 17-14 17S18 32 18 22V8Z" fill="#facc15" />
+    <path d="M18 12H8v5c0 7 4 11 11 12M46 12h10v5c0 7-4 11-11 12" fill="none" stroke="#eab308" strokeLinecap="round" strokeWidth="3" />
+    <path d="M29 39h6v8h-6z" fill="#eab308" />
+    <path d="M20 47h24v8H20z" fill="#ca8a04" />
+    <path d="M24 12v10c0 5 2 9 5 11" fill="none" stroke="#fef08a" strokeLinecap="round" strokeWidth="2.5" />
+  </svg>
 }
 
 function Branch({ side, rounds, onSelectCountry }: { side: 'left' | 'right'; rounds: BracketRound[]; onSelectCountry?: (country: string) => void }) {
-  return <div className={`bracket-branch ${side}`}>{rounds.map((round) => <section className="bracket-branch-round" key={`${side}-${round.name}`}><h3>{round.name}</h3>{round.matches.map((match, index) => <BracketMatchCard key={`${side}-${round.name}-${index}`} match={match} onSelectCountry={onSelectCountry} />)}</section>)}</div>
+  const left = side === 'left'
+  const ordered = left ? rounds : [...rounds].reverse()
+  const line = 'border-[#c9d1bf]'
+  return <div className="flex">
+    {ordered.map((round) => {
+      const roundIndex = rounds.indexOf(round)
+      const hasPrev = roundIndex > 0
+      const paired = round.matches.length > 1
+      const prevEdge = left ? 'left-0 border-t' : 'right-0 border-t'
+      return <section className="flex flex-col" key={`${side}-${round.name}`}>
+        <h3 className="mb-2 px-4 text-center text-[10px] font-bold uppercase tracking-wider text-[#334633]">{round.name}</h3>
+        <div className="flex flex-1 flex-col">
+          {round.matches.map((match, index) => <div className="relative flex flex-1 items-center justify-center px-4 py-1.5" key={`${side}-${round.name}-${index}`}>
+            {hasPrev && <span className={`absolute top-1/2 w-4 ${prevEdge} ${line}`} />}
+            <BracketMatchCard match={match} onSelectCountry={onSelectCountry} />
+            <span className={`absolute top-1/2 w-4 border-t ${line} ${left ? 'right-0' : 'left-0'} ${paired && index % 2 === 0 ? `h-full ${left ? 'border-r' : 'border-l'}` : ''}`} />
+            {paired && index % 2 === 1 && <span className={`absolute bottom-1/2 h-1/2 w-4 ${left ? 'right-0 border-r' : 'left-0 border-l'} ${line}`} />}
+          </div>)}
+        </div>
+      </section>
+    })}
+  </div>
 }
 
 export default function KnockoutBracket({ tournament, participants = [], roundNames: configuredRounds, title, season, onSelectCountry }: KnockoutBracketProps) {
@@ -109,12 +167,26 @@ export default function KnockoutBracket({ tournament, participants = [], roundNa
   const right = buildBranch(entrants.slice(leftCount), roundNames.slice(0, -1))
   const finalHome = left.finalist ?? entrants[0]
   const finalAway = right.finalist ?? entrants[1] ?? entrants[0]
-  const finalScore = simulateRound([finalHome, finalAway], 'Final', roundNames.length).matches[0]
   const thirdPlace = knockoutStage?.rounds?.find((round) => round.toLowerCase().includes('third-place'))
 
-  return <div className="knockout-bracket-tree">
-    <Branch side="left" rounds={left.rounds} onSelectCountry={onSelectCountry} />
-    <section className="bracket-center-final"><span className="eyebrow">FINAL</span><svg className="bracket-trophy" aria-hidden="true" viewBox="0 0 48 48"><path d="M15 7h18v8c0 8-4 13-9 13s-9-5-9-13V7Zm0 3H8v3c0 6 3 9 8 9m17-12h7v3c0 6-3 9-8 9M24 28v8m-8 5h16m-13-5h10v5H19z" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" /></svg><span className="bracket-tournament-title">{title}</span><BracketMatchCard match={finalScore} onSelectCountry={onSelectCountry} /><span className="bracket-season">{season ?? tournament?.season ?? 'FINAL'}</span>{thirdPlace && <small className="bracket-third-place">{thirdPlace}</small>}</section>
-    <Branch side="right" rounds={right.rounds} onSelectCountry={onSelectCountry} />
+  if (!finalHome || !finalAway) return <p className="rounded-2xl border border-[#e2e6d9] bg-white p-4 text-center text-sm text-slate-500">Bracket not available yet.</p>
+  const finalMatch = simulateRound([finalHome, finalAway], 'Final', roundNames.length).matches[0]
+
+  return <div className="overflow-x-auto rounded-[20px] border border-[#e2e6d9] bg-[#f3f3eb] p-3 snap-x" aria-label={`${title} knockout bracket`}>
+    <div className="flex min-w-max items-stretch">
+      <Branch side="left" rounds={left.rounds} onSelectCountry={onSelectCountry} />
+      <section className="relative flex snap-center flex-col items-center justify-center gap-2 px-4">
+        <span className={`absolute left-0 top-1/2 w-4 border-t ${left.rounds.length ? 'border-[#c9d1bf]' : 'border-transparent'}`} />
+        <span className={`absolute right-0 top-1/2 w-4 border-t ${right.rounds.length ? 'border-[#c9d1bf]' : 'border-transparent'}`} />
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[#a07d00]">Final</span>
+        <Trophy />
+        <span className="max-w-40 text-center text-xs font-bold text-[#17221b]">{title}</span>
+        <BracketMatchCard match={finalMatch} onSelectCountry={onSelectCountry} />
+        <span className="text-[10px] text-slate-400">{season ?? tournament?.season ?? ''}</span>
+        {thirdPlace && <small className="text-[10px] text-slate-500">{thirdPlace}</small>}
+      </section>
+      <Branch side="right" rounds={right.rounds} onSelectCountry={onSelectCountry} />
+    </div>
   </div>
 }
+

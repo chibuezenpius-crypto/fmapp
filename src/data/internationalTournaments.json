@@ -1,98 +1,1609 @@
 {
   "metadata": {
-    "version": "1.0.0",
-    "description": "Simulated international and continental tournaments with explicit national-team pools and stages."
+    "version": "3.0.0",
+    "description": "Simulated VFA international competitions covering every member nation."
   },
   "tournaments": [
     {
-      "id": "afcon-2027",
-      "name": "Africa Cup of Nations",
-      "category": "Continental Competitions",
-      "region": "Africa",
-      "season": "2027",
-      "hostCountryCodes": ["MAR"],
-      "eligibleCountryCodes": ["NGA", "GHA", "ANG", "SEN", "CIV", "CMR", "MAR", "EGY"],
-      "stages": [
-        { "id": "group-stage", "name": "Group Stage", "format": "groups", "groups": [{ "name": "Group A", "countryCodes": ["MAR", "NGA", "ANG", "GHA"] }, { "name": "Group B", "countryCodes": ["SEN", "CIV", "CMR", "EGY"] }], "advancement": "Top four in each group qualify for the quarter-finals." },
-        { "id": "knockout-stage", "name": "Knockout Stage", "format": "knockout", "rounds": ["Quarter-finals", "Semi-finals", "Final"] }
-      ],
-      "rules": ["Eight national teams qualify for the group stage.", "Group matches award three points for a win and one for a draw.", "The top four teams in each group advance to the quarter-finals.", "Knockout matches use extra time and penalties if required."],
-      "history": [{ "season": "2025", "champion": "Senegal", "runnerUp": "Morocco" }, { "season": "2023", "champion": "Ivory Coast", "runnerUp": "Nigeria" }]
-    },
-    {
-      "id": "euro-2028",
-      "name": "UEFA European Championship",
-      "category": "Continental Competitions",
-      "region": "Europe",
-      "season": "2028",
-      "hostCountryCodes": ["ENG", "SCO", "WAL", "IRL"],
-      "eligibleCountryCodes": ["ENG", "ESP", "FRA", "GER", "ITA", "POR", "NED", "SCO", "WAL", "IRL", "BEL", "CRO", "NOR", "SWE"],
-      "stages": [
-        { "id": "group-stage", "name": "Group Stage", "format": "groups", "groups": [{ "name": "Group A", "countryCodes": ["ENG", "SCO", "NED", "NOR"] }, { "name": "Group B", "countryCodes": ["ESP", "POR", "IRL", "SWE"] }, { "name": "Group C", "countryCodes": ["FRA", "BEL", "CRO"] }, { "name": "Group D", "countryCodes": ["GER", "ITA", "WAL"] }], "advancement": "Top two teams in each group advance to the quarter-finals." },
-        { "id": "knockout-stage", "name": "Knockout Stage", "format": "knockout", "rounds": ["Quarter-finals", "Semi-finals", "Final"] }
-      ],
-      "rules": ["Fifteen national teams compete in four groups.", "Three points are awarded for a win and one for a draw.", "The top two teams in each group advance.", "Knockout ties are decided by extra time and penalties when level."],
-      "history": [{ "season": "2024", "champion": "Spain", "runnerUp": "England" }, { "season": "2020", "champion": "Italy", "runnerUp": "England" }]
-    },
-    {
-      "id": "copa-america-2028",
-      "name": "Copa América",
-      "category": "Continental Competitions",
-      "region": "South America",
-      "season": "2028",
-      "hostCountryCodes": ["ARG"],
-      "eligibleCountryCodes": ["ARG", "BRA", "COL", "URU"],
-      "stages": [
-        { "id": "group-stage", "name": "Group Stage", "format": "groups", "groups": [{ "name": "Group A", "countryCodes": ["ARG", "COL"] }, { "name": "Group B", "countryCodes": ["BRA", "URU"] }], "advancement": "The top two teams in each group qualify for the semi-finals." },
-        { "id": "knockout-stage", "name": "Knockout Stage", "format": "knockout", "rounds": ["Semi-finals", "Third-place match", "Final"] }
-      ],
-      "rules": ["Four invited national teams are split into two groups.", "Each team plays the other team in its group.", "Both teams in each group advance to the semi-finals.", "Knockout matches use extra time and penalties when required."],
-      "history": [{ "season": "2024", "champion": "Argentina", "runnerUp": "Colombia" }, { "season": "2021", "champion": "Argentina", "runnerUp": "Brazil" }]
-    },
-    {
-      "id": "asian-cup-2027",
-      "name": "AFC Asian Cup",
-      "category": "Continental Competitions",
-      "region": "Asia",
-      "season": "2027",
-      "hostCountryCodes": ["JPN"],
-      "eligibleCountryCodes": ["JPN", "KOR"],
-      "stages": [
-        { "id": "group-stage", "name": "Group Stage", "format": "groups", "groups": [{ "name": "Group A", "countryCodes": ["JPN", "KOR"] }], "advancement": "Both teams qualify for the final." },
-        { "id": "knockout-stage", "name": "Knockout Stage", "format": "knockout", "rounds": ["Final"] }
-      ],
-      "rules": ["National teams are drawn into a round-robin group.", "Three points are awarded for a win and one for a draw.", "The top two teams qualify for the final.", "The final is decided by extra time and penalties when required."],
-      "history": [{ "season": "2023", "champion": "Qatar", "runnerUp": "Jordan" }, { "season": "2019", "champion": "Qatar", "runnerUp": "Japan" }]
-    },
-    {
-      "id": "concacaf-gold-cup-2027",
-      "name": "CONCACAF Gold Cup",
-      "category": "Continental Competitions",
-      "region": "North America",
-      "season": "2027",
-      "hostCountryCodes": ["USA", "MEX"],
-      "eligibleCountryCodes": ["USA", "MEX"],
-      "stages": [
-        { "id": "group-stage", "name": "Group Stage", "format": "groups", "groups": [{ "name": "Group A", "countryCodes": ["USA", "MEX"] }], "advancement": "The top two teams qualify for the final." },
-        { "id": "knockout-stage", "name": "Knockout Stage", "format": "knockout", "rounds": ["Final"] }
-      ],
-      "rules": ["National teams from the North American region compete for the continental title.", "Group matches award three points for a win and one for a draw.", "The top two teams advance to the final.", "The final is decided by extra time and penalties if level."],
-      "history": [{ "season": "2025", "champion": "Mexico", "runnerUp": "United States" }, { "season": "2023", "champion": "United States", "runnerUp": "Mexico" }]
-    },
-    {
-      "id": "world-cup-2030",
-      "name": "FIFA World Cup",
+      "id": "vfa-world-cup-2030",
+      "name": "VFA World Cup",
       "category": "International",
       "region": "International",
       "season": "2030",
-      "hostCountryCodes": ["ESP", "POR", "MAR", "ARG", "URU", "BRA"],
-      "eligibleCountryCodes": ["NGA", "BRA", "ENG", "ESP", "FRA", "GER", "ITA", "ARG", "POR", "NED", "SCO", "WAL", "IRL", "GHA", "ANG", "SEN", "CIV", "CMR", "MAR", "EGY", "BEL", "JPN", "KOR", "USA", "MEX", "COL", "CRO", "URU", "NOR", "SWE"],
-      "stages": [
-        { "id": "group-stage", "name": "Group Stage", "format": "groups", "groups": [{ "name": "Group A", "countryCodes": ["NGA", "ENG", "GER", "ARG", "GHA"] }, { "name": "Group B", "countryCodes": ["BRA", "ESP", "POR", "ANG", "SEN"] }, { "name": "Group C", "countryCodes": ["FRA", "ITA", "NED", "CIV", "MAR"] }, { "name": "Group D", "countryCodes": ["SCO", "WAL", "IRL", "EGY", "BEL"] }, { "name": "Group E", "countryCodes": ["JPN", "KOR", "USA", "MEX", "COL"] }, { "name": "Group F", "countryCodes": ["CRO", "URU", "NOR", "SWE", "CMR"] }], "advancement": "The top two teams and four best third-placed teams advance to the round of 16." },
-        { "id": "knockout-stage", "name": "Knockout Stage", "format": "knockout", "rounds": ["Round of 16", "Quarter-finals", "Semi-finals", "Final"] }
+      "hostCountryCodes": [
+        "ESP",
+        "POR",
+        "MAR",
+        "ARG",
+        "URU",
+        "BRA"
       ],
-      "rules": ["Thirty national teams are drawn into six groups.", "Each team plays every other team in its group once.", "The top two teams and four best third-placed teams advance.", "Knockout matches use extra time and penalties when required."],
-      "history": [{ "season": "2026", "champion": "Argentina", "runnerUp": "France" }, { "season": "2022", "champion": "Argentina", "runnerUp": "France" }]
+      "eligibleCountryCodes": [
+        "ENG",
+        "FRA",
+        "ESP",
+        "GER",
+        "POR",
+        "NED",
+        "ITA",
+        "BEL",
+        "CRO",
+        "SCO",
+        "WAL",
+        "IRL",
+        "NOR",
+        "SWE",
+        "SUI",
+        "DEN",
+        "AUT",
+        "POL",
+        "UKR",
+        "TUR",
+        "SRB",
+        "CZE",
+        "HUN",
+        "ROU",
+        "GRE",
+        "SVK",
+        "SVN",
+        "NIR",
+        "FIN",
+        "ISL",
+        "ALB",
+        "GEO",
+        "BIH",
+        "MKD",
+        "MNE",
+        "BUL",
+        "ISR",
+        "RUS",
+        "KOS",
+        "ARM",
+        "AZE",
+        "BLR",
+        "CYP",
+        "EST",
+        "KAZ",
+        "LVA",
+        "LTU",
+        "LUX",
+        "MDA",
+        "MLT",
+        "FRO",
+        "GIB",
+        "AND",
+        "LIE",
+        "SMR",
+        "SEN",
+        "MAR",
+        "NGA",
+        "CIV",
+        "EGY",
+        "GHA",
+        "CMR",
+        "ANG",
+        "ALG",
+        "TUN",
+        "COD",
+        "MLI",
+        "RSA",
+        "BFA",
+        "GAB",
+        "CPV",
+        "GUI",
+        "ZAM",
+        "UGA",
+        "BEN",
+        "MOZ",
+        "KEN",
+        "MTN",
+        "MAD",
+        "LBY",
+        "COM",
+        "ZIM",
+        "TAN",
+        "CGO",
+        "SDN",
+        "EQG",
+        "TOG",
+        "NAM",
+        "SLE",
+        "GNB",
+        "MWI",
+        "BOT",
+        "LBR",
+        "CTA",
+        "RWA",
+        "NIG",
+        "ETH",
+        "GAM",
+        "BDI",
+        "LES",
+        "SSD",
+        "CHA",
+        "MRI",
+        "SWZ",
+        "DJI",
+        "STP",
+        "SEY",
+        "SOM",
+        "ERI",
+        "JPN",
+        "KOR",
+        "AUS",
+        "IRN",
+        "KSA",
+        "QAT",
+        "UZB",
+        "JOR",
+        "IRQ",
+        "UAE",
+        "CHN",
+        "OMA",
+        "BHR",
+        "SYR",
+        "PLE",
+        "KGZ",
+        "THA",
+        "VIE",
+        "IND",
+        "LIB",
+        "PRK",
+        "TJK",
+        "KUW",
+        "MAS",
+        "IDN",
+        "TKM",
+        "AFG",
+        "YEM",
+        "PHI",
+        "HKG",
+        "SIN",
+        "MYA",
+        "TPE",
+        "MDV",
+        "NEP",
+        "BAN",
+        "PAK",
+        "LAO",
+        "CAM",
+        "SRI",
+        "MNG",
+        "BRU",
+        "BHU",
+        "TLS",
+        "MAC",
+        "GUM",
+        "USA",
+        "MEX",
+        "CAN",
+        "PAN",
+        "CRC",
+        "JAM",
+        "HON",
+        "SLV",
+        "HAI",
+        "CUW",
+        "TRI",
+        "GUA",
+        "SUR",
+        "CUB",
+        "NCA",
+        "DOM",
+        "GUY",
+        "PUR",
+        "BER",
+        "GRN",
+        "SKN",
+        "LCA",
+        "ATG",
+        "VIN",
+        "BLZ",
+        "BRB",
+        "DMA",
+        "MSR",
+        "CAY",
+        "BAH",
+        "ARU",
+        "TCA",
+        "VGB",
+        "VIR",
+        "AIA",
+        "ARG",
+        "BRA",
+        "URU",
+        "COL",
+        "ECU",
+        "PAR",
+        "CHI",
+        "PER",
+        "VEN",
+        "BOL",
+        "NZL",
+        "FIJ",
+        "NCL",
+        "TAH",
+        "SOL",
+        "PNG",
+        "VAN",
+        "SAM",
+        "TGA",
+        "COK",
+        "ASA"
+      ],
+      "qualifiedCountryCodes": [
+        "ENG",
+        "FRA",
+        "ESP",
+        "GER",
+        "POR",
+        "NED",
+        "ITA",
+        "BEL",
+        "CRO",
+        "SCO",
+        "WAL",
+        "IRL",
+        "NOR",
+        "SWE",
+        "SUI",
+        "DEN",
+        "SEN",
+        "MAR",
+        "NGA",
+        "CIV",
+        "EGY",
+        "GHA",
+        "CMR",
+        "ANG",
+        "ALG",
+        "JPN",
+        "KOR",
+        "AUS",
+        "IRN",
+        "KSA",
+        "QAT",
+        "UZB",
+        "JOR",
+        "ARG",
+        "BRA",
+        "URU",
+        "COL",
+        "ECU",
+        "PAR",
+        "USA",
+        "MEX",
+        "CAN",
+        "PAN",
+        "CRC",
+        "JAM",
+        "NZL",
+        "BOL",
+        "COD"
+      ],
+      "stages": [
+        {
+          "id": "group-stage",
+          "name": "Group Stage",
+          "format": "groups",
+          "groups": [
+            {
+              "name": "Group A",
+              "countryCodes": [
+                "ENG",
+                "KSA",
+                "CRC",
+                "DEN"
+              ]
+            },
+            {
+              "name": "Group B",
+              "countryCodes": [
+                "SEN",
+                "EGY",
+                "ECU",
+                "SUI"
+              ]
+            },
+            {
+              "name": "Group C",
+              "countryCodes": [
+                "JPN",
+                "POR",
+                "NED",
+                "SWE"
+              ]
+            },
+            {
+              "name": "Group D",
+              "countryCodes": [
+                "USA",
+                "COL",
+                "GHA",
+                "NOR"
+              ]
+            },
+            {
+              "name": "Group E",
+              "countryCodes": [
+                "ARG",
+                "PAN",
+                "QAT",
+                "IRL"
+              ]
+            },
+            {
+              "name": "Group F",
+              "countryCodes": [
+                "NZL",
+                "IRN",
+                "JAM",
+                "COD"
+              ]
+            },
+            {
+              "name": "Group G",
+              "countryCodes": [
+                "FRA",
+                "CIV",
+                "PAR",
+                "WAL"
+              ]
+            },
+            {
+              "name": "Group H",
+              "countryCodes": [
+                "MAR",
+                "GER",
+                "ITA",
+                "BOL"
+              ]
+            },
+            {
+              "name": "Group I",
+              "countryCodes": [
+                "KOR",
+                "URU",
+                "CMR",
+                "SCO"
+              ]
+            },
+            {
+              "name": "Group J",
+              "countryCodes": [
+                "MEX",
+                "CAN",
+                "UZB",
+                "ALG"
+              ]
+            },
+            {
+              "name": "Group K",
+              "countryCodes": [
+                "BRA",
+                "AUS",
+                "BEL",
+                "CRO"
+              ]
+            },
+            {
+              "name": "Group L",
+              "countryCodes": [
+                "ESP",
+                "NGA",
+                "ANG",
+                "JOR"
+              ]
+            }
+          ],
+          "advancement": "The top two teams and the eight best third-placed teams advance to the round of 32."
+        },
+        {
+          "id": "knockout-stage",
+          "name": "Knockout Stage",
+          "format": "knockout",
+          "rounds": [
+            "Round of 32",
+            "Round of 16",
+            "Quarter-finals",
+            "Semi-finals",
+            "Final"
+          ]
+        }
+      ],
+      "rules": [
+        "All 211 VFA member nations enter qualification through their confederations.",
+        "Forty-eight qualified teams are drawn into twelve groups of four.",
+        "The top two teams and the eight best third-placed teams advance to the round of 32.",
+        "Knockout matches use extra time and penalties when required."
+      ],
+      "history": [
+        {
+          "season": "2026",
+          "champion": "Argentina",
+          "runnerUp": "France"
+        },
+        {
+          "season": "2022",
+          "champion": "Argentina",
+          "runnerUp": "France"
+        }
+      ]
+    },
+    {
+      "id": "vfa-euros-2028",
+      "name": "VFA Euros",
+      "category": "International",
+      "region": "International",
+      "season": "2028",
+      "hostCountryCodes": [
+        "ENG",
+        "SCO",
+        "WAL",
+        "IRL"
+      ],
+      "eligibleCountryCodes": [
+        "ENG",
+        "FRA",
+        "ESP",
+        "GER",
+        "POR",
+        "NED",
+        "ITA",
+        "BEL",
+        "CRO",
+        "SCO",
+        "WAL",
+        "IRL",
+        "NOR",
+        "SWE",
+        "SUI",
+        "DEN",
+        "AUT",
+        "POL",
+        "UKR",
+        "TUR",
+        "SRB",
+        "CZE",
+        "HUN",
+        "ROU",
+        "GRE",
+        "SVK",
+        "SVN",
+        "NIR",
+        "FIN",
+        "ISL",
+        "ALB",
+        "GEO",
+        "BIH",
+        "MKD",
+        "MNE",
+        "BUL",
+        "ISR",
+        "RUS",
+        "KOS",
+        "ARM",
+        "AZE",
+        "BLR",
+        "CYP",
+        "EST",
+        "KAZ",
+        "LVA",
+        "LTU",
+        "LUX",
+        "MDA",
+        "MLT",
+        "FRO",
+        "GIB",
+        "AND",
+        "LIE",
+        "SMR"
+      ],
+      "stages": [
+        {
+          "id": "group-stage",
+          "name": "Group Stage",
+          "format": "groups",
+          "groups": [
+            {
+              "name": "Group A",
+              "countryCodes": [
+                "ENG",
+                "CZE",
+                "HUN",
+                "EST",
+                "KAZ"
+              ]
+            },
+            {
+              "name": "Group B",
+              "countryCodes": [
+                "FRA",
+                "SRB",
+                "ROU",
+                "CYP",
+                "LVA"
+              ]
+            },
+            {
+              "name": "Group C",
+              "countryCodes": [
+                "ESP",
+                "TUR",
+                "GRE",
+                "BLR",
+                "LTU"
+              ]
+            },
+            {
+              "name": "Group D",
+              "countryCodes": [
+                "GER",
+                "UKR",
+                "SVK",
+                "AZE",
+                "LUX"
+              ]
+            },
+            {
+              "name": "Group E",
+              "countryCodes": [
+                "POR",
+                "POL",
+                "SVN",
+                "ARM",
+                "MDA"
+              ]
+            },
+            {
+              "name": "Group F",
+              "countryCodes": [
+                "NED",
+                "AUT",
+                "NIR",
+                "KOS",
+                "MLT"
+              ]
+            },
+            {
+              "name": "Group G",
+              "countryCodes": [
+                "ITA",
+                "DEN",
+                "FIN",
+                "RUS",
+                "FRO"
+              ]
+            },
+            {
+              "name": "Group H",
+              "countryCodes": [
+                "BEL",
+                "SUI",
+                "ISL",
+                "ISR",
+                "GIB"
+              ]
+            },
+            {
+              "name": "Group I",
+              "countryCodes": [
+                "CRO",
+                "SWE",
+                "ALB",
+                "BUL",
+                "AND"
+              ]
+            },
+            {
+              "name": "Group J",
+              "countryCodes": [
+                "SCO",
+                "NOR",
+                "GEO",
+                "MNE",
+                "LIE"
+              ]
+            },
+            {
+              "name": "Group K",
+              "countryCodes": [
+                "WAL",
+                "IRL",
+                "BIH",
+                "MKD",
+                "SMR"
+              ]
+            }
+          ],
+          "advancement": "The top 1 teams in each group and the 5 best next-placed teams advance to the round of 16."
+        },
+        {
+          "id": "knockout-stage",
+          "name": "Knockout Stage",
+          "format": "knockout",
+          "rounds": [
+            "Round of 16",
+            "Quarter-finals",
+            "Semi-finals",
+            "Final"
+          ]
+        }
+      ],
+      "rules": [
+        "All 55 Europe member nations are drawn into 11 groups.",
+        "Each team plays every other team in its group once; a win earns three points and a draw one.",
+        "The top 1 teams in each group and the 5 best next-placed teams advance to the round of 16.",
+        "Knockout matches use extra time and penalties when required.",
+        "Results also feed the VFA World Cup qualification rankings."
+      ],
+      "history": [
+        {
+          "season": "2024",
+          "champion": "Spain",
+          "runnerUp": "England"
+        },
+        {
+          "season": "2020",
+          "champion": "Italy",
+          "runnerUp": "England"
+        }
+      ]
+    },
+    {
+      "id": "euro-nations-league-2027",
+      "name": "Euro Nations League",
+      "category": "International",
+      "region": "International",
+      "season": "2027",
+      "hostCountryCodes": [
+        "POR"
+      ],
+      "eligibleCountryCodes": [
+        "ENG",
+        "FRA",
+        "ESP",
+        "GER",
+        "POR",
+        "NED",
+        "ITA",
+        "BEL",
+        "CRO",
+        "SCO",
+        "WAL",
+        "IRL",
+        "NOR",
+        "SWE",
+        "SUI",
+        "DEN",
+        "AUT",
+        "POL",
+        "UKR",
+        "TUR",
+        "SRB",
+        "CZE",
+        "HUN",
+        "ROU",
+        "GRE",
+        "SVK",
+        "SVN",
+        "NIR",
+        "FIN",
+        "ISL",
+        "ALB",
+        "GEO",
+        "BIH",
+        "MKD",
+        "MNE",
+        "BUL",
+        "ISR",
+        "RUS",
+        "KOS",
+        "ARM",
+        "AZE",
+        "BLR",
+        "CYP",
+        "EST",
+        "KAZ",
+        "LVA",
+        "LTU",
+        "LUX",
+        "MDA",
+        "MLT",
+        "FRO",
+        "GIB",
+        "AND",
+        "LIE",
+        "SMR"
+      ],
+      "stages": [
+        {
+          "id": "league-phase",
+          "name": "League Phase",
+          "format": "groups",
+          "groups": [
+            {
+              "name": "League A · Group A",
+              "countryCodes": [
+                "ENG",
+                "BEL",
+                "CRO",
+                "DEN"
+              ]
+            },
+            {
+              "name": "League A · Group B",
+              "countryCodes": [
+                "FRA",
+                "ITA",
+                "SCO",
+                "SUI"
+              ]
+            },
+            {
+              "name": "League A · Group C",
+              "countryCodes": [
+                "ESP",
+                "NED",
+                "WAL",
+                "SWE"
+              ]
+            },
+            {
+              "name": "League A · Group D",
+              "countryCodes": [
+                "GER",
+                "POR",
+                "IRL",
+                "NOR"
+              ]
+            },
+            {
+              "name": "League B · Group A",
+              "countryCodes": [
+                "AUT",
+                "ROU",
+                "GRE",
+                "GEO"
+              ]
+            },
+            {
+              "name": "League B · Group B",
+              "countryCodes": [
+                "POL",
+                "HUN",
+                "SVK",
+                "ALB"
+              ]
+            },
+            {
+              "name": "League B · Group C",
+              "countryCodes": [
+                "UKR",
+                "CZE",
+                "SVN",
+                "ISL"
+              ]
+            },
+            {
+              "name": "League B · Group D",
+              "countryCodes": [
+                "TUR",
+                "SRB",
+                "NIR",
+                "FIN"
+              ]
+            },
+            {
+              "name": "League C · Group A",
+              "countryCodes": [
+                "BIH",
+                "ARM",
+                "AZE",
+                "LUX"
+              ]
+            },
+            {
+              "name": "League C · Group B",
+              "countryCodes": [
+                "MKD",
+                "KOS",
+                "BLR",
+                "LTU"
+              ]
+            },
+            {
+              "name": "League C · Group C",
+              "countryCodes": [
+                "MNE",
+                "RUS",
+                "CYP",
+                "LVA"
+              ]
+            },
+            {
+              "name": "League C · Group D",
+              "countryCodes": [
+                "BUL",
+                "ISR",
+                "EST",
+                "KAZ"
+              ]
+            },
+            {
+              "name": "League D · Group A",
+              "countryCodes": [
+                "MDA",
+                "GIB",
+                "AND"
+              ]
+            },
+            {
+              "name": "League D · Group B",
+              "countryCodes": [
+                "MLT",
+                "FRO",
+                "LIE",
+                "SMR"
+              ]
+            }
+          ],
+          "advancement": "The four League A group winners advance to the finals. Group winners are promoted and last-placed teams are relegated between divisions."
+        },
+        {
+          "id": "knockout-stage",
+          "name": "Finals",
+          "format": "knockout",
+          "rounds": [
+            "Semi-finals",
+            "Final"
+          ]
+        }
+      ],
+      "rules": [
+        "All 55 European nations are placed into four divisions by ranking: League A, B and C hold 16 teams each and League D holds the rest.",
+        "Each division is split into groups of four; every team plays the others home and away.",
+        "Group winners are promoted, last-placed teams are relegated, and League A winners play the finals.",
+        "Knockout matches use extra time and penalties when required."
+      ],
+      "history": [
+        {
+          "season": "2025",
+          "champion": "Spain",
+          "runnerUp": "Portugal"
+        },
+        {
+          "season": "2023",
+          "champion": "Spain",
+          "runnerUp": "Croatia"
+        }
+      ]
+    },
+    {
+      "id": "avfac-2027",
+      "name": "AVFAC Africa Cup",
+      "category": "International",
+      "region": "International",
+      "season": "2027",
+      "hostCountryCodes": [
+        "MAR"
+      ],
+      "eligibleCountryCodes": [
+        "SEN",
+        "MAR",
+        "NGA",
+        "CIV",
+        "EGY",
+        "GHA",
+        "CMR",
+        "ANG",
+        "ALG",
+        "TUN",
+        "COD",
+        "MLI",
+        "RSA",
+        "BFA",
+        "GAB",
+        "CPV",
+        "GUI",
+        "ZAM",
+        "UGA",
+        "BEN",
+        "MOZ",
+        "KEN",
+        "MTN",
+        "MAD",
+        "LBY",
+        "COM",
+        "ZIM",
+        "TAN",
+        "CGO",
+        "SDN",
+        "EQG",
+        "TOG",
+        "NAM",
+        "SLE",
+        "GNB",
+        "MWI",
+        "BOT",
+        "LBR",
+        "CTA",
+        "RWA",
+        "NIG",
+        "ETH",
+        "GAM",
+        "BDI",
+        "LES",
+        "SSD",
+        "CHA",
+        "MRI",
+        "SWZ",
+        "DJI",
+        "STP",
+        "SEY",
+        "SOM",
+        "ERI"
+      ],
+      "stages": [
+        {
+          "id": "group-stage",
+          "name": "Group Stage",
+          "format": "groups",
+          "groups": [
+            {
+              "name": "Group A",
+              "countryCodes": [
+                "SEN",
+                "ZAM",
+                "UGA",
+                "MWI",
+                "BOT",
+                "ERI"
+              ]
+            },
+            {
+              "name": "Group B",
+              "countryCodes": [
+                "MAR",
+                "GUI",
+                "BEN",
+                "GNB",
+                "LBR",
+                "SOM"
+              ]
+            },
+            {
+              "name": "Group C",
+              "countryCodes": [
+                "NGA",
+                "CPV",
+                "MOZ",
+                "SLE",
+                "CTA",
+                "SEY"
+              ]
+            },
+            {
+              "name": "Group D",
+              "countryCodes": [
+                "CIV",
+                "GAB",
+                "KEN",
+                "NAM",
+                "RWA",
+                "STP"
+              ]
+            },
+            {
+              "name": "Group E",
+              "countryCodes": [
+                "EGY",
+                "BFA",
+                "MTN",
+                "TOG",
+                "NIG",
+                "DJI"
+              ]
+            },
+            {
+              "name": "Group F",
+              "countryCodes": [
+                "GHA",
+                "RSA",
+                "MAD",
+                "EQG",
+                "ETH",
+                "SWZ"
+              ]
+            },
+            {
+              "name": "Group G",
+              "countryCodes": [
+                "CMR",
+                "MLI",
+                "LBY",
+                "SDN",
+                "GAM",
+                "MRI"
+              ]
+            },
+            {
+              "name": "Group H",
+              "countryCodes": [
+                "ANG",
+                "COD",
+                "COM",
+                "CGO",
+                "BDI",
+                "CHA"
+              ]
+            },
+            {
+              "name": "Group I",
+              "countryCodes": [
+                "ALG",
+                "TUN",
+                "ZIM",
+                "TAN",
+                "LES",
+                "SSD"
+              ]
+            }
+          ],
+          "advancement": "The top 1 teams in each group and the 7 best next-placed teams advance to the round of 16."
+        },
+        {
+          "id": "knockout-stage",
+          "name": "Knockout Stage",
+          "format": "knockout",
+          "rounds": [
+            "Round of 16",
+            "Quarter-finals",
+            "Semi-finals",
+            "Final"
+          ]
+        }
+      ],
+      "rules": [
+        "All 54 Africa member nations are drawn into 9 groups.",
+        "Each team plays every other team in its group once; a win earns three points and a draw one.",
+        "The top 1 teams in each group and the 7 best next-placed teams advance to the round of 16.",
+        "Knockout matches use extra time and penalties when required.",
+        "Results also feed the VFA World Cup qualification rankings."
+      ],
+      "history": [
+        {
+          "season": "2025",
+          "champion": "Senegal",
+          "runnerUp": "Morocco"
+        },
+        {
+          "season": "2023",
+          "champion": "Ivory Coast",
+          "runnerUp": "Nigeria"
+        }
+      ]
+    },
+    {
+      "id": "vfa-south-american-cup-2028",
+      "name": "VFA South American Cup",
+      "category": "International",
+      "region": "International",
+      "season": "2028",
+      "hostCountryCodes": [
+        "ARG"
+      ],
+      "eligibleCountryCodes": [
+        "ARG",
+        "BRA",
+        "URU",
+        "COL",
+        "ECU",
+        "PAR",
+        "CHI",
+        "PER",
+        "VEN",
+        "BOL"
+      ],
+      "stages": [
+        {
+          "id": "group-stage",
+          "name": "Group Stage",
+          "format": "groups",
+          "groups": [
+            {
+              "name": "Group A",
+              "countryCodes": [
+                "ARG",
+                "COL",
+                "ECU",
+                "PER",
+                "VEN"
+              ]
+            },
+            {
+              "name": "Group B",
+              "countryCodes": [
+                "BRA",
+                "URU",
+                "PAR",
+                "CHI",
+                "BOL"
+              ]
+            }
+          ],
+          "advancement": "The top 4 teams in each group advance to the quarter-finals."
+        },
+        {
+          "id": "knockout-stage",
+          "name": "Knockout Stage",
+          "format": "knockout",
+          "rounds": [
+            "Quarter-finals",
+            "Semi-finals",
+            "Final"
+          ]
+        }
+      ],
+      "rules": [
+        "All 10 South America member nations are drawn into 2 groups.",
+        "Each team plays every other team in its group once; a win earns three points and a draw one.",
+        "The top 4 teams in each group advance to the quarter-finals.",
+        "Knockout matches use extra time and penalties when required.",
+        "Results also feed the VFA World Cup qualification rankings."
+      ],
+      "history": [
+        {
+          "season": "2024",
+          "champion": "Argentina",
+          "runnerUp": "Colombia"
+        },
+        {
+          "season": "2021",
+          "champion": "Argentina",
+          "runnerUp": "Brazil"
+        }
+      ]
+    },
+    {
+      "id": "vfa-asian-cup-2027",
+      "name": "VFA Asian Cup",
+      "category": "International",
+      "region": "International",
+      "season": "2027",
+      "hostCountryCodes": [
+        "JPN"
+      ],
+      "eligibleCountryCodes": [
+        "JPN",
+        "KOR",
+        "AUS",
+        "IRN",
+        "KSA",
+        "QAT",
+        "UZB",
+        "JOR",
+        "IRQ",
+        "UAE",
+        "CHN",
+        "OMA",
+        "BHR",
+        "SYR",
+        "PLE",
+        "KGZ",
+        "THA",
+        "VIE",
+        "IND",
+        "LIB",
+        "PRK",
+        "TJK",
+        "KUW",
+        "MAS",
+        "IDN",
+        "TKM",
+        "AFG",
+        "YEM",
+        "PHI",
+        "HKG",
+        "SIN",
+        "MYA",
+        "TPE",
+        "MDV",
+        "NEP",
+        "BAN",
+        "PAK",
+        "LAO",
+        "CAM",
+        "SRI",
+        "MNG",
+        "BRU",
+        "BHU",
+        "TLS",
+        "MAC",
+        "GUM"
+      ],
+      "stages": [
+        {
+          "id": "group-stage",
+          "name": "Group Stage",
+          "format": "groups",
+          "groups": [
+            {
+              "name": "Group A",
+              "countryCodes": [
+                "JPN",
+                "LIB",
+                "PRK",
+                "SRI",
+                "MNG"
+              ]
+            },
+            {
+              "name": "Group B",
+              "countryCodes": [
+                "KOR",
+                "IND",
+                "TJK",
+                "CAM",
+                "BRU"
+              ]
+            },
+            {
+              "name": "Group C",
+              "countryCodes": [
+                "AUS",
+                "VIE",
+                "KUW",
+                "LAO",
+                "BHU"
+              ]
+            },
+            {
+              "name": "Group D",
+              "countryCodes": [
+                "IRN",
+                "THA",
+                "MAS",
+                "PAK",
+                "TLS"
+              ]
+            },
+            {
+              "name": "Group E",
+              "countryCodes": [
+                "KSA",
+                "KGZ",
+                "IDN",
+                "BAN",
+                "MAC"
+              ]
+            },
+            {
+              "name": "Group F",
+              "countryCodes": [
+                "QAT",
+                "PLE",
+                "TKM",
+                "NEP",
+                "GUM"
+              ]
+            },
+            {
+              "name": "Group G",
+              "countryCodes": [
+                "UZB",
+                "SYR",
+                "AFG",
+                "MDV"
+              ]
+            },
+            {
+              "name": "Group H",
+              "countryCodes": [
+                "JOR",
+                "BHR",
+                "YEM",
+                "TPE"
+              ]
+            },
+            {
+              "name": "Group I",
+              "countryCodes": [
+                "IRQ",
+                "OMA",
+                "PHI",
+                "MYA"
+              ]
+            },
+            {
+              "name": "Group J",
+              "countryCodes": [
+                "UAE",
+                "CHN",
+                "HKG",
+                "SIN"
+              ]
+            }
+          ],
+          "advancement": "The top 1 teams in each group and the 6 best next-placed teams advance to the round of 16."
+        },
+        {
+          "id": "knockout-stage",
+          "name": "Knockout Stage",
+          "format": "knockout",
+          "rounds": [
+            "Round of 16",
+            "Quarter-finals",
+            "Semi-finals",
+            "Final"
+          ]
+        }
+      ],
+      "rules": [
+        "All 46 Asia member nations are drawn into 10 groups.",
+        "Each team plays every other team in its group once; a win earns three points and a draw one.",
+        "The top 1 teams in each group and the 6 best next-placed teams advance to the round of 16.",
+        "Knockout matches use extra time and penalties when required.",
+        "Results also feed the VFA World Cup qualification rankings."
+      ],
+      "history": [
+        {
+          "season": "2023",
+          "champion": "Qatar",
+          "runnerUp": "Jordan"
+        },
+        {
+          "season": "2019",
+          "champion": "Qatar",
+          "runnerUp": "Japan"
+        }
+      ]
+    },
+    {
+      "id": "vfa-gold-cup-2027",
+      "name": "VFA Gold Cup",
+      "category": "International",
+      "region": "International",
+      "season": "2027",
+      "hostCountryCodes": [
+        "USA",
+        "MEX"
+      ],
+      "eligibleCountryCodes": [
+        "USA",
+        "MEX",
+        "CAN",
+        "PAN",
+        "CRC",
+        "JAM",
+        "HON",
+        "SLV",
+        "HAI",
+        "CUW",
+        "TRI",
+        "GUA",
+        "SUR",
+        "CUB",
+        "NCA",
+        "DOM",
+        "GUY",
+        "PUR",
+        "BER",
+        "GRN",
+        "SKN",
+        "LCA",
+        "ATG",
+        "VIN",
+        "BLZ",
+        "BRB",
+        "DMA",
+        "MSR",
+        "CAY",
+        "BAH",
+        "ARU",
+        "TCA",
+        "VGB",
+        "VIR",
+        "AIA"
+      ],
+      "stages": [
+        {
+          "id": "group-stage",
+          "name": "Group Stage",
+          "format": "groups",
+          "groups": [
+            {
+              "name": "Group A",
+              "countryCodes": [
+                "USA",
+                "CUB",
+                "NCA",
+                "MSR",
+                "CAY"
+              ]
+            },
+            {
+              "name": "Group B",
+              "countryCodes": [
+                "MEX",
+                "SUR",
+                "DOM",
+                "DMA",
+                "BAH"
+              ]
+            },
+            {
+              "name": "Group C",
+              "countryCodes": [
+                "CAN",
+                "GUA",
+                "GUY",
+                "BRB",
+                "ARU"
+              ]
+            },
+            {
+              "name": "Group D",
+              "countryCodes": [
+                "PAN",
+                "TRI",
+                "PUR",
+                "BLZ",
+                "TCA"
+              ]
+            },
+            {
+              "name": "Group E",
+              "countryCodes": [
+                "CRC",
+                "CUW",
+                "BER",
+                "VIN",
+                "VGB"
+              ]
+            },
+            {
+              "name": "Group F",
+              "countryCodes": [
+                "JAM",
+                "HAI",
+                "GRN",
+                "ATG",
+                "VIR"
+              ]
+            },
+            {
+              "name": "Group G",
+              "countryCodes": [
+                "HON",
+                "SLV",
+                "SKN",
+                "LCA",
+                "AIA"
+              ]
+            }
+          ],
+          "advancement": "The top 2 teams in each group and the 2 best next-placed teams advance to the round of 16."
+        },
+        {
+          "id": "knockout-stage",
+          "name": "Knockout Stage",
+          "format": "knockout",
+          "rounds": [
+            "Round of 16",
+            "Quarter-finals",
+            "Semi-finals",
+            "Final"
+          ]
+        }
+      ],
+      "rules": [
+        "All 35 North America member nations are drawn into 7 groups.",
+        "Each team plays every other team in its group once; a win earns three points and a draw one.",
+        "The top 2 teams in each group and the 2 best next-placed teams advance to the round of 16.",
+        "Knockout matches use extra time and penalties when required.",
+        "Results also feed the VFA World Cup qualification rankings."
+      ],
+      "history": [
+        {
+          "season": "2025",
+          "champion": "Mexico",
+          "runnerUp": "United States"
+        },
+        {
+          "season": "2023",
+          "champion": "United States",
+          "runnerUp": "Mexico"
+        }
+      ]
+    },
+    {
+      "id": "vfa-oceania-cup-2028",
+      "name": "VFA Oceania Cup",
+      "category": "International",
+      "region": "International",
+      "season": "2028",
+      "hostCountryCodes": [
+        "NZL"
+      ],
+      "eligibleCountryCodes": [
+        "NZL",
+        "FIJ",
+        "NCL",
+        "TAH",
+        "SOL",
+        "PNG",
+        "VAN",
+        "SAM",
+        "TGA",
+        "COK",
+        "ASA"
+      ],
+      "stages": [
+        {
+          "id": "group-stage",
+          "name": "Group Stage",
+          "format": "groups",
+          "groups": [
+            {
+              "name": "Group A",
+              "countryCodes": [
+                "NZL",
+                "PNG",
+                "VAN"
+              ]
+            },
+            {
+              "name": "Group B",
+              "countryCodes": [
+                "FIJ",
+                "SOL",
+                "SAM",
+                "ASA"
+              ]
+            },
+            {
+              "name": "Group C",
+              "countryCodes": [
+                "NCL",
+                "TAH",
+                "TGA",
+                "COK"
+              ]
+            }
+          ],
+          "advancement": "The top 2 teams in each group and the 2 best next-placed teams advance to the quarter-finals."
+        },
+        {
+          "id": "knockout-stage",
+          "name": "Knockout Stage",
+          "format": "knockout",
+          "rounds": [
+            "Quarter-finals",
+            "Semi-finals",
+            "Final"
+          ]
+        }
+      ],
+      "rules": [
+        "All 11 Oceania member nations are drawn into 3 groups.",
+        "Each team plays every other team in its group once; a win earns three points and a draw one.",
+        "The top 2 teams in each group and the 2 best next-placed teams advance to the quarter-finals.",
+        "Knockout matches use extra time and penalties when required.",
+        "Results also feed the VFA World Cup qualification rankings."
+      ],
+      "history": [
+        {
+          "season": "2024",
+          "champion": "New Zealand",
+          "runnerUp": "Vanuatu"
+        },
+        {
+          "season": "2020",
+          "champion": "New Zealand",
+          "runnerUp": "Tahiti"
+        }
+      ]
     }
   ]
 }

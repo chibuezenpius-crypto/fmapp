@@ -9,8 +9,16 @@ import TransferMarket from './TransferMarket'
 import PersonnelProfile from './PersonnelProfile'
 import CountryOverview from './CountryOverview'
 import TacticsHub from './TacticsHub'
+import MatchesList from './MatchesList'
 import type { ClubConfidenceData, MatchInfo, PersonnelProfile as PersonnelProfileData, Player, SquadHealthMetrics } from './types/game'
 import './App.css'
+
+const SCREEN_SIZES = [
+  { label: 'Mobile', width: 480 },
+  { label: 'Tablet', width: 768 },
+  { label: 'Desktop', width: 1100 },
+  { label: 'Full', width: 0 },
+]
 
 
 const tabs = [
@@ -36,6 +44,7 @@ function App() {
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null)
   const [selectedCountryName, setSelectedCountryName] = useState<string | null>(null)
   const [countryReturnLabel, setCountryReturnLabel] = useState('previous view')
+  const [screenSize, setScreenSize] = useState(SCREEN_SIZES[0])
   const [clubSection, setClubSection] = useState<ClubSection>('Overview')
   const [clubReturnTab, setClubReturnTab] = useState<TabId>('Home')
   const position = league.standings.find((standing) => standing.clubId === club.id)
@@ -95,7 +104,10 @@ function App() {
 
   return (
     <div className="app-backdrop">
-      <div className="app-shell">
+      <div className="screen-size-switcher" role="group" aria-label="Screen size">
+        {SCREEN_SIZES.map((size) => <button aria-pressed={screenSize.label === size.label} key={size.label} onClick={() => setScreenSize(size)} type="button">{size.label}<small>{size.width ? `${size.width}px` : 'Full'}</small></button>)}
+      </div>
+      <div className="app-shell" style={screenSize.width ? { width: `min(100%, ${screenSize.width}px)` } : { width: '100%' }}>
         <header className="topbar">
           {detailOpen ? <button aria-label={backLabel} className="header-back-button" onClick={goBack} type="button"><ArrowLeft aria-hidden="true" size={19} strokeWidth={2.2} /></button>
             : <ClubReference name="N" selectedClubName={selectedClubName} onSelect={setSelectedClubName} onOpen={openClubProfile} className="club-mark" ariaLabel={`${club.name} crest`} />}
@@ -122,7 +134,7 @@ function App() {
             {activeTab === 'Tactics' && <TacticsHub />}
             {activeTab === 'Transfers' && <TransferMarket onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />}
             {activeTab === 'League' && <LeagueHub selectedCompetitionId={selectedLeagueId} onSelectCompetition={setSelectedLeagueId} onSelectCountry={openCountryOverview} />}
-            {activeTab === 'Matches' && <MatchesView matches={matchFixtures} onSelectMatch={setSelectedMatchId} />}
+            {activeTab === 'Matches' && <MatchesList matches={matchFixtures} onSelectMatch={setSelectedMatchId} />}
           </>}
         </main>
 
@@ -347,27 +359,6 @@ function LeagueTable({ compact = false, selectedClubName, onSelectClub }: { comp
       {!compact && <span className="table-form">{standing.form.map((result, index) => <i className={`form-${result.toLowerCase()}`} key={`${standing.clubId}-${index}`} />)}</span>}
     </div>)}
   </div>
-}
-
-function MatchesView({ matches, onSelectMatch }: { matches: MatchInfo[]; onSelectMatch: (id: string) => void }) {
-  return <>
-    <div className="page-intro"><span className="eyebrow">FIXTURES & RESULTS</span><h1>Match centre</h1><p>North Country Premier · 2026/27</p></div>
-    <div className="fixture-list">{matches.map((match) => {
-      const isHomeOwn = match.homeClubId === club.id
-      const isAwayOwn = match.awayClubId === club.id
-      return (
-        <button aria-label={`Open ${match.homeClubName} versus ${match.awayClubName} match details`} className={`fixture-list-card ${match.status.toLowerCase()}`} key={match.id} onClick={() => onSelectMatch(match.id)} type="button">
-          <span className="fixture-list-meta"><span>{match.competition.toUpperCase()} · MD {match.matchday}</span><strong>{match.status === 'Completed' ? 'FULL TIME' : 'UPCOMING'}</strong></span>
-          <span className="fixture-list-teams">
-            <span><i className={`fixture-club-crest ${isHomeOwn ? '' : 'away'}`}>{match.homeClubName.slice(0, 1)}</i><b>{match.homeClubName}</b></span>
-            <strong>{match.score ? `${match.score.home} - ${match.score.away}` : 'VS'}</strong>
-            <span><i className={`fixture-club-crest ${isAwayOwn ? '' : 'away'}`}>{match.awayClubName.slice(0, 1)}</i><b>{match.awayClubName}</b></span>
-          </span>
-          <span className="fixture-list-footer"><span>{new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${match.date}T12:00:00`))}</span><span>{match.kickOff} · {match.venue}</span></span>
-        </button>
-      )
-    })}</div>
-  </>
 }
 
 export default App

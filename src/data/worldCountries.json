@@ -1,0 +1,1279 @@
+{
+  "countryCount": 211,
+  "confederations": [
+    "Europe",
+    "Africa",
+    "Asia",
+    "North America",
+    "South America",
+    "Oceania"
+  ],
+  "countries": [
+    {
+      "code": "ENG",
+      "name": "England",
+      "flagCode": "gb-eng",
+      "confederation": "Europe"
+    },
+    {
+      "code": "FRA",
+      "name": "France",
+      "flagCode": "fr",
+      "confederation": "Europe"
+    },
+    {
+      "code": "ESP",
+      "name": "Spain",
+      "flagCode": "es",
+      "confederation": "Europe"
+    },
+    {
+      "code": "GER",
+      "name": "Germany",
+      "flagCode": "de",
+      "confederation": "Europe"
+    },
+    {
+      "code": "POR",
+      "name": "Portugal",
+      "flagCode": "pt",
+      "confederation": "Europe"
+    },
+    {
+      "code": "NED",
+      "name": "Netherlands",
+      "flagCode": "nl",
+      "confederation": "Europe"
+    },
+    {
+      "code": "ITA",
+      "name": "Italy",
+      "flagCode": "it",
+      "confederation": "Europe"
+    },
+    {
+      "code": "BEL",
+      "name": "Belgium",
+      "flagCode": "be",
+      "confederation": "Europe"
+    },
+    {
+      "code": "CRO",
+      "name": "Croatia",
+      "flagCode": "hr",
+      "confederation": "Europe"
+    },
+    {
+      "code": "SCO",
+      "name": "Scotland",
+      "flagCode": "gb-sct",
+      "confederation": "Europe"
+    },
+    {
+      "code": "WAL",
+      "name": "Wales",
+      "flagCode": "gb-wls",
+      "confederation": "Europe"
+    },
+    {
+      "code": "IRL",
+      "name": "Ireland",
+      "flagCode": "ie",
+      "confederation": "Europe"
+    },
+    {
+      "code": "NOR",
+      "name": "Norway",
+      "flagCode": "no",
+      "confederation": "Europe"
+    },
+    {
+      "code": "SWE",
+      "name": "Sweden",
+      "flagCode": "se",
+      "confederation": "Europe"
+    },
+    {
+      "code": "SUI",
+      "name": "Switzerland",
+      "flagCode": "ch",
+      "confederation": "Europe"
+    },
+    {
+      "code": "DEN",
+      "name": "Denmark",
+      "flagCode": "dk",
+      "confederation": "Europe"
+    },
+    {
+      "code": "AUT",
+      "name": "Austria",
+      "flagCode": "at",
+      "confederation": "Europe"
+    },
+    {
+      "code": "POL",
+      "name": "Poland",
+      "flagCode": "pl",
+      "confederation": "Europe"
+    },
+    {
+      "code": "UKR",
+      "name": "Ukraine",
+      "flagCode": "ua",
+      "confederation": "Europe"
+    },
+    {
+      "code": "TUR",
+      "name": "Turkey",
+      "flagCode": "tr",
+      "confederation": "Europe"
+    },
+    {
+      "code": "SRB",
+      "name": "Serbia",
+      "flagCode": "rs",
+      "confederation": "Europe"
+    },
+    {
+      "code": "CZE",
+      "name": "Czechia",
+      "flagCode": "cz",
+      "confederation": "Europe"
+    },
+    {
+      "code": "HUN",
+      "name": "Hungary",
+      "flagCode": "hu",
+      "confederation": "Europe"
+    },
+    {
+      "code": "ROU",
+      "name": "Romania",
+      "flagCode": "ro",
+      "confederation": "Europe"
+    },
+    {
+      "code": "GRE",
+      "name": "Greece",
+      "flagCode": "gr",
+      "confederation": "Europe"
+    },
+    {
+      "code": "SVK",
+      "name": "Slovakia",
+      "flagCode": "sk",
+      "confederation": "Europe"
+    },
+    {
+      "code": "SVN",
+      "name": "Slovenia",
+      "flagCode": "si",
+      "confederation": "Europe"
+    },
+    {
+      "code": "NIR",
+      "name": "Northern Ireland",
+      "flagCode": "gb-nir",
+      "confederation": "Europe"
+    },
+    {
+      "code": "FIN",
+      "name": "Finland",
+      "flagCode": "fi",
+      "confederation": "Europe"
+    },
+    {
+      "code": "ISL",
+      "name": "Iceland",
+      "flagCode": "is",
+      "confederation": "Europe"
+    },
+    {
+      "code": "ALB",
+      "name": "Albania",
+      "flagCode": "al",
+      "confederation": "Europe"
+    },
+    {
+      "code": "GEO",
+      "name": "Georgia",
+      "flagCode": "ge",
+      "confederation": "Europe"
+    },
+    {
+      "code": "BIH",
+      "name": "Bosnia and Herzegovina",
+      "flagCode": "ba",
+      "confederation": "Europe"
+    },
+    {
+      "code": "MKD",
+      "name": "North Macedonia",
+      "flagCode": "mk",
+      "confederation": "Europe"
+    },
+    {
+      "code": "MNE",
+      "name": "Montenegro",
+      "flagCode": "me",
+      "confederation": "Europe"
+    },
+    {
+      "code": "BUL",
+      "name": "Bulgaria",
+      "flagCode": "bg",
+      "confederation": "Europe"
+    },
+    {
+      "code": "ISR",
+      "name": "Israel",
+      "flagCode": "il",
+      "confederation": "Europe"
+    },
+    {
+      "code": "RUS",
+      "name": "Russia",
+      "flagCode": "ru",
+      "confederation": "Europe"
+    },
+    {
+      "code": "KOS",
+      "name": "Kosovo",
+      "flagCode": "xk",
+      "confederation": "Europe"
+    },
+    {
+      "code": "ARM",
+      "name": "Armenia",
+      "flagCode": "am",
+      "confederation": "Europe"
+    },
+    {
+      "code": "AZE",
+      "name": "Azerbaijan",
+      "flagCode": "az",
+      "confederation": "Europe"
+    },
+    {
+      "code": "BLR",
+      "name": "Belarus",
+      "flagCode": "by",
+      "confederation": "Europe"
+    },
+    {
+      "code": "CYP",
+      "name": "Cyprus",
+      "flagCode": "cy",
+      "confederation": "Europe"
+    },
+    {
+      "code": "EST",
+      "name": "Estonia",
+      "flagCode": "ee",
+      "confederation": "Europe"
+    },
+    {
+      "code": "KAZ",
+      "name": "Kazakhstan",
+      "flagCode": "kz",
+      "confederation": "Europe"
+    },
+    {
+      "code": "LVA",
+      "name": "Latvia",
+      "flagCode": "lv",
+      "confederation": "Europe"
+    },
+    {
+      "code": "LTU",
+      "name": "Lithuania",
+      "flagCode": "lt",
+      "confederation": "Europe"
+    },
+    {
+      "code": "LUX",
+      "name": "Luxembourg",
+      "flagCode": "lu",
+      "confederation": "Europe"
+    },
+    {
+      "code": "MDA",
+      "name": "Moldova",
+      "flagCode": "md",
+      "confederation": "Europe"
+    },
+    {
+      "code": "MLT",
+      "name": "Malta",
+      "flagCode": "mt",
+      "confederation": "Europe"
+    },
+    {
+      "code": "FRO",
+      "name": "Faroe Islands",
+      "flagCode": "fo",
+      "confederation": "Europe"
+    },
+    {
+      "code": "GIB",
+      "name": "Gibraltar",
+      "flagCode": "gi",
+      "confederation": "Europe"
+    },
+    {
+      "code": "AND",
+      "name": "Andorra",
+      "flagCode": "ad",
+      "confederation": "Europe"
+    },
+    {
+      "code": "LIE",
+      "name": "Liechtenstein",
+      "flagCode": "li",
+      "confederation": "Europe"
+    },
+    {
+      "code": "SMR",
+      "name": "San Marino",
+      "flagCode": "sm",
+      "confederation": "Europe"
+    },
+    {
+      "code": "SEN",
+      "name": "Senegal",
+      "flagCode": "sn",
+      "confederation": "Africa"
+    },
+    {
+      "code": "MAR",
+      "name": "Morocco",
+      "flagCode": "ma",
+      "confederation": "Africa"
+    },
+    {
+      "code": "NGA",
+      "name": "Nigeria",
+      "flagCode": "ng",
+      "confederation": "Africa"
+    },
+    {
+      "code": "CIV",
+      "name": "Ivory Coast",
+      "flagCode": "ci",
+      "confederation": "Africa"
+    },
+    {
+      "code": "EGY",
+      "name": "Egypt",
+      "flagCode": "eg",
+      "confederation": "Africa"
+    },
+    {
+      "code": "GHA",
+      "name": "Ghana",
+      "flagCode": "gh",
+      "confederation": "Africa"
+    },
+    {
+      "code": "CMR",
+      "name": "Cameroon",
+      "flagCode": "cm",
+      "confederation": "Africa"
+    },
+    {
+      "code": "ANG",
+      "name": "Angola",
+      "flagCode": "ao",
+      "confederation": "Africa"
+    },
+    {
+      "code": "ALG",
+      "name": "Algeria",
+      "flagCode": "dz",
+      "confederation": "Africa"
+    },
+    {
+      "code": "TUN",
+      "name": "Tunisia",
+      "flagCode": "tn",
+      "confederation": "Africa"
+    },
+    {
+      "code": "COD",
+      "name": "DR Congo",
+      "flagCode": "cd",
+      "confederation": "Africa"
+    },
+    {
+      "code": "MLI",
+      "name": "Mali",
+      "flagCode": "ml",
+      "confederation": "Africa"
+    },
+    {
+      "code": "RSA",
+      "name": "South Africa",
+      "flagCode": "za",
+      "confederation": "Africa"
+    },
+    {
+      "code": "BFA",
+      "name": "Burkina Faso",
+      "flagCode": "bf",
+      "confederation": "Africa"
+    },
+    {
+      "code": "GAB",
+      "name": "Gabon",
+      "flagCode": "ga",
+      "confederation": "Africa"
+    },
+    {
+      "code": "CPV",
+      "name": "Cape Verde",
+      "flagCode": "cv",
+      "confederation": "Africa"
+    },
+    {
+      "code": "GUI",
+      "name": "Guinea",
+      "flagCode": "gn",
+      "confederation": "Africa"
+    },
+    {
+      "code": "ZAM",
+      "name": "Zambia",
+      "flagCode": "zm",
+      "confederation": "Africa"
+    },
+    {
+      "code": "UGA",
+      "name": "Uganda",
+      "flagCode": "ug",
+      "confederation": "Africa"
+    },
+    {
+      "code": "BEN",
+      "name": "Benin",
+      "flagCode": "bj",
+      "confederation": "Africa"
+    },
+    {
+      "code": "MOZ",
+      "name": "Mozambique",
+      "flagCode": "mz",
+      "confederation": "Africa"
+    },
+    {
+      "code": "KEN",
+      "name": "Kenya",
+      "flagCode": "ke",
+      "confederation": "Africa"
+    },
+    {
+      "code": "MTN",
+      "name": "Mauritania",
+      "flagCode": "mr",
+      "confederation": "Africa"
+    },
+    {
+      "code": "MAD",
+      "name": "Madagascar",
+      "flagCode": "mg",
+      "confederation": "Africa"
+    },
+    {
+      "code": "LBY",
+      "name": "Libya",
+      "flagCode": "ly",
+      "confederation": "Africa"
+    },
+    {
+      "code": "COM",
+      "name": "Comoros",
+      "flagCode": "km",
+      "confederation": "Africa"
+    },
+    {
+      "code": "ZIM",
+      "name": "Zimbabwe",
+      "flagCode": "zw",
+      "confederation": "Africa"
+    },
+    {
+      "code": "TAN",
+      "name": "Tanzania",
+      "flagCode": "tz",
+      "confederation": "Africa"
+    },
+    {
+      "code": "CGO",
+      "name": "Congo",
+      "flagCode": "cg",
+      "confederation": "Africa"
+    },
+    {
+      "code": "SDN",
+      "name": "Sudan",
+      "flagCode": "sd",
+      "confederation": "Africa"
+    },
+    {
+      "code": "EQG",
+      "name": "Equatorial Guinea",
+      "flagCode": "gq",
+      "confederation": "Africa"
+    },
+    {
+      "code": "TOG",
+      "name": "Togo",
+      "flagCode": "tg",
+      "confederation": "Africa"
+    },
+    {
+      "code": "NAM",
+      "name": "Namibia",
+      "flagCode": "na",
+      "confederation": "Africa"
+    },
+    {
+      "code": "SLE",
+      "name": "Sierra Leone",
+      "flagCode": "sl",
+      "confederation": "Africa"
+    },
+    {
+      "code": "GNB",
+      "name": "Guinea-Bissau",
+      "flagCode": "gw",
+      "confederation": "Africa"
+    },
+    {
+      "code": "MWI",
+      "name": "Malawi",
+      "flagCode": "mw",
+      "confederation": "Africa"
+    },
+    {
+      "code": "BOT",
+      "name": "Botswana",
+      "flagCode": "bw",
+      "confederation": "Africa"
+    },
+    {
+      "code": "LBR",
+      "name": "Liberia",
+      "flagCode": "lr",
+      "confederation": "Africa"
+    },
+    {
+      "code": "CTA",
+      "name": "Central African Republic",
+      "flagCode": "cf",
+      "confederation": "Africa"
+    },
+    {
+      "code": "RWA",
+      "name": "Rwanda",
+      "flagCode": "rw",
+      "confederation": "Africa"
+    },
+    {
+      "code": "NIG",
+      "name": "Niger",
+      "flagCode": "ne",
+      "confederation": "Africa"
+    },
+    {
+      "code": "ETH",
+      "name": "Ethiopia",
+      "flagCode": "et",
+      "confederation": "Africa"
+    },
+    {
+      "code": "GAM",
+      "name": "Gambia",
+      "flagCode": "gm",
+      "confederation": "Africa"
+    },
+    {
+      "code": "BDI",
+      "name": "Burundi",
+      "flagCode": "bi",
+      "confederation": "Africa"
+    },
+    {
+      "code": "LES",
+      "name": "Lesotho",
+      "flagCode": "ls",
+      "confederation": "Africa"
+    },
+    {
+      "code": "SSD",
+      "name": "South Sudan",
+      "flagCode": "ss",
+      "confederation": "Africa"
+    },
+    {
+      "code": "CHA",
+      "name": "Chad",
+      "flagCode": "td",
+      "confederation": "Africa"
+    },
+    {
+      "code": "MRI",
+      "name": "Mauritius",
+      "flagCode": "mu",
+      "confederation": "Africa"
+    },
+    {
+      "code": "SWZ",
+      "name": "Eswatini",
+      "flagCode": "sz",
+      "confederation": "Africa"
+    },
+    {
+      "code": "DJI",
+      "name": "Djibouti",
+      "flagCode": "dj",
+      "confederation": "Africa"
+    },
+    {
+      "code": "STP",
+      "name": "Sao Tome and Principe",
+      "flagCode": "st",
+      "confederation": "Africa"
+    },
+    {
+      "code": "SEY",
+      "name": "Seychelles",
+      "flagCode": "sc",
+      "confederation": "Africa"
+    },
+    {
+      "code": "SOM",
+      "name": "Somalia",
+      "flagCode": "so",
+      "confederation": "Africa"
+    },
+    {
+      "code": "ERI",
+      "name": "Eritrea",
+      "flagCode": "er",
+      "confederation": "Africa"
+    },
+    {
+      "code": "JPN",
+      "name": "Japan",
+      "flagCode": "jp",
+      "confederation": "Asia"
+    },
+    {
+      "code": "KOR",
+      "name": "South Korea",
+      "flagCode": "kr",
+      "confederation": "Asia"
+    },
+    {
+      "code": "AUS",
+      "name": "Australia",
+      "flagCode": "au",
+      "confederation": "Asia"
+    },
+    {
+      "code": "IRN",
+      "name": "Iran",
+      "flagCode": "ir",
+      "confederation": "Asia"
+    },
+    {
+      "code": "KSA",
+      "name": "Saudi Arabia",
+      "flagCode": "sa",
+      "confederation": "Asia"
+    },
+    {
+      "code": "QAT",
+      "name": "Qatar",
+      "flagCode": "qa",
+      "confederation": "Asia"
+    },
+    {
+      "code": "UZB",
+      "name": "Uzbekistan",
+      "flagCode": "uz",
+      "confederation": "Asia"
+    },
+    {
+      "code": "JOR",
+      "name": "Jordan",
+      "flagCode": "jo",
+      "confederation": "Asia"
+    },
+    {
+      "code": "IRQ",
+      "name": "Iraq",
+      "flagCode": "iq",
+      "confederation": "Asia"
+    },
+    {
+      "code": "UAE",
+      "name": "United Arab Emirates",
+      "flagCode": "ae",
+      "confederation": "Asia"
+    },
+    {
+      "code": "CHN",
+      "name": "China",
+      "flagCode": "cn",
+      "confederation": "Asia"
+    },
+    {
+      "code": "OMA",
+      "name": "Oman",
+      "flagCode": "om",
+      "confederation": "Asia"
+    },
+    {
+      "code": "BHR",
+      "name": "Bahrain",
+      "flagCode": "bh",
+      "confederation": "Asia"
+    },
+    {
+      "code": "SYR",
+      "name": "Syria",
+      "flagCode": "sy",
+      "confederation": "Asia"
+    },
+    {
+      "code": "PLE",
+      "name": "Palestine",
+      "flagCode": "ps",
+      "confederation": "Asia"
+    },
+    {
+      "code": "KGZ",
+      "name": "Kyrgyzstan",
+      "flagCode": "kg",
+      "confederation": "Asia"
+    },
+    {
+      "code": "THA",
+      "name": "Thailand",
+      "flagCode": "th",
+      "confederation": "Asia"
+    },
+    {
+      "code": "VIE",
+      "name": "Vietnam",
+      "flagCode": "vn",
+      "confederation": "Asia"
+    },
+    {
+      "code": "IND",
+      "name": "India",
+      "flagCode": "in",
+      "confederation": "Asia"
+    },
+    {
+      "code": "LIB",
+      "name": "Lebanon",
+      "flagCode": "lb",
+      "confederation": "Asia"
+    },
+    {
+      "code": "PRK",
+      "name": "North Korea",
+      "flagCode": "kp",
+      "confederation": "Asia"
+    },
+    {
+      "code": "TJK",
+      "name": "Tajikistan",
+      "flagCode": "tj",
+      "confederation": "Asia"
+    },
+    {
+      "code": "KUW",
+      "name": "Kuwait",
+      "flagCode": "kw",
+      "confederation": "Asia"
+    },
+    {
+      "code": "MAS",
+      "name": "Malaysia",
+      "flagCode": "my",
+      "confederation": "Asia"
+    },
+    {
+      "code": "IDN",
+      "name": "Indonesia",
+      "flagCode": "id",
+      "confederation": "Asia"
+    },
+    {
+      "code": "TKM",
+      "name": "Turkmenistan",
+      "flagCode": "tm",
+      "confederation": "Asia"
+    },
+    {
+      "code": "AFG",
+      "name": "Afghanistan",
+      "flagCode": "af",
+      "confederation": "Asia"
+    },
+    {
+      "code": "YEM",
+      "name": "Yemen",
+      "flagCode": "ye",
+      "confederation": "Asia"
+    },
+    {
+      "code": "PHI",
+      "name": "Philippines",
+      "flagCode": "ph",
+      "confederation": "Asia"
+    },
+    {
+      "code": "HKG",
+      "name": "Hong Kong",
+      "flagCode": "hk",
+      "confederation": "Asia"
+    },
+    {
+      "code": "SIN",
+      "name": "Singapore",
+      "flagCode": "sg",
+      "confederation": "Asia"
+    },
+    {
+      "code": "MYA",
+      "name": "Myanmar",
+      "flagCode": "mm",
+      "confederation": "Asia"
+    },
+    {
+      "code": "TPE",
+      "name": "Chinese Taipei",
+      "flagCode": "tw",
+      "confederation": "Asia"
+    },
+    {
+      "code": "MDV",
+      "name": "Maldives",
+      "flagCode": "mv",
+      "confederation": "Asia"
+    },
+    {
+      "code": "NEP",
+      "name": "Nepal",
+      "flagCode": "np",
+      "confederation": "Asia"
+    },
+    {
+      "code": "BAN",
+      "name": "Bangladesh",
+      "flagCode": "bd",
+      "confederation": "Asia"
+    },
+    {
+      "code": "PAK",
+      "name": "Pakistan",
+      "flagCode": "pk",
+      "confederation": "Asia"
+    },
+    {
+      "code": "LAO",
+      "name": "Laos",
+      "flagCode": "la",
+      "confederation": "Asia"
+    },
+    {
+      "code": "CAM",
+      "name": "Cambodia",
+      "flagCode": "kh",
+      "confederation": "Asia"
+    },
+    {
+      "code": "SRI",
+      "name": "Sri Lanka",
+      "flagCode": "lk",
+      "confederation": "Asia"
+    },
+    {
+      "code": "MNG",
+      "name": "Mongolia",
+      "flagCode": "mn",
+      "confederation": "Asia"
+    },
+    {
+      "code": "BRU",
+      "name": "Brunei",
+      "flagCode": "bn",
+      "confederation": "Asia"
+    },
+    {
+      "code": "BHU",
+      "name": "Bhutan",
+      "flagCode": "bt",
+      "confederation": "Asia"
+    },
+    {
+      "code": "TLS",
+      "name": "Timor-Leste",
+      "flagCode": "tl",
+      "confederation": "Asia"
+    },
+    {
+      "code": "MAC",
+      "name": "Macau",
+      "flagCode": "mo",
+      "confederation": "Asia"
+    },
+    {
+      "code": "GUM",
+      "name": "Guam",
+      "flagCode": "gu",
+      "confederation": "Asia"
+    },
+    {
+      "code": "USA",
+      "name": "United States",
+      "flagCode": "us",
+      "confederation": "North America"
+    },
+    {
+      "code": "MEX",
+      "name": "Mexico",
+      "flagCode": "mx",
+      "confederation": "North America"
+    },
+    {
+      "code": "CAN",
+      "name": "Canada",
+      "flagCode": "ca",
+      "confederation": "North America"
+    },
+    {
+      "code": "PAN",
+      "name": "Panama",
+      "flagCode": "pa",
+      "confederation": "North America"
+    },
+    {
+      "code": "CRC",
+      "name": "Costa Rica",
+      "flagCode": "cr",
+      "confederation": "North America"
+    },
+    {
+      "code": "JAM",
+      "name": "Jamaica",
+      "flagCode": "jm",
+      "confederation": "North America"
+    },
+    {
+      "code": "HON",
+      "name": "Honduras",
+      "flagCode": "hn",
+      "confederation": "North America"
+    },
+    {
+      "code": "SLV",
+      "name": "El Salvador",
+      "flagCode": "sv",
+      "confederation": "North America"
+    },
+    {
+      "code": "HAI",
+      "name": "Haiti",
+      "flagCode": "ht",
+      "confederation": "North America"
+    },
+    {
+      "code": "CUW",
+      "name": "Curacao",
+      "flagCode": "cw",
+      "confederation": "North America"
+    },
+    {
+      "code": "TRI",
+      "name": "Trinidad and Tobago",
+      "flagCode": "tt",
+      "confederation": "North America"
+    },
+    {
+      "code": "GUA",
+      "name": "Guatemala",
+      "flagCode": "gt",
+      "confederation": "North America"
+    },
+    {
+      "code": "SUR",
+      "name": "Suriname",
+      "flagCode": "sr",
+      "confederation": "North America"
+    },
+    {
+      "code": "CUB",
+      "name": "Cuba",
+      "flagCode": "cu",
+      "confederation": "North America"
+    },
+    {
+      "code": "NCA",
+      "name": "Nicaragua",
+      "flagCode": "ni",
+      "confederation": "North America"
+    },
+    {
+      "code": "DOM",
+      "name": "Dominican Republic",
+      "flagCode": "do",
+      "confederation": "North America"
+    },
+    {
+      "code": "GUY",
+      "name": "Guyana",
+      "flagCode": "gy",
+      "confederation": "North America"
+    },
+    {
+      "code": "PUR",
+      "name": "Puerto Rico",
+      "flagCode": "pr",
+      "confederation": "North America"
+    },
+    {
+      "code": "BER",
+      "name": "Bermuda",
+      "flagCode": "bm",
+      "confederation": "North America"
+    },
+    {
+      "code": "GRN",
+      "name": "Grenada",
+      "flagCode": "gd",
+      "confederation": "North America"
+    },
+    {
+      "code": "SKN",
+      "name": "Saint Kitts and Nevis",
+      "flagCode": "kn",
+      "confederation": "North America"
+    },
+    {
+      "code": "LCA",
+      "name": "Saint Lucia",
+      "flagCode": "lc",
+      "confederation": "North America"
+    },
+    {
+      "code": "ATG",
+      "name": "Antigua and Barbuda",
+      "flagCode": "ag",
+      "confederation": "North America"
+    },
+    {
+      "code": "VIN",
+      "name": "Saint Vincent and the Grenadines",
+      "flagCode": "vc",
+      "confederation": "North America"
+    },
+    {
+      "code": "BLZ",
+      "name": "Belize",
+      "flagCode": "bz",
+      "confederation": "North America"
+    },
+    {
+      "code": "BRB",
+      "name": "Barbados",
+      "flagCode": "bb",
+      "confederation": "North America"
+    },
+    {
+      "code": "DMA",
+      "name": "Dominica",
+      "flagCode": "dm",
+      "confederation": "North America"
+    },
+    {
+      "code": "MSR",
+      "name": "Montserrat",
+      "flagCode": "ms",
+      "confederation": "North America"
+    },
+    {
+      "code": "CAY",
+      "name": "Cayman Islands",
+      "flagCode": "ky",
+      "confederation": "North America"
+    },
+    {
+      "code": "BAH",
+      "name": "Bahamas",
+      "flagCode": "bs",
+      "confederation": "North America"
+    },
+    {
+      "code": "ARU",
+      "name": "Aruba",
+      "flagCode": "aw",
+      "confederation": "North America"
+    },
+    {
+      "code": "TCA",
+      "name": "Turks and Caicos Islands",
+      "flagCode": "tc",
+      "confederation": "North America"
+    },
+    {
+      "code": "VGB",
+      "name": "British Virgin Islands",
+      "flagCode": "vg",
+      "confederation": "North America"
+    },
+    {
+      "code": "VIR",
+      "name": "US Virgin Islands",
+      "flagCode": "vi",
+      "confederation": "North America"
+    },
+    {
+      "code": "AIA",
+      "name": "Anguilla",
+      "flagCode": "ai",
+      "confederation": "North America"
+    },
+    {
+      "code": "ARG",
+      "name": "Argentina",
+      "flagCode": "ar",
+      "confederation": "South America"
+    },
+    {
+      "code": "BRA",
+      "name": "Brazil",
+      "flagCode": "br",
+      "confederation": "South America"
+    },
+    {
+      "code": "URU",
+      "name": "Uruguay",
+      "flagCode": "uy",
+      "confederation": "South America"
+    },
+    {
+      "code": "COL",
+      "name": "Colombia",
+      "flagCode": "co",
+      "confederation": "South America"
+    },
+    {
+      "code": "ECU",
+      "name": "Ecuador",
+      "flagCode": "ec",
+      "confederation": "South America"
+    },
+    {
+      "code": "PAR",
+      "name": "Paraguay",
+      "flagCode": "py",
+      "confederation": "South America"
+    },
+    {
+      "code": "CHI",
+      "name": "Chile",
+      "flagCode": "cl",
+      "confederation": "South America"
+    },
+    {
+      "code": "PER",
+      "name": "Peru",
+      "flagCode": "pe",
+      "confederation": "South America"
+    },
+    {
+      "code": "VEN",
+      "name": "Venezuela",
+      "flagCode": "ve",
+      "confederation": "South America"
+    },
+    {
+      "code": "BOL",
+      "name": "Bolivia",
+      "flagCode": "bo",
+      "confederation": "South America"
+    },
+    {
+      "code": "NZL",
+      "name": "New Zealand",
+      "flagCode": "nz",
+      "confederation": "Oceania"
+    },
+    {
+      "code": "FIJ",
+      "name": "Fiji",
+      "flagCode": "fj",
+      "confederation": "Oceania"
+    },
+    {
+      "code": "NCL",
+      "name": "New Caledonia",
+      "flagCode": "nc",
+      "confederation": "Oceania"
+    },
+    {
+      "code": "TAH",
+      "name": "Tahiti",
+      "flagCode": "pf",
+      "confederation": "Oceania"
+    },
+    {
+      "code": "SOL",
+      "name": "Solomon Islands",
+      "flagCode": "sb",
+      "confederation": "Oceania"
+    },
+    {
+      "code": "PNG",
+      "name": "Papua New Guinea",
+      "flagCode": "pg",
+      "confederation": "Oceania"
+    },
+    {
+      "code": "VAN",
+      "name": "Vanuatu",
+      "flagCode": "vu",
+      "confederation": "Oceania"
+    },
+    {
+      "code": "SAM",
+      "name": "Samoa",
+      "flagCode": "ws",
+      "confederation": "Oceania"
+    },
+    {
+      "code": "TGA",
+      "name": "Tonga",
+      "flagCode": "to",
+      "confederation": "Oceania"
+    },
+    {
+      "code": "COK",
+      "name": "Cook Islands",
+      "flagCode": "ck",
+      "confederation": "Oceania"
+    },
+    {
+      "code": "ASA",
+      "name": "American Samoa",
+      "flagCode": "as",
+      "confederation": "Oceania"
+    }
+  ]
+}

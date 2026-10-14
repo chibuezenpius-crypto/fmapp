@@ -259,9 +259,23 @@ export interface InternationalTournament {
   season: string
   hostCountryCodes: string[]
   eligibleCountryCodes: string[]
+  qualifiedCountryCodes?: string[]
   stages: TournamentStage[]
   rules: string[]
   history: { season: string; champion: string; runnerUp: string }[]
+}
+
+export interface WorldCountry {
+  code: string
+  name: string
+  flagCode: string
+  confederation: string
+}
+
+export interface WorldCountriesDatabase {
+  countryCount: number
+  confederations: string[]
+  countries: WorldCountry[]
 }
 
 export interface InternationalTournamentsDatabase {

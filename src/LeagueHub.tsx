@@ -6,6 +6,7 @@ import type { GlobalLeaguesDatabase, GlobalCountryLeague, InternationalTournamen
 import Flag from './Flag'
 import ClubBadge from './ClubBadge'
 import KnockoutBracket from './KnockoutBracket'
+import { findWorldCountry, worldCountries } from './worldCountries'
 
 const categories: LeagueCategory[] = ['Domestic Leagues', 'Continental Competitions', 'International']
 const leagueSections = ['Standings', 'Player Stats', 'Team Stats', 'Rules', 'History'] as const
@@ -33,12 +34,23 @@ function adaptGlobalLeague(countryLeague: GlobalCountryLeague): LeagueCompetitio
 const internationalTournaments = rawInternationalTournaments as unknown as InternationalTournamentsDatabase
 
 function findTournamentCountry(code: string) {
-  return globalLeagues.countries.find((country) => country.countryCode === code)
+  const country = findWorldCountry(code)
+  return country && { countryName: country.name, flagCode: country.flagCode }
+}
+
+function tournamentFieldCodes(tournament: InternationalTournament) {
+  const grouped = tournament.stages.flatMap((stage) => stage.groups?.flatMap((group) => group.countryCodes) ?? [])
+  return grouped.length ? grouped : tournament.eligibleCountryCodes
+}
+
+function nationCompetitions(code: string) {
+  return internationalTournaments.tournaments.filter((tournament) => (tournament.qualifiedCountryCodes ?? tournament.eligibleCountryCodes).includes(code)).map((tournament) => tournament.name)
 }
 
 function adaptTournament(tournament: InternationalTournament): LeagueCompetition {
   const sample = leagueCompetitions[0]
-  const standings: LeagueStanding[] = tournament.eligibleCountryCodes.map((code, index) => {
+  const fieldCodes = tournamentFieldCodes(tournament)
+  const standings: LeagueStanding[] = fieldCodes.map((code, index) => {
     const country = findTournamentCountry(code)
     const played = 3
     const won = index % 3 === 0 ? 2 : 1
@@ -69,7 +81,7 @@ function adaptTournament(tournament: InternationalTournament): LeagueCompetition
     category: tournament.category,
     season: tournament.season,
     matchday: 1,
-    totalMatchdays: tournament.eligibleCountryCodes.length,
+    totalMatchdays: fieldCodes.length,
     standings,
     teamStats: standings.map((team, index) => ({ clubId: team.clubId, clubName: team.clubName, possession: 55 + index % 6 * 3, goals: team.goalsFor, cleanSheets: Math.max(0, 3 - team.goalsAgainst % 4), cards: 3 + index % 7 })),
     rules: tournament.rules,
@@ -121,6 +133,7 @@ export default function LeagueHub({ selectedCompetitionId, onSelectCompetition, 
   const [tournamentStageId, setTournamentStageId] = useState('group-stage')
   const [season, setSeason] = useState('2026/27')
   const categoryTournaments = internationalTournaments.tournaments.filter((item) => item.category === category)
+  const [openConfederation, setOpenConfederation] = useState('')
   const browseItems = category === 'Domestic Leagues'
     ? [...globalLeagues.countries.map((item) => ({ id: item.id, name: item.name, country: item.countryName, totalMatchdays: 34 })), ...leagueCompetitions.filter((item) => item.category === 'Domestic Leagues' && item.totalMatchdays <= 8).map((item) => ({ id: item.id, name: item.name, country: item.country, totalMatchdays: item.totalMatchdays }))]
     : [...(category === 'International' ? [] : leagueCompetitions.filter((item) => item.category === category).map((item) => ({ id: item.id, name: item.name, country: item.country, totalMatchdays: item.totalMatchdays }))), ...categoryTournaments.map((item) => ({ id: item.id, name: item.name, country: item.region, totalMatchdays: item.stages.length }))]
@@ -148,6 +161,14 @@ export default function LeagueHub({ selectedCompetitionId, onSelectCompetition, 
           {openRegion === region && <div className="region-leagues">{browseItems.filter((item) => item.country === region).map((item) => <button className="region-league" key={item.id} onClick={() => { setSection('Standings'); setTournamentStageId('group-stage'); onSelectCompetition(item.id) }} type="button"><span>{item.name}</span><small>{item.totalMatchdays <= 8 ? 'CUP' : 'LEAGUE'}</small></button>)}</div>}
         </section>)}
       </div>
+      {category === 'International' && <div className="league-region-list"><span className="eyebrow">NATIONAL TEAMS · {worldCountries.countryCount}</span>
+        {worldCountries.confederations.map((confederation) => {
+          const nations = worldCountries.countries.filter((nation) => nation.confederation === confederation)
+          return <section className="region-accordion" key={confederation}><button aria-expanded={openConfederation === confederation} className={openConfederation === confederation ? 'region-toggle open' : 'region-toggle'} onClick={() => setOpenConfederation(openConfederation === confederation ? '' : confederation)} type="button"><span>{confederation}</span><i>{nations.length}</i><b>{openConfederation === confederation ? '−' : '+'}</b></button>
+            {openConfederation === confederation && <div className="region-leagues">{nations.map((nation) => <div className="region-league nation-row" key={nation.code}><Flag code={nation.flagCode} countryName={nation.name} onSelectCountry={onSelectCountry} /><span>{nation.name}</span><small>{nationCompetitions(nation.code).join(' · ')}</small></div>)}</div>}
+          </section>
+        })}
+      </div>}
     </>}
 
     {currentCompetition && <section className="league-detail">

@@ -52,7 +52,7 @@ export default function PlayerProfile({ player, section, selectedClubName, onSec
 
   return <div className="player-profile">
     <section className="profile-hero">
-      <div className="profile-jersey">{String(player.shirtNumber).padStart(2, '0')}</div>
+      <img alt={`Portrait of ${player.name}`} className="profile-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80" />
       <div className="profile-player-info"><span className="eyebrow">{player.position} · {player.age} YEARS</span><h1>{player.name}</h1>
         <div className="profile-clubline"><ClubReference name="Northbridge FC" selectedClubName={selectedClubName} onSelectClub={onSelectClub} /><span>·</span><span>{player.contract.squadRole}</span></div>
       </div>
