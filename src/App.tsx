@@ -1,12 +1,14 @@
 import { useState, type ReactNode } from 'react'
 import { club, league, nextMatch } from './data/mockData'
 import PlayerProfile, { type ProfileSection } from './PlayerProfile'
+import ClubProfile, { type ClubSection } from './ClubProfile'
 import type { Player } from './types/game'
 import './App.css'
 
 const tabs = [
   { id: 'Home', label: 'Home', icon: 'M3 10.5 12 3l9 7.5M5.5 9v11h13V9M9 20v-6h6v6' },
   { id: 'Squad', label: 'Squad', icon: 'M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM20 8v6M23 11h-6' },
+  { id: 'Club', label: 'Club', icon: 'M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 9h.01M15 9h.01M9 12h.01M15 12h.01' },
   { id: 'Tactics', label: 'Tactics', icon: 'M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11ZM9 12l2 2 4-4' },
   { id: 'Transfers', label: 'Transfers', icon: 'M7 7h14l-4-4M17 17H3l4 4M21 7l-4 4M3 17l4-4' },
   { id: 'League', label: 'League', icon: 'M4 19V5m0 14h17M8 15v-4m5 4V7m5 8v-6' },
@@ -22,21 +24,29 @@ function App() {
   const [profileSection, setProfileSection] = useState<ProfileSection>('Overview')
   const [selectedClubName, setSelectedClubName] = useState<string | null>(null)
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null)
+  const [clubSection, setClubSection] = useState<ClubSection>('Overview')
+  const [clubReturnTab, setClubReturnTab] = useState<TabId>('Home')
   const position = league.standings.find((standing) => standing.clubId === club.id)
   const selectPlayer = (player: Player) => {
     setSelectedPlayer(player)
     setProfileSection('Overview')
+  }
+  const openClubProfile = () => {
+    if (activeTab !== 'Club') setClubReturnTab(activeTab)
+    setSelectedPlayer(null)
+    setActiveTab('Club')
+    setClubSection('Overview')
   }
 
   return (
     <div className="app-backdrop">
       <div className="app-shell">
         <header className="topbar">
-          <ClubReference name="N" selectedClubName={selectedClubName} onSelect={setSelectedClubName} className="club-mark" ariaLabel={`${club.name} crest`} />
+          <ClubReference name="N" selectedClubName={selectedClubName} onSelect={setSelectedClubName} onOpen={openClubProfile} className="club-mark" ariaLabel={`${club.name} crest`} />
           <div className="identity">
             <span className="eyebrow">MANAGER CAREER · 2026/27</span>
             <strong>{club.manager.name}</strong>
-            <ClubReference name={club.name} selectedClubName={selectedClubName} onSelect={setSelectedClubName} className="club-name" />
+            <ClubReference name={club.name} selectedClubName={selectedClubName} onSelect={setSelectedClubName} onOpen={openClubProfile} className="club-name" />
           </div>
           <div className="header-date"><span>IN-GAME DATE</span><strong>14 OCT</strong><span>WEDNESDAY</span></div>
           <div className="budget-strip"><span>TRANSFER BUDGET</span><strong>{money(club.finances.transferBudget)}</strong></div>
@@ -45,6 +55,8 @@ function App() {
         <main className="main-content" key={selectedPlayer ? 'profile' : activeTab}>
           {selectedPlayer ? <PlayerProfile player={selectedPlayer} section={profileSection} selectedClubName={selectedClubName} backLabel={`Back to ${activeTab === 'Squad' ? 'squad' : activeTab.toLowerCase()}`}
             onBack={() => setSelectedPlayer(null)} onSectionChange={setProfileSection} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} /> : <>
+            {activeTab === 'Club' && <ClubProfile section={clubSection} selectedClubName={selectedClubName} backLabel={`Back to ${clubReturnTab.toLowerCase()}`}
+              onBack={() => setActiveTab(clubReturnTab)} onSectionChange={setClubSection} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} />}
             {activeTab === 'Home' && <HomeView position={position?.position ?? 0} selectedClubName={selectedClubName} selectedMatchId={selectedMatchId} onSelectMatch={setSelectedMatchId} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} />}
             {activeTab === 'Squad' && <SquadView selectedClubName={selectedClubName} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} />}
             {activeTab === 'Tactics' && <TacticsView selectedClubName={selectedClubName} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} />}
@@ -58,7 +70,7 @@ function App() {
           {tabs.map((tab) => (
             <button aria-current={activeTab === tab.id ? 'page' : undefined} aria-label={tab.label}
               className={activeTab === tab.id ? 'nav-item active' : 'nav-item'} key={tab.id}
-              onClick={() => { setSelectedPlayer(null); setActiveTab(tab.id) }} type="button">
+              onClick={() => { if (tab.id === 'Club' && activeTab !== 'Club') setClubReturnTab(activeTab); setSelectedPlayer(null); setActiveTab(tab.id) }} type="button">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d={tab.icon} /></svg>
               <span>{tab.label}</span>
             </button>
@@ -69,8 +81,8 @@ function App() {
   )
 }
 
-function ClubReference({ name, selectedClubName, onSelect, className = '', ariaLabel, children }: { name: string; selectedClubName: string | null; onSelect: (name: string) => void; className?: string; ariaLabel?: string; children?: ReactNode }) {
-  return <button aria-label={ariaLabel} aria-pressed={selectedClubName === name} className={`entity-link ${className} ${selectedClubName === name ? 'selected' : ''}`} onClick={() => onSelect(name)} type="button">{children ?? name}</button>
+function ClubReference({ name, selectedClubName, onSelect, onOpen, className = '', ariaLabel, children }: { name: string; selectedClubName: string | null; onSelect: (name: string) => void; onOpen?: () => void; className?: string; ariaLabel?: string; children?: ReactNode }) {
+  return <button aria-label={ariaLabel} aria-pressed={selectedClubName === name} className={`entity-link ${className} ${selectedClubName === name ? 'selected' : ''}`} onClick={() => onOpen ? onOpen() : onSelect(name)} type="button">{children ?? name}</button>
 }
 
 function PlayerReference({ player, onSelectPlayer, className = '' }: { player: Player; onSelectPlayer: (player: Player) => void; className?: string }) {

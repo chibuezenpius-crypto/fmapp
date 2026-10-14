@@ -30,7 +30,7 @@ export interface PlayerAttributes {
 export interface PlayerPersonalInfo {
   dateOfBirth: string
   placeOfBirth: string
-  nationalities: string[]
+  nationalities: { country: string; code: string; type: 'Primary' | 'Secondary' }[]
   languages: { name: string; proficiency: 'Basic' | 'Conversational' | 'Fluent' | 'Native' }[]
   preferredFoot: 'Left' | 'Right' | 'Both'
   heightCm: number
@@ -138,9 +138,17 @@ export interface Club {
   shortName: string
   founded: number
   colors: { primary: string; secondary: string }
+  prestige: number
   manager: { name: string; nationality: string; age: number; reputation: number }
   stadium: { name: string; capacity: number; attendance: number }
-  finances: { transferBudget: number; wageBudget: number; weeklyWages: number; balance: number }
+  finances: { transferBudget: number; wageBudget: number; weeklyWages: number; balance: number; sponsorshipIncomeAnnual: number; ticketSalesPerHomeMatch: number; operationsPerMonth: number }
+  sponsors: { name: string; valueAnnual: number; category: string; endDate: string }[]
+  facilities: { trainingLevel: number; youthLevel: number; maxLevel: number }
+  history: {
+    achievements: { season: string; title: string; detail: string }[]
+    records: { title: string; record: string; holder: string }[]
+    pastSeasonPositions: { season: string; competition: string; position: number; teamCount: number }[]
+  }
   formation: string
   leagueId: string
   nextMatchId: string

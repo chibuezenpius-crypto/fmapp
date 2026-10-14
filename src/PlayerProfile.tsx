@@ -1,5 +1,6 @@
 import type { Player, PlayerAttributes, PlayerAchievement } from './types/game'
 import { squad } from './data/mockData'
+import { ArrowLeft } from 'lucide-react'
 
 export type ProfileSection = 'Overview' | 'Personal Info' | 'Contracts' | 'History' | 'Relationships' | 'Achievements'
 
@@ -51,7 +52,7 @@ export default function PlayerProfile({ player, section, selectedClubName, backL
   const averageRating = player.seasonStats.at(-1)?.averageRating ?? player.form
 
   return <div className="player-profile">
-    <button className="profile-back" onClick={onBack} type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6M9 12h12" /></svg><span>{backLabel}</span></button>
+    <button className="profile-back" onClick={onBack} type="button"><ArrowLeft aria-hidden="true" size={17} strokeWidth={2} /><span>{backLabel}</span></button>
     <section className="profile-hero">
       <div className="profile-jersey">{String(player.shirtNumber).padStart(2, '0')}</div>
       <div className="profile-player-info"><span className="eyebrow">{player.position} · {player.age} YEARS</span><h1>{player.name}</h1>
@@ -81,7 +82,9 @@ export default function PlayerProfile({ player, section, selectedClubName, backL
 
       {section === 'Personal Info' && <div className="profile-card-grid">
         <section className="profile-card"><span className="eyebrow">PERSONAL DETAILS</span><dl className="detail-list">
-          <div><dt>Born</dt><dd>{displayDate(profile.dateOfBirth)}</dd></div><div><dt>Place of birth</dt><dd>{profile.placeOfBirth}</dd></div><div><dt>Nationality</dt><dd>{profile.nationalities.join(', ')}</dd></div><div><dt>Height</dt><dd>{profile.heightCm} cm</dd></div><div><dt>Preferred foot</dt><dd>{profile.preferredFoot}</dd></div>
+          <div><dt>Born</dt><dd>{displayDate(profile.dateOfBirth)}</dd></div><div><dt>Place of birth</dt><dd>{profile.placeOfBirth}</dd></div>
+          <div className="nationality-detail"><dt>Nationalities</dt><dd className="nationality-list">{profile.nationalities.map((nationality) => <span className={`nationality-badge ${nationality.type.toLowerCase()}`} key={nationality.type}><b>{nationality.code}</b><span><small>{nationality.type}</small><strong>{nationality.country}</strong></span></span>)}</dd></div>
+          <div><dt>Height</dt><dd>{profile.heightCm} cm</dd></div><div><dt>Preferred foot</dt><dd>{profile.preferredFoot}</dd></div>
         </dl></section>
         <section className="profile-card"><span className="eyebrow">LANGUAGES</span><div className="language-list">{profile.languages.map((language) => <div className="language-row" key={language.name}><strong>{language.name}</strong><span>{language.proficiency}</span></div>)}</div></section>
         <section className="profile-card"><span className="eyebrow">OFF THE PITCH</span><div className="tag-list">{profile.hobbies.map((hobby) => <span key={hobby}>{hobby}</span>)}</div></section>

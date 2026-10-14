@@ -28,7 +28,10 @@ function createPlayer(
     personalInfo: {
       dateOfBirth: `${2026 - age}-04-${String((shirtNumber % 27) + 1).padStart(2, '0')}`,
       placeOfBirth: ['Manchester', 'Liverpool', 'Leeds', 'Bristol', 'London'][shirtNumber % 5],
-      nationalities: ['English'],
+      nationalities: [
+        { country: ['England', 'England', 'Nigeria', 'England', 'Portugal', 'England', 'Nigeria', 'Scotland', 'Portugal', 'Ireland', 'Wales'][shirtNumber - 1], code: ['ENG', 'ENG', 'NGA', 'ENG', 'POR', 'ENG', 'NGA', 'SCO', 'POR', 'IRL', 'WAL'][shirtNumber - 1], type: 'Primary' },
+        { country: ['Wales', 'Ireland', 'England', 'Wales', 'Spain', 'Ghana', 'Ghana', 'England', 'Angola', 'England', 'Ireland'][shirtNumber - 1], code: ['WAL', 'IRL', 'ENG', 'WAL', 'ESP', 'GHA', 'GHA', 'ENG', 'ANG', 'ENG', 'IRL'][shirtNumber - 1], type: 'Secondary' },
+      ],
       languages: [{ name: 'English', proficiency: 'Native' }],
       preferredFoot: shirtNumber % 3 === 0 ? 'Left' : 'Right',
       heightCm: 174 + (shirtNumber % 13),
@@ -108,9 +111,34 @@ export const club: Club = {
   shortName: 'NBR',
   founded: 1898,
   colors: { primary: '#d4f34a', secondary: '#13221c' },
+  prestige: 74,
   manager: { name: 'Alex Morgan', nationality: 'English', age: 38, reputation: 3 },
   stadium: { name: 'Foundry Park', capacity: 28450, attendance: 24118 },
-  finances: { transferBudget: 12500000, wageBudget: 248000, weeklyWages: 193500, balance: 18400000 },
+  finances: { transferBudget: 12500000, wageBudget: 248000, weeklyWages: 193500, balance: 18400000, sponsorshipIncomeAnnual: 6800000, ticketSalesPerHomeMatch: 684000, operationsPerMonth: 2250000 },
+  sponsors: [
+    { name: 'Northstar Energy', valueAnnual: 4200000, category: 'Front of shirt', endDate: '2028-06-30' },
+    { name: 'Foundry Bank', valueAnnual: 1800000, category: 'Official partner', endDate: '2027-06-30' },
+    { name: 'Kestrel Sports', valueAnnual: 800000, category: 'Kit supplier', endDate: '2029-06-30' },
+  ],
+  facilities: { trainingLevel: 4, youthLevel: 3, maxLevel: 5 },
+  history: {
+    achievements: [
+      { season: '2025/26', title: 'North Country Premier Champions', detail: 'First league title in 38 years' },
+      { season: '2023/24', title: 'North Cup Winners', detail: 'Won the final 2-1 at Foundry Park' },
+      { season: '2018/19', title: 'Promotion', detail: 'Promoted as second-division runners-up' },
+    ],
+    records: [
+      { title: 'Most appearances', record: '412 appearances', holder: 'Arthur Bell' },
+      { title: 'Most goals', record: '186 goals', holder: 'Eddie Shaw' },
+      { title: 'Biggest win', record: '8-0 vs Millbrook', holder: 'League Cup · 1974' },
+    ],
+    pastSeasonPositions: [
+      { season: '2025/26', competition: 'North Country Premier', position: 1, teamCount: 20 },
+      { season: '2024/25', competition: 'North Country Premier', position: 6, teamCount: 20 },
+      { season: '2023/24', competition: 'North Country Premier', position: 9, teamCount: 20 },
+      { season: '2022/23', competition: 'North Country Premier', position: 12, teamCount: 20 },
+    ],
+  },
   formation: '4-2-3-1',
   leagueId: 'north-country-premier',
   nextMatchId: 'match-01',
