@@ -1,4 +1,4 @@
-import type { Club, League, LeagueCategory, LeagueCompetition, LeagueStanding, MatchInfo, MatchLineupPlayer, ManagerProfile, Player, PlayerAttributes, RefereeProfile } from '../types/game'
+import type { Club, ClubConfidenceData, League, LeagueCategory, LeagueCompetition, LeagueStanding, MatchInfo, MatchLineupPlayer, ManagerProfile, Player, PlayerAttributes, RefereeProfile, SquadHealthMetrics } from '../types/game'
 
 const attributeBase: PlayerAttributes = {
   crossing: 10, dribbling: 10, finishing: 10, firstTouch: 10, heading: 10, longShots: 10,
@@ -460,4 +460,129 @@ export const recentMatch: MatchInfo = {
   },
 }
 
-export const matchFixtures: MatchInfo[] = [recentMatch, nextMatch]
+export const upcomingMatch2: MatchInfo = {
+  id: 'match-02',
+  competition: league.name,
+  matchday: 13,
+  date: '2026-10-24',
+  kickOff: '15:00',
+  homeClubId: 'redmere',
+  homeClubName: 'Redmere City',
+  awayClubId: club.id,
+  awayClubName: club.name,
+  venue: 'Redmere Park',
+  referee: 'Stephen Marsh',
+  weather: 'Clear, 13°C',
+  status: 'Upcoming',
+  formation: { home: '4-2-3-1', away: club.formation },
+  coaches: { home: 'Daniel Ferreira', away: club.manager.name },
+  keyPlayers: { home: 'Nico Silva', away: 'Finn Gallagher' },
+  lastFiveForm: { home: ['L', 'W', 'W', 'D', 'W'], away: ['W', 'D', 'W', 'W', 'D'] },
+  headToHead: {
+    homeWins: 7,
+    draws: 4,
+    awayWins: 11,
+    recentMeetings: [
+      { date: '2026-10-10', homeClubName: club.name, awayClubName: 'Redmere City', homeScore: 2, awayScore: 1 },
+      { date: '2026-02-21', homeClubName: 'Redmere City', awayClubName: club.name, homeScore: 0, awayScore: 0 },
+      { date: '2025-09-13', homeClubName: club.name, awayClubName: 'Redmere City', homeScore: 1, awayScore: 2 },
+    ],
+  },
+  lineups: {
+    home: {
+      formation: '4-2-3-1',
+      coach: 'Daniel Ferreira',
+      startingXI: [
+        { id: 'red-1', name: 'Oscar Knight', shirtNumber: 1, position: 'GK', x: 50, y: 9 },
+        { id: 'red-2', name: 'Toby Lane', shirtNumber: 2, position: 'RB', x: 16, y: 23 },
+        { id: 'red-3', name: 'Ethan Vale', shirtNumber: 5, position: 'CB', x: 38, y: 22 },
+        { id: 'red-4', name: 'Rui Mendes', shirtNumber: 4, position: 'CB', x: 62, y: 22 },
+        { id: 'red-5', name: 'Aaron Bell', shirtNumber: 3, position: 'LB', x: 84, y: 23 },
+        { id: 'red-6', name: 'Nico Silva', shirtNumber: 6, position: 'DM', x: 38, y: 43 },
+        { id: 'red-7', name: 'Jonas Park', shirtNumber: 8, position: 'DM', x: 62, y: 43 },
+        { id: 'red-8', name: 'Mason King', shirtNumber: 10, position: 'AM', x: 50, y: 55 },
+        { id: 'red-9', name: 'Caleb Ward', shirtNumber: 7, position: 'RW', x: 17, y: 65 },
+        { id: 'red-10', name: 'Hugo Alves', shirtNumber: 9, position: 'ST', x: 50, y: 72 },
+        { id: 'red-11', name: 'Elliot James', shirtNumber: 11, position: 'LW', x: 83, y: 65 },
+      ],
+      substitutes: westhavenBench,
+    },
+    away: { formation: '4-3-3', coach: club.manager.name, startingXI: northbridgeStartingXI, substitutes: northbridgeBench },
+  },
+  commentary: [],
+  stats: undefined,
+}
+
+export const upcomingMatch3: MatchInfo = {
+  id: 'match-03',
+  competition: league.name,
+  matchday: 14,
+  date: '2026-10-31',
+  kickOff: '17:30',
+  homeClubId: club.id,
+  homeClubName: club.name,
+  awayClubId: 'oldcastle',
+  awayClubName: 'Oldcastle Rovers',
+  venue: club.stadium.name,
+  referee: 'Martin Ellery',
+  weather: 'Breezy, 11°C',
+  status: 'Upcoming',
+  formation: { home: club.formation, away: '4-4-2' },
+  coaches: { home: club.manager.name, away: 'Gareth Nolan' },
+  keyPlayers: { home: 'Adrian Costa', away: 'Leon Mercer' },
+  lastFiveForm: { home: ['W', 'D', 'W', 'W', 'D'], away: ['D', 'W', 'W', 'L', 'W'] },
+  headToHead: {
+    homeWins: 9,
+    draws: 5,
+    awayWins: 5,
+    recentMeetings: [
+      { date: '2026-04-04', homeClubName: 'Oldcastle Rovers', awayClubName: club.name, homeScore: 1, awayScore: 2 },
+      { date: '2025-11-22', homeClubName: club.name, awayClubName: 'Oldcastle Rovers', homeScore: 1, awayScore: 0 },
+    ],
+  },
+  lineups: {
+    home: { formation: '4-3-3', coach: club.manager.name, startingXI: northbridgeStartingXI, substitutes: northbridgeBench },
+    away: {
+      formation: '4-4-2',
+      coach: 'Gareth Nolan',
+      startingXI: westhavenStartingXI,
+      substitutes: westhavenBench,
+    },
+  },
+  commentary: [],
+  stats: undefined,
+}
+
+export const upcomingFixtures: MatchInfo[] = [nextMatch, upcomingMatch2, upcomingMatch3]
+
+export const matchFixtures: MatchInfo[] = [recentMatch, nextMatch, upcomingMatch2, upcomingMatch3]
+
+export const clubConfidence: ClubConfidenceData = {
+  board: {
+    percentage: 88,
+    status: 'Very Good',
+    note: 'Delighted with 2nd place standing and healthy wage balance',
+  },
+  fan: {
+    percentage: 82,
+    status: 'Good',
+    note: 'Energized by attacking football ahead of Westhaven clash',
+  },
+  player: {
+    percentage: 79,
+    status: 'Good',
+    note: 'Strong dressing room faith in current tactical setup',
+  },
+}
+
+export const squadHealthMetrics: SquadHealthMetrics = {
+  activeInjuries: 0,
+  injuriesNote: 'Full squad available',
+  suspensions: 0,
+  suspensionsNote: 'No disciplinary bans',
+  squadMorale: 'Very Good',
+  moralePercentage: 92,
+  teamChemistry: 88,
+  chemistryNote: 'Fluid tactical cohesion',
+  averageFitness: 96,
+}

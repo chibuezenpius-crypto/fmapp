@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
-import { club, league, managerProfiles, matchFixtures, nextMatch, refereeProfiles } from './data/mockData'
+import { club, clubConfidence, league, managerProfiles, matchFixtures, nextMatch, refereeProfiles, squadHealthMetrics, upcomingFixtures } from './data/mockData'
 import PlayerProfile, { type ProfileSection } from './PlayerProfile'
 import ClubProfile, { type ClubSection } from './ClubProfile'
 import MatchCenter from './MatchCenter'
@@ -9,8 +9,9 @@ import TransferMarket from './TransferMarket'
 import PersonnelProfile from './PersonnelProfile'
 import CountryOverview from './CountryOverview'
 import TacticsHub from './TacticsHub'
-import type { MatchInfo, PersonnelProfile as PersonnelProfileData, Player } from './types/game'
+import type { ClubConfidenceData, MatchInfo, PersonnelProfile as PersonnelProfileData, Player, SquadHealthMetrics } from './types/game'
 import './App.css'
+
 
 const tabs = [
   { id: 'Home', label: 'Home', icon: 'M3 10.5 12 3l9 7.5M5.5 9v11h13V9M9 20v-6h6v6' },
@@ -165,11 +166,163 @@ function HomeView({ position, selectedClubName, selectedMatchId, onSelectMatch, 
       <div className="metric"><span>TRANSFER BUDGET</span><strong>{money(club.finances.transferBudget)}</strong><span className="metric-note">Wage room £54.5k/wk</span></div>
       <div className="metric"><span>LAST 5</span><div className="form-dots">{league.standings[1].form.map((result, index) => <b className={`form-${result.toLowerCase()}`} key={`${result}-${index}`}>{result}</b>)}</div><span className="metric-note">4 wins · 1 draw</span></div>
     </section>
-    <section className="content-section"><SectionHeading kicker="THE RUN-IN" title="League table" detail="TOP 5  →" /><LeagueTable compact selectedClubName={selectedClubName} onSelectClub={onSelectClub} onSelectPlayer={onSelectPlayer} /></section>
-    <section className="content-section squad-teaser"><SectionHeading kicker="FIRST TEAM" title="Squad status" detail={`${club.squad.length} PLAYERS`} />
-      <div className="squad-status"><span className="status-indicator" /><div><strong>Everyone ready</strong><span>Full squad available for Saturday</span></div><strong className="fitness-score">96% <small>AVG</small></strong></div>
-    </section>
+    <TeamStatusCard metrics={squadHealthMetrics} totalPlayers={club.squad.length} />
+    <ClubConfidenceCard data={clubConfidence} />
+    <UpcomingFixturesPreview fixtures={upcomingFixtures} onSelectMatch={onSelectMatch} selectedMatchId={selectedMatchId} />
+    <section className="content-section" aria-label="League table preview"><SectionHeading kicker="THE RUN-IN" title="League table" detail="TOP 5  →" /><LeagueTable compact onSelectClub={onSelectClub} onSelectPlayer={onSelectPlayer} selectedClubName={selectedClubName} /></section>
   </>
+}
+
+function TeamStatusCard({ metrics, totalPlayers }: { metrics: SquadHealthMetrics; totalPlayers: number }) {
+  return (
+    <section className="content-section" aria-label="Squad health and team status">
+      <SectionHeading kicker="FIRST TEAM" title="Team status" detail={`${totalPlayers} PLAYERS`} />
+      <div className="team-status-card">
+        <div className="team-metrics-grid">
+          <div className="team-metric-box">
+            <span className="team-metric-label">ACTIVE INJURIES</span>
+            <div className="team-metric-val-row">
+              <strong className="team-metric-val zero">{metrics.activeInjuries}</strong>
+              <span className="metric-status-tag clean">None</span>
+            </div>
+            <span className="team-metric-hint">{metrics.injuriesNote}</span>
+          </div>
+
+          <div className="team-metric-box">
+            <span className="team-metric-label">SUSPENSIONS</span>
+            <div className="team-metric-val-row">
+              <strong className="team-metric-val zero">{metrics.suspensions}</strong>
+              <span className="metric-status-tag clean">Eligible</span>
+            </div>
+            <span className="team-metric-hint">{metrics.suspensionsNote}</span>
+          </div>
+
+          <div className="team-metric-box">
+            <span className="team-metric-label">SQUAD MORALE</span>
+            <div className="team-metric-val-row">
+              <strong className="team-metric-val">{metrics.moralePercentage}%</strong>
+              <span className="metric-status-tag morale">{metrics.squadMorale}</span>
+            </div>
+            <span className="team-metric-hint">High camp harmony</span>
+          </div>
+
+          <div className="team-metric-box">
+            <span className="team-metric-label">TEAM CHEMISTRY</span>
+            <div className="team-metric-val-row">
+              <strong className="team-metric-val">{metrics.teamChemistry}%</strong>
+              <span className="metric-status-tag chemistry">Strong</span>
+            </div>
+            <span className="team-metric-hint">{metrics.chemistryNote}</span>
+          </div>
+        </div>
+
+        <div className="team-status-footer">
+          <span className="status-indicator" />
+          <div className="team-status-footer-info">
+            <strong>Everyone ready</strong>
+            <span>Full squad available for Saturday</span>
+          </div>
+          <strong className="fitness-score">{metrics.averageFitness}% <small>AVG</small></strong>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ClubConfidenceCard({ data }: { data: ClubConfidenceData }) {
+  const items = [
+    { key: 'board', label: 'Board Confidence', item: data.board },
+    { key: 'fan', label: 'Fan Confidence', item: data.fan },
+    { key: 'player', label: 'Player Confidence', item: data.player },
+  ] as const
+
+  return (
+    <section className="content-section" aria-label="Club confidence ratings">
+      <SectionHeading kicker="CLUB STANDING" title="Club confidence" detail="OCTOBER 2026" />
+      <div className="confidence-card">
+        {items.map(({ key, label, item }) => (
+          <div className="confidence-item" key={key}>
+            <div className="confidence-label-row">
+              <span className="confidence-title">{label}</span>
+              <div className="confidence-badge-group">
+                <span className={`confidence-badge ${item.status.toLowerCase().replace(' ', '-')}`}>
+                  {item.status}
+                </span>
+                <strong className="confidence-pct">{item.percentage}%</strong>
+              </div>
+            </div>
+            <div className="confidence-track" role="progressbar" aria-valuenow={item.percentage} aria-valuemin={0} aria-valuemax={100} aria-label={`${label}: ${item.percentage}%`}>
+              <div
+                className={`confidence-fill ${item.percentage >= 85 ? 'high' : 'medium'}`}
+                style={{ width: `${item.percentage}%` }}
+              />
+            </div>
+            <span className="confidence-note">{item.note}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function UpcomingFixturesPreview({
+  fixtures,
+  selectedMatchId,
+  onSelectMatch,
+}: {
+  fixtures: MatchInfo[]
+  selectedMatchId: string | null
+  onSelectMatch: (id: string) => void
+}) {
+  return (
+    <section className="content-section" aria-label="Upcoming fixtures preview">
+      <SectionHeading kicker="SCHEDULE" title="Upcoming fixtures" detail="NEXT 3 MATCHES" />
+      <div className="upcoming-fixtures-card">
+        {fixtures.slice(0, 3).map((match) => {
+          const isHome = match.homeClubId === club.id
+          const opponentName = isHome ? match.awayClubName : match.homeClubName
+          const opponentInitial = opponentName.charAt(0)
+          const dateObj = new Date(`${match.date}T12:00:00`)
+          const dayNum = dateObj.getDate()
+          const monthStr = new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(dateObj).toUpperCase()
+          const isSelected = selectedMatchId === match.id
+
+          return (
+            <button
+              key={match.id}
+              type="button"
+              className={`upcoming-fixture-row ${isSelected ? 'selected' : ''}`}
+              onClick={() => onSelectMatch(match.id)}
+              aria-label={`View match details: Northbridge vs ${opponentName} on ${dayNum} ${monthStr}`}
+              aria-pressed={isSelected}
+            >
+              <div className="upcoming-date-box">
+                <strong>{String(dayNum).padStart(2, '0')}</strong>
+                <small>{monthStr}</small>
+              </div>
+
+              <div className="upcoming-crest-slot">
+                <span className="mini-crest">{opponentInitial}</span>
+              </div>
+
+              <div className="upcoming-match-info">
+                <div className="upcoming-meta-row">
+                  <span className={`venue-tag ${isHome ? 'home' : 'away'}`}>{isHome ? 'HOME' : 'AWAY'}</span>
+                  <span className="upcoming-comp-text">{match.competition} · MD {match.matchday}</span>
+                </div>
+                <strong className="upcoming-opponent-title">{opponentName}</strong>
+              </div>
+
+              <div className="upcoming-right-slot">
+                <span className="upcoming-time-text">{match.kickOff}</span>
+                <span className="upcoming-venue-text">{isHome ? 'Foundry Park' : match.venue}</span>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
 }
 
 function SquadView({ selectedClubName, onSelectClub, onSelectPlayer }: { selectedClubName: string | null; onSelectClub: (name: string) => void; onSelectPlayer: (player: Player) => void }) {
@@ -199,11 +352,21 @@ function LeagueTable({ compact = false, selectedClubName, onSelectClub }: { comp
 function MatchesView({ matches, onSelectMatch }: { matches: MatchInfo[]; onSelectMatch: (id: string) => void }) {
   return <>
     <div className="page-intro"><span className="eyebrow">FIXTURES & RESULTS</span><h1>Match centre</h1><p>North Country Premier · 2026/27</p></div>
-    <div className="fixture-list">{matches.map((match) => <button aria-label={`Open ${match.homeClubName} versus ${match.awayClubName} match details`} className={`fixture-list-card ${match.status.toLowerCase()}`} key={match.id} onClick={() => onSelectMatch(match.id)} type="button">
-      <span className="fixture-list-meta"><span>{match.competition.toUpperCase()} · MD {match.matchday}</span><strong>{match.status === 'Completed' ? 'FULL TIME' : 'UPCOMING'}</strong></span>
-      <span className="fixture-list-teams"><span><i className="fixture-club-crest">N</i><b>{match.homeClubName}</b></span><strong>{match.score ? `${match.score.home} - ${match.score.away}` : 'VS'}</strong><span><i className="fixture-club-crest away">{match.awayClubName.slice(0, 1)}</i><b>{match.awayClubName}</b></span></span>
-      <span className="fixture-list-footer"><span>{new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${match.date}T12:00:00`))}</span><span>{match.kickOff} · {match.venue}</span></span>
-    </button>)}</div>
+    <div className="fixture-list">{matches.map((match) => {
+      const isHomeOwn = match.homeClubId === club.id
+      const isAwayOwn = match.awayClubId === club.id
+      return (
+        <button aria-label={`Open ${match.homeClubName} versus ${match.awayClubName} match details`} className={`fixture-list-card ${match.status.toLowerCase()}`} key={match.id} onClick={() => onSelectMatch(match.id)} type="button">
+          <span className="fixture-list-meta"><span>{match.competition.toUpperCase()} · MD {match.matchday}</span><strong>{match.status === 'Completed' ? 'FULL TIME' : 'UPCOMING'}</strong></span>
+          <span className="fixture-list-teams">
+            <span><i className={`fixture-club-crest ${isHomeOwn ? '' : 'away'}`}>{match.homeClubName.slice(0, 1)}</i><b>{match.homeClubName}</b></span>
+            <strong>{match.score ? `${match.score.home} - ${match.score.away}` : 'VS'}</strong>
+            <span><i className={`fixture-club-crest ${isAwayOwn ? '' : 'away'}`}>{match.awayClubName.slice(0, 1)}</i><b>{match.awayClubName}</b></span>
+          </span>
+          <span className="fixture-list-footer"><span>{new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${match.date}T12:00:00`))}</span><span>{match.kickOff} · {match.venue}</span></span>
+        </button>
+      )
+    })}</div>
   </>
 }
 

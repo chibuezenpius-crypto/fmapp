@@ -1,36 +1,18 @@
-const flagCodes: Record<string, string> = {
-  eng: 'gb',
-  sco: 'gb',
-  wal: 'gb',
-  england: 'gb',
-  scotland: 'gb',
-  wales: 'gb',
-  irl: 'ie',
-  ireland: 'ie',
-  nga: 'ng',
-  nigeria: 'ng',
-  ang: 'ao',
-  angola: 'ao',
-  por: 'pt',
-  portugal: 'pt',
-  esp: 'es',
-  spain: 'es',
-  gha: 'gh',
-  ghana: 'gh',
-  english: 'gb',
-  welsh: 'gb',
-  irish: 'ie',
-  nigerian: 'ng',
-  portuguese: 'pt',
-  spanish: 'es',
-}
+import nameDatabase from './data/names/globalNameDatabase.json'
+
+const countryEntries = Object.values((nameDatabase as { countries: Record<string, { code: string; countryName: string; iso2: string; flagCode?: string }> }).countries)
+const flagOverrides: Record<string, string> = { ENG: 'gb-eng', SCO: 'gb-sct', WAL: 'gb-wls' }
+const nameAliases: Record<string, string> = { english: 'england', scottish: 'scotland', welsh: 'wales', irish: 'ireland', nigerian: 'nigeria', portuguese: 'portugal', spanish: 'spain' }
 
 export function resolveFlagCode(countryCode: string) {
   const normalized = countryCode.trim().toLowerCase()
-  return flagCodes[normalized] ?? normalized
+  const code = normalized.toUpperCase()
+  const country = countryEntries.find((entry) => entry.code.toLowerCase() === normalized || entry.iso2.toLowerCase() === normalized || entry.countryName.toLowerCase() === (nameAliases[normalized] ?? normalized))
+  return flagOverrides[code] ?? country?.flagCode ?? country?.iso2 ?? normalized
 }
 
 export function displayCountryName(countryName: string) {
-  const names: Record<string, string> = { english: 'England', welsh: 'Wales', irish: 'Ireland', nigerian: 'Nigeria', spanish: 'Spain', portuguese: 'Portugal' }
-  return names[countryName.trim().toLowerCase()] ?? countryName
+  const normalized = countryName.trim().toLowerCase()
+  const alias = nameAliases[normalized] ?? normalized
+  return countryEntries.find((entry) => entry.countryName.toLowerCase() === alias || entry.code.toLowerCase() === normalized || entry.iso2.toLowerCase() === normalized)?.countryName ?? countryName
 }

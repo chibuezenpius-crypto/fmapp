@@ -38,6 +38,7 @@ export interface PlayerPersonalInfo {
   teamOpinion: number
   personality: string
   characterTrait: string
+  nationalTeamRepresentation?: { country: string; code: string }
 }
 
 export interface ContractOffer {
@@ -204,6 +205,70 @@ export interface LeagueCompetition {
   history: { season: string; champion: string; runnerUp: string; points: number }[]
 }
 
+export interface ProceduralClubBadge {
+  viewBox: string
+  shape: 'shield'
+  initials: string
+  primaryColor: string
+  secondaryColor: string
+}
+
+export interface GlobalLeagueTeam {
+  id: string
+  name: string
+  founded: number
+  colors: { primary: string; secondary: string }
+  badge: ProceduralClubBadge
+  standing: LeagueStanding
+}
+
+export interface GlobalCountryLeague {
+  id: string
+  name: string
+  countryCode: string
+  countryName: string
+  flagCode: string
+  season: string
+  teams: GlobalLeagueTeam[]
+}
+
+export interface GlobalLeaguesDatabase {
+  metadata: { countryCount: number; clubsPerCountry: number; teamCount: number }
+  countries: GlobalCountryLeague[]
+}
+
+export interface TournamentGroup {
+  name: string
+  countryCodes: string[]
+}
+
+export interface TournamentStage {
+  id: string
+  name: string
+  format: 'groups' | 'knockout'
+  groups?: TournamentGroup[]
+  rounds?: string[]
+  advancement?: string
+}
+
+export interface InternationalTournament {
+  id: string
+  name: string
+  category: 'Continental Competitions' | 'International'
+  region: string
+  season: string
+  hostCountryCodes: string[]
+  eligibleCountryCodes: string[]
+  stages: TournamentStage[]
+  rules: string[]
+  history: { season: string; champion: string; runnerUp: string }[]
+}
+
+export interface InternationalTournamentsDatabase {
+  metadata: { version: string; description: string }
+  tournaments: InternationalTournament[]
+}
+
 export interface ManagerProfile {
   id: string
   name: string
@@ -297,4 +362,28 @@ export interface MatchStats {
   shotsOnTarget: { home: number; away: number }
   passAccuracy: { home: number; away: number }
   fouls: { home: number; away: number }
+}
+
+export interface ClubConfidenceItem {
+  percentage: number
+  status: 'Critical' | 'Poor' | 'Moderate' | 'Good' | 'Very Good' | 'Exceptional'
+  note: string
+}
+
+export interface ClubConfidenceData {
+  board: ClubConfidenceItem
+  fan: ClubConfidenceItem
+  player: ClubConfidenceItem
+}
+
+export interface SquadHealthMetrics {
+  activeInjuries: number
+  injuriesNote: string
+  suspensions: number
+  suspensionsNote: string
+  squadMorale: 'Very Good' | 'Good' | 'Okay' | 'Poor'
+  moralePercentage: number
+  teamChemistry: number
+  chemistryNote: string
+  averageFitness: number
 }

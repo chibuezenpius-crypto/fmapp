@@ -1,0 +1,98 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Simulated international and continental tournaments with explicit national-team pools and stages."
+  },
+  "tournaments": [
+    {
+      "id": "afcon-2027",
+      "name": "Africa Cup of Nations",
+      "category": "Continental Competitions",
+      "region": "Africa",
+      "season": "2027",
+      "hostCountryCodes": ["MAR"],
+      "eligibleCountryCodes": ["NGA", "GHA", "ANG", "SEN", "CIV", "CMR", "MAR", "EGY"],
+      "stages": [
+        { "id": "group-stage", "name": "Group Stage", "format": "groups", "groups": [{ "name": "Group A", "countryCodes": ["MAR", "NGA", "ANG", "GHA"] }, { "name": "Group B", "countryCodes": ["SEN", "CIV", "CMR", "EGY"] }], "advancement": "Top four in each group qualify for the quarter-finals." },
+        { "id": "knockout-stage", "name": "Knockout Stage", "format": "knockout", "rounds": ["Quarter-finals", "Semi-finals", "Final"] }
+      ],
+      "rules": ["Eight national teams qualify for the group stage.", "Group matches award three points for a win and one for a draw.", "The top four teams in each group advance to the quarter-finals.", "Knockout matches use extra time and penalties if required."],
+      "history": [{ "season": "2025", "champion": "Senegal", "runnerUp": "Morocco" }, { "season": "2023", "champion": "Ivory Coast", "runnerUp": "Nigeria" }]
+    },
+    {
+      "id": "euro-2028",
+      "name": "UEFA European Championship",
+      "category": "Continental Competitions",
+      "region": "Europe",
+      "season": "2028",
+      "hostCountryCodes": ["ENG", "SCO", "WAL", "IRL"],
+      "eligibleCountryCodes": ["ENG", "ESP", "FRA", "GER", "ITA", "POR", "NED", "SCO", "WAL", "IRL", "BEL", "CRO", "NOR", "SWE"],
+      "stages": [
+        { "id": "group-stage", "name": "Group Stage", "format": "groups", "groups": [{ "name": "Group A", "countryCodes": ["ENG", "SCO", "NED", "NOR"] }, { "name": "Group B", "countryCodes": ["ESP", "POR", "IRL", "SWE"] }, { "name": "Group C", "countryCodes": ["FRA", "BEL", "CRO"] }, { "name": "Group D", "countryCodes": ["GER", "ITA", "WAL"] }], "advancement": "Top two teams in each group advance to the quarter-finals." },
+        { "id": "knockout-stage", "name": "Knockout Stage", "format": "knockout", "rounds": ["Quarter-finals", "Semi-finals", "Final"] }
+      ],
+      "rules": ["Fifteen national teams compete in four groups.", "Three points are awarded for a win and one for a draw.", "The top two teams in each group advance.", "Knockout ties are decided by extra time and penalties when level."],
+      "history": [{ "season": "2024", "champion": "Spain", "runnerUp": "England" }, { "season": "2020", "champion": "Italy", "runnerUp": "England" }]
+    },
+    {
+      "id": "copa-america-2028",
+      "name": "Copa América",
+      "category": "Continental Competitions",
+      "region": "South America",
+      "season": "2028",
+      "hostCountryCodes": ["ARG"],
+      "eligibleCountryCodes": ["ARG", "BRA", "COL", "URU"],
+      "stages": [
+        { "id": "group-stage", "name": "Group Stage", "format": "groups", "groups": [{ "name": "Group A", "countryCodes": ["ARG", "COL"] }, { "name": "Group B", "countryCodes": ["BRA", "URU"] }], "advancement": "The top two teams in each group qualify for the semi-finals." },
+        { "id": "knockout-stage", "name": "Knockout Stage", "format": "knockout", "rounds": ["Semi-finals", "Third-place match", "Final"] }
+      ],
+      "rules": ["Four invited national teams are split into two groups.", "Each team plays the other team in its group.", "Both teams in each group advance to the semi-finals.", "Knockout matches use extra time and penalties when required."],
+      "history": [{ "season": "2024", "champion": "Argentina", "runnerUp": "Colombia" }, { "season": "2021", "champion": "Argentina", "runnerUp": "Brazil" }]
+    },
+    {
+      "id": "asian-cup-2027",
+      "name": "AFC Asian Cup",
+      "category": "Continental Competitions",
+      "region": "Asia",
+      "season": "2027",
+      "hostCountryCodes": ["JPN"],
+      "eligibleCountryCodes": ["JPN", "KOR"],
+      "stages": [
+        { "id": "group-stage", "name": "Group Stage", "format": "groups", "groups": [{ "name": "Group A", "countryCodes": ["JPN", "KOR"] }], "advancement": "Both teams qualify for the final." },
+        { "id": "knockout-stage", "name": "Knockout Stage", "format": "knockout", "rounds": ["Final"] }
+      ],
+      "rules": ["National teams are drawn into a round-robin group.", "Three points are awarded for a win and one for a draw.", "The top two teams qualify for the final.", "The final is decided by extra time and penalties when required."],
+      "history": [{ "season": "2023", "champion": "Qatar", "runnerUp": "Jordan" }, { "season": "2019", "champion": "Qatar", "runnerUp": "Japan" }]
+    },
+    {
+      "id": "concacaf-gold-cup-2027",
+      "name": "CONCACAF Gold Cup",
+      "category": "Continental Competitions",
+      "region": "North America",
+      "season": "2027",
+      "hostCountryCodes": ["USA", "MEX"],
+      "eligibleCountryCodes": ["USA", "MEX"],
+      "stages": [
+        { "id": "group-stage", "name": "Group Stage", "format": "groups", "groups": [{ "name": "Group A", "countryCodes": ["USA", "MEX"] }], "advancement": "The top two teams qualify for the final." },
+        { "id": "knockout-stage", "name": "Knockout Stage", "format": "knockout", "rounds": ["Final"] }
+      ],
+      "rules": ["National teams from the North American region compete for the continental title.", "Group matches award three points for a win and one for a draw.", "The top two teams advance to the final.", "The final is decided by extra time and penalties if level."],
+      "history": [{ "season": "2025", "champion": "Mexico", "runnerUp": "United States" }, { "season": "2023", "champion": "United States", "runnerUp": "Mexico" }]
+    },
+    {
+      "id": "world-cup-2030",
+      "name": "FIFA World Cup",
+      "category": "International",
+      "region": "International",
+      "season": "2030",
+      "hostCountryCodes": ["ESP", "POR", "MAR", "ARG", "URU", "BRA"],
+      "eligibleCountryCodes": ["NGA", "BRA", "ENG", "ESP", "FRA", "GER", "ITA", "ARG", "POR", "NED", "SCO", "WAL", "IRL", "GHA", "ANG", "SEN", "CIV", "CMR", "MAR", "EGY", "BEL", "JPN", "KOR", "USA", "MEX", "COL", "CRO", "URU", "NOR", "SWE"],
+      "stages": [
+        { "id": "group-stage", "name": "Group Stage", "format": "groups", "groups": [{ "name": "Group A", "countryCodes": ["NGA", "ENG", "GER", "ARG", "GHA"] }, { "name": "Group B", "countryCodes": ["BRA", "ESP", "POR", "ANG", "SEN"] }, { "name": "Group C", "countryCodes": ["FRA", "ITA", "NED", "CIV", "MAR"] }, { "name": "Group D", "countryCodes": ["SCO", "WAL", "IRL", "EGY", "BEL"] }, { "name": "Group E", "countryCodes": ["JPN", "KOR", "USA", "MEX", "COL"] }, { "name": "Group F", "countryCodes": ["CRO", "URU", "NOR", "SWE", "CMR"] }], "advancement": "The top two teams and four best third-placed teams advance to the round of 16." },
+        { "id": "knockout-stage", "name": "Knockout Stage", "format": "knockout", "rounds": ["Round of 16", "Quarter-finals", "Semi-finals", "Final"] }
+      ],
+      "rules": ["Thirty national teams are drawn into six groups.", "Each team plays every other team in its group once.", "The top two teams and four best third-placed teams advance.", "Knockout matches use extra time and penalties when required."],
+      "history": [{ "season": "2026", "champion": "Argentina", "runnerUp": "France" }, { "season": "2022", "champion": "Argentina", "runnerUp": "France" }]
+    }
+  ]
+}

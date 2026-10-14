@@ -81,6 +81,7 @@ export default function PlayerProfile({ player, section, selectedClubName, onSec
       {section === 'Personal Info' && <div className="profile-card-grid">
         <section className="profile-card"><span className="eyebrow">PERSONAL DETAILS</span><dl className="detail-list">
           <div><dt>Born</dt><dd>{displayDate(profile.dateOfBirth)}</dd></div><div><dt>Place of birth</dt><dd>{profile.placeOfBirth}</dd></div>
+          {profile.nationalTeamRepresentation && <div><dt>National team</dt><dd>{profile.nationalTeamRepresentation.country}</dd></div>}
           <div><dt>Height</dt><dd>{profile.heightCm} cm</dd></div><div><dt>Preferred foot</dt><dd>{profile.preferredFoot}</dd></div>
         </dl></section>
         <section className="profile-card nationality-card"><span className="eyebrow">NATIONALITIES</span><div className="nationality-list">{profile.nationalities.map((nationality) => <span className={`nationality-badge ${nationality.type.toLowerCase()}`} key={nationality.type}><b className="nationality-flag-holder"><Flag code={nationality.code} countryName={nationality.country} onSelectCountry={onSelectCountry} /></b><span><small>{nationality.type}</small><strong>{nationality.country}</strong></span></span>)}</div></section>
