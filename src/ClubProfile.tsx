@@ -1,14 +1,13 @@
 import { useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
 import { club } from './data/mockData'
 import type { Player } from './types/game'
 
-export type ClubSection = 'Overview' | 'Squad' | 'Tactics' | 'History' | 'Finances & Facilities'
+export type ClubSection = 'Overview' | 'Squad' | 'Tactics' | 'Staffs' | 'History' | 'Finances & Facilities'
 
 type PositionFilter = 'ALL' | 'GK' | 'DEF' | 'MID' | 'FWD'
 type SortMode = 'Value' | 'Rating' | 'Age'
 
-const sections: ClubSection[] = ['Overview', 'Squad', 'Tactics', 'History', 'Finances & Facilities']
+const sections: ClubSection[] = ['Overview', 'Squad', 'Tactics', 'Staffs', 'History', 'Finances & Facilities']
 const money = (amount: number) => `£${new Intl.NumberFormat('en-GB').format(amount)}`
 const shortMoney = (amount: number) => `£${(amount / 1000000).toFixed(1)}m`
 const displayDate = (date: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`))
@@ -16,11 +15,10 @@ const displayDate = (date: string) => new Intl.DateTimeFormat('en-GB', { day: 'n
 interface ClubProfileProps {
   section: ClubSection
   selectedClubName: string | null
-  backLabel: string
-  onBack: () => void
   onSectionChange: (section: ClubSection) => void
   onSelectClub: (name: string) => void
   onSelectPlayer: (player: Player) => void
+  onSelectPersonnel: (idOrName: string) => void
 }
 
 function StarRating({ rating }: { rating: number }) {
@@ -35,7 +33,7 @@ function PlayerButton({ player, onSelectPlayer, role, x, y }: { player: Player; 
   return <button aria-label={`Open ${player.name} profile`} className="club-pitch-player" onClick={() => onSelectPlayer(player)} style={{ left: x, top: y }} type="button"><span>{String(player.shirtNumber).padStart(2, '0')}</span><strong>{player.name}</strong>{role && <small>{role}</small>}</button>
 }
 
-export default function ClubProfile({ section, selectedClubName, backLabel, onBack, onSectionChange, onSelectClub, onSelectPlayer }: ClubProfileProps) {
+export default function ClubProfile({ section, selectedClubName, onSectionChange, onSelectClub, onSelectPlayer, onSelectPersonnel }: ClubProfileProps) {
   const [positionFilter, setPositionFilter] = useState<PositionFilter>('ALL')
   const [sortMode, setSortMode] = useState<SortMode>('Value')
   const [trainingLevel, setTrainingLevel] = useState(club.facilities.trainingLevel)
@@ -78,7 +76,6 @@ export default function ClubProfile({ section, selectedClubName, backLabel, onBa
   ]
 
   return <div className="club-profile">
-    <button className="profile-back" onClick={onBack} type="button"><ArrowLeft aria-hidden="true" size={17} strokeWidth={2} /><span>{backLabel}</span></button>
     <header className="club-profile-hero">
       <div className="club-profile-crest">N</div>
       <div className="club-profile-title"><span className="eyebrow">EST. {club.founded} · {club.nickname.toUpperCase()}</span><h1>{club.name}</h1><div><ClubReference name={club.name} selectedClubName={selectedClubName} onSelectClub={onSelectClub} /><span> · {club.stadium.name}</span></div></div>
@@ -94,6 +91,7 @@ export default function ClubProfile({ section, selectedClubName, backLabel, onBa
         <section className="club-manager-card"><div className="club-manager-avatar">{club.manager.name.split(' ').map((part) => part[0]).join('')}</div><div className="club-manager-info"><span className="eyebrow">FIRST TEAM MANAGER</span><strong>{club.manager.name}</strong><span>{club.manager.nationality} · Age {club.manager.age}</span></div><div className="manager-reputation"><StarRating rating={club.manager.reputation} /><small>REPUTATION</small></div></section>
         <section className="club-stadium-card"><div><span className="eyebrow">HOME GROUND</span><h2>{club.stadium.name}</h2><span>Founded {club.founded} · {club.nickname}</span></div><div className="stadium-capacity"><strong>{new Intl.NumberFormat('en-GB').format(club.stadium.capacity)}</strong><span>CAPACITY</span></div><div className="stadium-attendance"><span>AVG ATTENDANCE</span><strong>{new Intl.NumberFormat('en-GB').format(club.stadium.attendance)}</strong><div><i style={{ width: `${club.stadium.attendance / club.stadium.capacity * 100}%` }} /></div></div></section>
         <div className="club-overview-metrics"><article><span>TRANSFER BUDGET</span><strong>{shortMoney(club.finances.transferBudget)}</strong><small>Available now</small></article><article><span>WAGE BUDGET</span><strong>{money(club.finances.wageBudget)}<small> / wk</small></strong><small>{money(club.finances.wageBudget - club.finances.weeklyWages)} remaining</small></article><article><span>TEAM PRESTIGE</span><strong>{club.prestige}<small> / 100</small></strong><small>National reputation</small></article></div>
+        <section className="club-kits-panel"><div className="club-panel-heading"><div><span className="eyebrow">2026/27 MATCH KITS</span><h2>Club colours</h2></div></div><div className="club-kits-row"><div className="kit-preview home"><i /><i /><i /><strong>HOME</strong></div><div className="kit-preview away"><i /><i /><i /><strong>AWAY</strong></div><div className="club-kit-copy"><strong>Northbridge identity</strong><span>Lime and forest green</span><span>{club.stadium.name} · {club.stadium.capacity.toLocaleString()} seats</span></div></div></section>
         <section className="club-overview-squad"><div className="club-panel-heading"><div><span className="eyebrow">FIRST TEAM</span><h2>Squad snapshot</h2></div><button className="club-text-action" onClick={() => onSectionChange('Squad')} type="button">VIEW SQUAD <span>→</span></button></div><div className="squad-snapshot-row">{club.squad.slice(6, 11).map((player) => <button aria-label={`Open ${player.name} profile`} className="snapshot-player" key={player.id} onClick={() => onSelectPlayer(player)} type="button"><span>{String(player.shirtNumber).padStart(2, '0')}</span><strong>{player.name.split(' ')[0]}</strong><small>{player.position}</small></button>)}</div></section>
       </>}
 
@@ -108,6 +106,11 @@ export default function ClubProfile({ section, selectedClubName, backLabel, onBa
         <div className="club-tactic-pitch" aria-label="Northbridge FC 4-3-3 formation"><div className="club-pitch-boundary" /><div className="club-pitch-halfway" /><div className="club-pitch-circle" /><div className="club-pitch-box top" /><div className="club-pitch-box bottom" />
           {formation.map(({ player, role, x, y }) => <PlayerButton key={player.id} player={player} onSelectPlayer={onSelectPlayer} role={role} x={x} y={y} />)}
         </div><p className="club-pitch-caption">Select a player to open their profile.</p>
+      </>}
+
+      {section === 'Staffs' && <>
+        <div className="club-subpage-heading"><div><span className="eyebrow">COACHING & BACKROOM</span><h2>Club staff</h2></div><span className="club-tactic-tag">{club.staff.length} PROFILES</span></div>
+        <div className="club-staff-list">{club.staff.map((staff) => <button className="club-staff-row" key={staff.id} onClick={() => onSelectPersonnel(staff.profileId)} type="button"><span className="club-staff-avatar">{staff.name.split(' ').map((part) => part[0]).join('')}</span><span className="club-staff-person"><strong>{staff.name}</strong><small>{staff.role}</small></span><span className="club-staff-nationality">{staff.nationality}</span><span className="club-staff-chevron">→</span></button>)}</div>
       </>}
 
       {section === 'History' && <>

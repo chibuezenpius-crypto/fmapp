@@ -1,6 +1,6 @@
 import type { Player, PlayerAttributes, PlayerAchievement } from './types/game'
 import { squad } from './data/mockData'
-import { ArrowLeft } from 'lucide-react'
+import Flag from './Flag'
 
 export type ProfileSection = 'Overview' | 'Personal Info' | 'Contracts' | 'History' | 'Relationships' | 'Achievements'
 
@@ -15,11 +15,10 @@ interface PlayerProfileProps {
   player: Player
   section: ProfileSection
   selectedClubName: string | null
-  backLabel: string
-  onBack: () => void
   onSectionChange: (section: ProfileSection) => void
   onSelectClub: (name: string) => void
   onSelectPlayer: (player: Player) => void
+  onSelectCountry: (country: string) => void
 }
 
 const money = (amount: number) => `£${new Intl.NumberFormat('en-GB').format(amount)}`
@@ -46,13 +45,12 @@ function AchievementList({ title, achievements, emptyText }: { title: string; ac
   </section>
 }
 
-export default function PlayerProfile({ player, section, selectedClubName, backLabel, onBack, onSectionChange, onSelectClub, onSelectPlayer }: PlayerProfileProps) {
+export default function PlayerProfile({ player, section, selectedClubName, onSectionChange, onSelectClub, onSelectPlayer, onSelectCountry }: PlayerProfileProps) {
   const profile = player.personalInfo
   const contract = player.contract
   const averageRating = player.seasonStats.at(-1)?.averageRating ?? player.form
 
   return <div className="player-profile">
-    <button className="profile-back" onClick={onBack} type="button"><ArrowLeft aria-hidden="true" size={17} strokeWidth={2} /><span>{backLabel}</span></button>
     <section className="profile-hero">
       <div className="profile-jersey">{String(player.shirtNumber).padStart(2, '0')}</div>
       <div className="profile-player-info"><span className="eyebrow">{player.position} · {player.age} YEARS</span><h1>{player.name}</h1>
@@ -83,12 +81,13 @@ export default function PlayerProfile({ player, section, selectedClubName, backL
       {section === 'Personal Info' && <div className="profile-card-grid">
         <section className="profile-card"><span className="eyebrow">PERSONAL DETAILS</span><dl className="detail-list">
           <div><dt>Born</dt><dd>{displayDate(profile.dateOfBirth)}</dd></div><div><dt>Place of birth</dt><dd>{profile.placeOfBirth}</dd></div>
-          <div className="nationality-detail"><dt>Nationalities</dt><dd className="nationality-list">{profile.nationalities.map((nationality) => <span className={`nationality-badge ${nationality.type.toLowerCase()}`} key={nationality.type}><b>{nationality.code}</b><span><small>{nationality.type}</small><strong>{nationality.country}</strong></span></span>)}</dd></div>
           <div><dt>Height</dt><dd>{profile.heightCm} cm</dd></div><div><dt>Preferred foot</dt><dd>{profile.preferredFoot}</dd></div>
         </dl></section>
+        <section className="profile-card nationality-card"><span className="eyebrow">NATIONALITIES</span><div className="nationality-list">{profile.nationalities.map((nationality) => <span className={`nationality-badge ${nationality.type.toLowerCase()}`} key={nationality.type}><b className="nationality-flag-holder"><Flag code={nationality.code} countryName={nationality.country} onSelectCountry={onSelectCountry} /></b><span><small>{nationality.type}</small><strong>{nationality.country}</strong></span></span>)}</div></section>
         <section className="profile-card"><span className="eyebrow">LANGUAGES</span><div className="language-list">{profile.languages.map((language) => <div className="language-row" key={language.name}><strong>{language.name}</strong><span>{language.proficiency}</span></div>)}</div></section>
         <section className="profile-card"><span className="eyebrow">OFF THE PITCH</span><div className="tag-list">{profile.hobbies.map((hobby) => <span key={hobby}>{hobby}</span>)}</div></section>
         <section className="profile-card opinion-card"><span className="eyebrow">TEAM OPINION</span><strong>{profile.teamOpinion}<small> / 100</small></strong><div className="status-track"><i style={{ width: `${profile.teamOpinion}%` }} /></div><span className="muted-copy">{profile.teamOpinion >= 80 ? 'Strong relationship with the group' : 'Positive relationship with the group'}</span></section>
+        <section className="profile-card character-card"><span className="eyebrow">PERSONALITY & CHARACTER</span><div className="character-traits"><span>Primary Personality: {profile.personality}</span><span>Character Trait: {profile.characterTrait}</span></div></section>
       </div>}
 
       {section === 'Contracts' && <>

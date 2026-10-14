@@ -36,6 +36,8 @@ export interface PlayerPersonalInfo {
   heightCm: number
   hobbies: string[]
   teamOpinion: number
+  personality: string
+  characterTrait: string
 }
 
 export interface ContractOffer {
@@ -144,6 +146,7 @@ export interface Club {
   finances: { transferBudget: number; wageBudget: number; weeklyWages: number; balance: number; sponsorshipIncomeAnnual: number; ticketSalesPerHomeMatch: number; operationsPerMonth: number }
   sponsors: { name: string; valueAnnual: number; category: string; endDate: string }[]
   facilities: { trainingLevel: number; youthLevel: number; maxLevel: number }
+  staff: { id: string; name: string; role: string; nationality: string; age: number; profileId: string }[]
   history: {
     achievements: { season: string; title: string; detail: string }[]
     records: { title: string; record: string; holder: string }[]
@@ -180,6 +183,59 @@ export interface League {
   standings: LeagueStanding[]
 }
 
+export type LeagueCategory = 'Domestic Leagues' | 'Continental Competitions' | 'International'
+
+export interface LeagueCompetition {
+  id: string
+  name: string
+  country: string
+  category: LeagueCategory
+  season: string
+  matchday: number
+  totalMatchdays: number
+  standings: LeagueStanding[]
+  playerStats: {
+    goals: { playerId: string; name: string; clubName: string; value: number }[]
+    assists: { playerId: string; name: string; clubName: string; value: number }[]
+    cleanSheets: { playerId: string; name: string; clubName: string; value: number }[]
+  }
+  teamStats: { clubId: string; clubName: string; possession: number; goals: number; cleanSheets: number; cards: number }[]
+  rules: string[]
+  history: { season: string; champion: string; runnerUp: string; points: number }[]
+}
+
+export interface ManagerProfile {
+  id: string
+  name: string
+  age: number
+  nationality: string
+  languages: { name: string; proficiency: 'Basic' | 'Conversational' | 'Fluent' | 'Native' }[]
+  attributes: { tacticalKnowledge: number; manManagement: number; discipline: number }
+  personality: string
+  preferredFormation: string
+  tacticalDNA: { label: string; value: string }[]
+  trophies: { season: string; title: string; clubName: string }[]
+  awards: { season: string; title: string; detail: string }[]
+  seasonRecords: { season: string; clubName: string; wins: number; draws: number; losses: number }[]
+}
+
+export interface RefereeProfile {
+  id: string
+  name: string
+  age: number
+  nationality: string
+  countryCode: string
+  languages: { name: string; proficiency: 'Basic' | 'Conversational' | 'Fluent' | 'Native' }[]
+  strictness: 'Lenient' | 'Balanced' | 'Strict'
+  yellowCardsPerMatch: number
+  redCardsPerMatch: number
+  foulThreshold: number
+}
+
+export type PersonnelProfile =
+  | { type: 'Manager'; profile: ManagerProfile }
+  | { type: 'Referee'; profile: RefereeProfile }
+
 export interface MatchInfo {
   id: string
   competition: string
@@ -196,5 +252,49 @@ export interface MatchInfo {
   status: 'Upcoming' | 'Live' | 'Completed'
   score?: { home: number; away: number }
   formation: { home: string; away: string }
+  coaches: { home: string; away: string }
   keyPlayers: { home: string; away: string }
+  lastFiveForm: { home: ('W' | 'D' | 'L')[]; away: ('W' | 'D' | 'L')[] }
+  headToHead: {
+    homeWins: number
+    draws: number
+    awayWins: number
+    recentMeetings: { date: string; homeClubName: string; awayClubName: string; homeScore: number; awayScore: number }[]
+  }
+  lineups: { home: MatchLineup; away: MatchLineup }
+  commentary: MatchCommentaryEvent[]
+  stats?: MatchStats
+}
+
+export interface MatchLineupPlayer {
+  id: string
+  playerId?: string
+  name: string
+  shirtNumber: number
+  position: string
+  x: number
+  y: number
+}
+
+export interface MatchLineup {
+  formation: string
+  coach: string
+  startingXI: MatchLineupPlayer[]
+  substitutes: MatchLineupPlayer[]
+}
+
+export interface MatchCommentaryEvent {
+  minute: number
+  team: 'home' | 'away'
+  type: 'Goal' | 'Yellow Card' | 'Red Card' | 'Save' | 'Foul' | 'Substitution'
+  player: string
+  detail: string
+}
+
+export interface MatchStats {
+  possession: { home: number; away: number }
+  shots: { home: number; away: number }
+  shotsOnTarget: { home: number; away: number }
+  passAccuracy: { home: number; away: number }
+  fouls: { home: number; away: number }
 }

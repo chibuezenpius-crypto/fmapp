@@ -1,8 +1,14 @@
 import { useState, type ReactNode } from 'react'
-import { club, league, nextMatch } from './data/mockData'
+import { ArrowLeft } from 'lucide-react'
+import { club, league, managerProfiles, matchFixtures, nextMatch, refereeProfiles } from './data/mockData'
 import PlayerProfile, { type ProfileSection } from './PlayerProfile'
 import ClubProfile, { type ClubSection } from './ClubProfile'
-import type { Player } from './types/game'
+import MatchCenter from './MatchCenter'
+import LeagueHub from './LeagueHub'
+import TransferMarket from './TransferMarket'
+import PersonnelProfile from './PersonnelProfile'
+import CountryOverview from './CountryOverview'
+import type { MatchInfo, PersonnelProfile as PersonnelProfileData, Player } from './types/game'
 import './App.css'
 
 const tabs = [
@@ -21,28 +27,76 @@ const money = (amount: number) => `£${(amount / 1000000).toFixed(1)}m`
 function App() {
   const [activeTab, setActiveTab] = useState<TabId>('Home')
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
+  const [selectedPersonnel, setSelectedPersonnel] = useState<PersonnelProfileData | null>(null)
   const [profileSection, setProfileSection] = useState<ProfileSection>('Overview')
   const [selectedClubName, setSelectedClubName] = useState<string | null>(null)
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null)
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null)
+  const [selectedCountryName, setSelectedCountryName] = useState<string | null>(null)
+  const [countryReturnLabel, setCountryReturnLabel] = useState('previous view')
   const [clubSection, setClubSection] = useState<ClubSection>('Overview')
   const [clubReturnTab, setClubReturnTab] = useState<TabId>('Home')
   const position = league.standings.find((standing) => standing.clubId === club.id)
+  const selectedMatch = matchFixtures.find((match) => match.id === selectedMatchId)
+  const detailOpen = selectedCountryName !== null || selectedPlayer !== null || selectedPersonnel !== null || selectedLeagueId !== null || activeTab === 'Club' || selectedMatch !== undefined
+  const backLabel = selectedCountryName ? `Back to ${countryReturnLabel}` : selectedPlayer || selectedPersonnel ? (activeTab === 'Club' ? 'Back to club' : `Back to ${activeTab.toLowerCase()}`)
+    : selectedLeagueId ? 'Back to leagues'
+    : activeTab === 'Club' ? `Back to ${clubReturnTab.toLowerCase()}` : `Back to ${activeTab.toLowerCase()}`
   const selectPlayer = (player: Player) => {
     setSelectedPlayer(player)
+    setSelectedPersonnel(null)
     setProfileSection('Overview')
+  }
+  const selectPersonnel = (idOrName: string) => {
+    const manager = managerProfiles.find((profile) => profile.id === idOrName || profile.name === idOrName)
+    const referee = refereeProfiles.find((profile) => profile.id === idOrName || profile.name === idOrName)
+    setSelectedPersonnel(manager ? { type: 'Manager', profile: manager } : referee ? { type: 'Referee', profile: referee } : null)
+    setSelectedPlayer(null)
+  }
+  const openCountryOverview = (country: string) => {
+    if (!selectedCountryName) {
+      const source = selectedPlayer ? 'player profile' : selectedPersonnel ? 'personnel profile' : selectedLeagueId ? 'league details' : selectedMatch ? 'match center' : activeTab === 'Club' ? 'club' : activeTab === 'League' ? 'leagues' : activeTab.toLowerCase()
+      setCountryReturnLabel(source)
+    }
+    setSelectedCountryName(country)
   }
   const openClubProfile = () => {
     if (activeTab !== 'Club') setClubReturnTab(activeTab)
     setSelectedPlayer(null)
+    setSelectedPersonnel(null)
     setActiveTab('Club')
     setClubSection('Overview')
+  }
+  const goBack = () => {
+    if (selectedCountryName) {
+      setSelectedCountryName(null)
+      return
+    }
+    if (selectedPersonnel) {
+      setSelectedPersonnel(null)
+      return
+    }
+    if (selectedPlayer) {
+      setSelectedPlayer(null)
+      return
+    }
+    if (selectedLeagueId) {
+      setSelectedLeagueId(null)
+      return
+    }
+    if (activeTab === 'Club') {
+      setActiveTab(clubReturnTab)
+      return
+    }
+    setSelectedMatchId(null)
   }
 
   return (
     <div className="app-backdrop">
       <div className="app-shell">
         <header className="topbar">
-          <ClubReference name="N" selectedClubName={selectedClubName} onSelect={setSelectedClubName} onOpen={openClubProfile} className="club-mark" ariaLabel={`${club.name} crest`} />
+          {detailOpen ? <button aria-label={backLabel} className="header-back-button" onClick={goBack} type="button"><ArrowLeft aria-hidden="true" size={19} strokeWidth={2.2} /></button>
+            : <ClubReference name="N" selectedClubName={selectedClubName} onSelect={setSelectedClubName} onOpen={openClubProfile} className="club-mark" ariaLabel={`${club.name} crest`} />}
           <div className="identity">
             <span className="eyebrow">MANAGER CAREER · 2026/27</span>
             <strong>{club.manager.name}</strong>
@@ -52,17 +106,21 @@ function App() {
           <div className="budget-strip"><span>TRANSFER BUDGET</span><strong>{money(club.finances.transferBudget)}</strong></div>
         </header>
 
-        <main className="main-content" key={selectedPlayer ? 'profile' : activeTab}>
-          {selectedPlayer ? <PlayerProfile player={selectedPlayer} section={profileSection} selectedClubName={selectedClubName} backLabel={`Back to ${activeTab === 'Squad' ? 'squad' : activeTab.toLowerCase()}`}
-            onBack={() => setSelectedPlayer(null)} onSectionChange={setProfileSection} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} /> : <>
-            {activeTab === 'Club' && <ClubProfile section={clubSection} selectedClubName={selectedClubName} backLabel={`Back to ${clubReturnTab.toLowerCase()}`}
-              onBack={() => setActiveTab(clubReturnTab)} onSectionChange={setClubSection} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} />}
+        <main className="main-content" key={selectedCountryName ? `country-${selectedCountryName}` : selectedPlayer ? 'profile' : selectedMatch ? `match-${selectedMatch.id}` : activeTab}>
+          {selectedCountryName ? <CountryOverview country={selectedCountryName} onSelectCountry={openCountryOverview} />
+            : selectedPlayer ? <PlayerProfile player={selectedPlayer} section={profileSection} selectedClubName={selectedClubName}
+            onSectionChange={setProfileSection} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />
+            : selectedPersonnel ? <PersonnelProfile personnel={selectedPersonnel} onSelectCountry={openCountryOverview} />
+            : activeTab === 'Club' ? <ClubProfile section={clubSection} selectedClubName={selectedClubName}
+              onSectionChange={setClubSection} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} onSelectPersonnel={selectPersonnel} />
+              : selectedMatch ? <MatchCenter match={selectedMatch} selectedClubName={selectedClubName}
+                onSelectClub={setSelectedClubName} onOpenClub={openClubProfile} onSelectPlayer={selectPlayer} onSelectPersonnel={selectPersonnel} /> : <>
             {activeTab === 'Home' && <HomeView position={position?.position ?? 0} selectedClubName={selectedClubName} selectedMatchId={selectedMatchId} onSelectMatch={setSelectedMatchId} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} />}
             {activeTab === 'Squad' && <SquadView selectedClubName={selectedClubName} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} />}
             {activeTab === 'Tactics' && <TacticsView selectedClubName={selectedClubName} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} />}
-            {activeTab === 'Transfers' && <TransfersView selectedClubName={selectedClubName} onSelectClub={setSelectedClubName} />}
-            {activeTab === 'League' && <LeagueView selectedClubName={selectedClubName} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} />}
-            {activeTab === 'Matches' && <MatchesView selectedClubName={selectedClubName} selectedMatchId={selectedMatchId} onSelectMatch={setSelectedMatchId} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} />}
+            {activeTab === 'Transfers' && <TransferMarket onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />}
+            {activeTab === 'League' && <LeagueHub selectedCompetitionId={selectedLeagueId} onSelectCompetition={setSelectedLeagueId} onSelectCountry={openCountryOverview} />}
+            {activeTab === 'Matches' && <MatchesView matches={matchFixtures} onSelectMatch={setSelectedMatchId} />}
           </>}
         </main>
 
@@ -70,7 +128,7 @@ function App() {
           {tabs.map((tab) => (
             <button aria-current={activeTab === tab.id ? 'page' : undefined} aria-label={tab.label}
               className={activeTab === tab.id ? 'nav-item active' : 'nav-item'} key={tab.id}
-              onClick={() => { if (tab.id === 'Club' && activeTab !== 'Club') setClubReturnTab(activeTab); setSelectedPlayer(null); setActiveTab(tab.id) }} type="button">
+              onClick={() => { if (tab.id === 'Club' && activeTab !== 'Club') setClubReturnTab(activeTab); if (tab.id !== 'Club') setSelectedMatchId(null); if (tab.id !== 'League') setSelectedLeagueId(null); setSelectedCountryName(null); setSelectedPlayer(null); setSelectedPersonnel(null); setActiveTab(tab.id) }} type="button">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d={tab.icon} /></svg>
               <span>{tab.label}</span>
             </button>
@@ -83,10 +141,6 @@ function App() {
 
 function ClubReference({ name, selectedClubName, onSelect, onOpen, className = '', ariaLabel, children }: { name: string; selectedClubName: string | null; onSelect: (name: string) => void; onOpen?: () => void; className?: string; ariaLabel?: string; children?: ReactNode }) {
   return <button aria-label={ariaLabel} aria-pressed={selectedClubName === name} className={`entity-link ${className} ${selectedClubName === name ? 'selected' : ''}`} onClick={() => onOpen ? onOpen() : onSelect(name)} type="button">{children ?? name}</button>
-}
-
-function PlayerReference({ player, onSelectPlayer, className = '' }: { player: Player; onSelectPlayer: (player: Player) => void; className?: string }) {
-  return <button className={`entity-link ${className}`} onClick={() => onSelectPlayer(player)} type="button">{player.name}</button>
 }
 
 function SectionHeading({ kicker, title, detail }: { kicker: string; title: string; detail?: string }) {
@@ -155,24 +209,6 @@ function TacticsView({ selectedClubName, onSelectClub, onSelectPlayer }: { selec
   </>
 }
 
-function TransfersView({ selectedClubName, onSelectClub }: { selectedClubName: string | null; onSelectClub: (name: string) => void }) {
-  return <>
-    <div className="page-intro"><span className="eyebrow">SCOUTING & RECRUITMENT</span><h1>Transfer centre</h1><p>Build the next <ClubReference name="Northbridge FC" selectedClubName={selectedClubName} onSelect={onSelectClub} /> side.</p></div>
-    <div className="transfer-budget"><span>AVAILABLE TO SPEND</span><strong>{money(club.finances.transferBudget)}</strong><small>Wage budget remaining <b>£54.5k / week</b></small></div>
-    <section className="content-section"><SectionHeading kicker="SQUAD PLANNING" title="Priority positions" />
-      <div className="priority-row"><span className="priority-grade">A</span><div><strong>Centre-back</strong><span>Depth needed · 2 players scouted</span></div><span className="priority-arrow">↗</span></div>
-      <div className="priority-row"><span className="priority-grade grade-b">B</span><div><strong>Striker</strong><span>Long-term option · 4 players scouted</span></div><span className="priority-arrow">↗</span></div>
-    </section>
-  </>
-}
-
-function LeagueView({ selectedClubName, onSelectClub, onSelectPlayer }: { selectedClubName: string | null; onSelectClub: (name: string) => void; onSelectPlayer: (player: Player) => void }) {
-  return <>
-    <div className="page-intro"><span className="eyebrow">{league.country.toUpperCase()} · {league.season}</span><h1>{league.name}</h1><p>Matchday {league.matchday} of {league.totalMatchdays}</p></div>
-    <LeagueTable selectedClubName={selectedClubName} onSelectClub={onSelectClub} onSelectPlayer={onSelectPlayer} /><div className="league-footnote"><span className="legend-dot" /> Promotion places <span className="muted-dot" /> Relegation zone</div>
-  </>
-}
-
 function LeagueTable({ compact = false, selectedClubName, onSelectClub }: { compact?: boolean; selectedClubName: string | null; onSelectClub: (name: string) => void; onSelectPlayer: (player: Player) => void }) {
   return <div className="table-wrap">
     <div className="table-head"><span>CLUB</span><span>P</span><span>GD</span><span>PTS</span>{!compact && <span>FORM</span>}</div>
@@ -184,16 +220,14 @@ function LeagueTable({ compact = false, selectedClubName, onSelectClub }: { comp
   </div>
 }
 
-function MatchesView({ selectedClubName, selectedMatchId, onSelectMatch, onSelectClub, onSelectPlayer }: { selectedClubName: string | null; selectedMatchId: string | null; onSelectMatch: (id: string) => void; onSelectClub: (name: string) => void; onSelectPlayer: (player: Player) => void }) {
-  const homeKeyPlayer = club.squad.find((player) => player.name === nextMatch.keyPlayers.home)
+function MatchesView({ matches, onSelectMatch }: { matches: MatchInfo[]; onSelectMatch: (id: string) => void }) {
   return <>
     <div className="page-intro"><span className="eyebrow">FIXTURES & RESULTS</span><h1>Match centre</h1><p>North Country Premier · 2026/27</p></div>
-    <div className="match-date"><span>UP NEXT · SATURDAY 17 OCTOBER</span><b>15:00</b></div>
-    <section className={`match-card ${selectedMatchId === nextMatch.id ? 'selected-match' : ''}`}><span className="eyebrow">{nextMatch.competition.toUpperCase()} · MATCHDAY {nextMatch.matchday}</span>
-      <div className="match-card-teams"><ClubReference name={nextMatch.homeClubName} selectedClubName={selectedClubName} onSelect={onSelectClub} className="match-team"><i>N</i>{nextMatch.homeClubName}</ClubReference><button aria-label="Select this fixture" aria-pressed={selectedMatchId === nextMatch.id} className="match-versus-select" onClick={() => onSelectMatch(nextMatch.id)} type="button">VS</button><ClubReference name={nextMatch.awayClubName} selectedClubName={selectedClubName} onSelect={onSelectClub} className="match-team"><i className="opponent-mark">W</i>{nextMatch.awayClubName}</ClubReference></div>
-      <div className="match-card-details"><span>{nextMatch.venue}</span><span>{nextMatch.weather}</span></div>
-    </section>
-    <div className="match-details-grid"><div><span>REFEREE</span><strong>{nextMatch.referee}</strong></div><div><span>YOUR SHAPE</span><strong>{nextMatch.formation.home}</strong></div><div><span>KEY PLAYER</span><strong>{homeKeyPlayer ? <PlayerReference player={homeKeyPlayer} onSelectPlayer={onSelectPlayer} /> : nextMatch.keyPlayers.home}</strong></div><div><span>OPPOSITION SHAPE</span><strong>{nextMatch.formation.away}</strong></div></div>
+    <div className="fixture-list">{matches.map((match) => <button aria-label={`Open ${match.homeClubName} versus ${match.awayClubName} match details`} className={`fixture-list-card ${match.status.toLowerCase()}`} key={match.id} onClick={() => onSelectMatch(match.id)} type="button">
+      <span className="fixture-list-meta"><span>{match.competition.toUpperCase()} · MD {match.matchday}</span><strong>{match.status === 'Completed' ? 'FULL TIME' : 'UPCOMING'}</strong></span>
+      <span className="fixture-list-teams"><span><i className="fixture-club-crest">N</i><b>{match.homeClubName}</b></span><strong>{match.score ? `${match.score.home} - ${match.score.away}` : 'VS'}</strong><span><i className="fixture-club-crest away">{match.awayClubName.slice(0, 1)}</i><b>{match.awayClubName}</b></span></span>
+      <span className="fixture-list-footer"><span>{new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${match.date}T12:00:00`))}</span><span>{match.kickOff} · {match.venue}</span></span>
+    </button>)}</div>
   </>
 }
 
