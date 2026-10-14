@@ -8,6 +8,7 @@ import LeagueHub from './LeagueHub'
 import TransferMarket from './TransferMarket'
 import PersonnelProfile from './PersonnelProfile'
 import CountryOverview from './CountryOverview'
+import TacticsHub from './TacticsHub'
 import type { MatchInfo, PersonnelProfile as PersonnelProfileData, Player } from './types/game'
 import './App.css'
 
@@ -117,7 +118,7 @@ function App() {
                 onSelectClub={setSelectedClubName} onOpenClub={openClubProfile} onSelectPlayer={selectPlayer} onSelectPersonnel={selectPersonnel} /> : <>
             {activeTab === 'Home' && <HomeView position={position?.position ?? 0} selectedClubName={selectedClubName} selectedMatchId={selectedMatchId} onSelectMatch={setSelectedMatchId} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} />}
             {activeTab === 'Squad' && <SquadView selectedClubName={selectedClubName} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} />}
-            {activeTab === 'Tactics' && <TacticsView selectedClubName={selectedClubName} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} />}
+            {activeTab === 'Tactics' && <TacticsHub />}
             {activeTab === 'Transfers' && <TransferMarket onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />}
             {activeTab === 'League' && <LeagueHub selectedCompetitionId={selectedLeagueId} onSelectCompetition={setSelectedLeagueId} onSelectCountry={openCountryOverview} />}
             {activeTab === 'Matches' && <MatchesView matches={matchFixtures} onSelectMatch={setSelectedMatchId} />}
@@ -165,7 +166,7 @@ function HomeView({ position, selectedClubName, selectedMatchId, onSelectMatch, 
       <div className="metric"><span>LAST 5</span><div className="form-dots">{league.standings[1].form.map((result, index) => <b className={`form-${result.toLowerCase()}`} key={`${result}-${index}`}>{result}</b>)}</div><span className="metric-note">4 wins · 1 draw</span></div>
     </section>
     <section className="content-section"><SectionHeading kicker="THE RUN-IN" title="League table" detail="TOP 5  →" /><LeagueTable compact selectedClubName={selectedClubName} onSelectClub={onSelectClub} onSelectPlayer={onSelectPlayer} /></section>
-    <section className="content-section squad-teaser"><SectionHeading kicker="FIRST TEAM" title="Squad status" detail="11 PLAYERS" />
+    <section className="content-section squad-teaser"><SectionHeading kicker="FIRST TEAM" title="Squad status" detail={`${club.squad.length} PLAYERS`} />
       <div className="squad-status"><span className="status-indicator" /><div><strong>Everyone ready</strong><span>Full squad available for Saturday</span></div><strong className="fitness-score">96% <small>AVG</small></strong></div>
     </section>
   </>
@@ -181,31 +182,6 @@ function SquadView({ selectedClubName, onSelectClub, onSelectPlayer }: { selecte
       <span className="player-fit"><i style={{ width: `${player.fitness}%` }} /></span>
       <strong className="player-rating">{player.overall}</strong><span className="player-value">{money(player.value)}</span>
     </button>)}</div>
-  </>
-}
-
-function TacticsView({ selectedClubName, onSelectClub, onSelectPlayer }: { selectedClubName: string | null; onSelectClub: (name: string) => void; onSelectPlayer: (player: Player) => void }) {
-  const formation = [
-    { player: club.squad[0], role: 'GK', lane: 'keeper', x: '50%' },
-    { player: club.squad[1], role: 'D(R)', lane: 'back', x: '15%' },
-    { player: club.squad[3], role: 'D(C)', lane: 'back', x: '38%' },
-    { player: club.squad[4], role: 'D(C)', lane: 'back', x: '62%' },
-    { player: club.squad[2], role: 'D(L)', lane: 'back', x: '85%' },
-    { player: club.squad[5], role: 'DM', lane: 'midfield', x: '38%' },
-    { player: club.squad[7], role: 'M(C)', lane: 'midfield', x: '62%' },
-    { player: club.squad[6], role: 'AM(R)', lane: 'attack', x: '18%' },
-    { player: club.squad[9], role: 'AM(C)', lane: 'attack', x: '50%' },
-    { player: club.squad[10], role: 'AM(L)', lane: 'attack', x: '82%' },
-    { player: club.squad[8], role: 'ST', lane: 'striker', x: '50%' },
-  ]
-  return <>
-    <div className="page-intro"><span className="eyebrow">MATCH PREPARATION</span><h1>Team tactics</h1><p>Shape your side for <ClubReference name="Westhaven Athletic" selectedClubName={selectedClubName} onSelect={onSelectClub} />.</p></div>
-    <div className="tactic-controls"><span>FORMATION</span><strong>{club.formation}</strong><span>MENTALITY</span><strong className="accent-text">Positive</strong></div>
-    <div className="pitch" aria-label={`Formation ${club.formation}`}>
-      <span className="pitch-line halfway" /><span className="pitch-circle" />
-      {formation.map(({ player, role, lane, x }) => <button aria-label={`Open ${player.name} profile`} className={`pitch-player ${lane}`} key={player.id} onClick={() => onSelectPlayer(player)} style={{ left: x }} type="button"><b>{String(player.shirtNumber).padStart(2, '0')}</b><span className="pitch-player-name">{player.name}</span><small>{role}</small></button>)}
-    </div>
-    <div className="tactic-summary"><span>IN POSSESSION</span><strong>Short passing · Play out of defence</strong><span>OUT OF POSSESSION</span><strong>High press · Mid block</strong></div>
   </>
 }
 

@@ -926,6 +926,78 @@ button.match-pitch-player { cursor: pointer; }
 .country-player-row > b { color: #586f30; font-family: 'Barlow Condensed', sans-serif; font-size: 14px; text-align: right; }
 .country-empty { color: #7d877d; font-size: 8px; }
 
+.tactics-hub { display: flex; flex-direction: column; gap: 11px; }
+.tactics-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 4px; background: #e6e9df; border: 1px solid #dce1d4; border-radius: 16px; scrollbar-width: none; }
+.tactics-tabs::-webkit-scrollbar { display: none; }
+.tactics-tab { flex: 1 0 auto; min-height: 32px; padding: 0 9px; color: #677467; background: transparent; border: 0; border-radius: 11px; font: inherit; font-size: 7px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.tactics-tab.active { color: #f3f3eb; background: #283a2e; }
+.tactics-section-content { display: flex; flex-direction: column; gap: 10px; animation: arrive .2s ease both; }
+.tactics-toolbar, .bench-panel, .role-assignment-list, .tactics-assignments-panel, .leadership-influence-panel, .formation-library, .mentality-panel { padding: 12px; background: #fff; border: 1px solid #e1e6d9; border-radius: 19px; }
+.tactics-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.tactics-toolbar > div:first-child { display: flex; flex-direction: column; gap: 3px; }
+.tactics-toolbar .eyebrow, .bench-heading .eyebrow, .tactics-subhead .eyebrow, .formation-library > .eyebrow, .mentality-panel > .eyebrow { font-size: 6px; }
+.tactics-toolbar > div > strong { color: #314731; font-family: 'Barlow Condensed', sans-serif; font-size: 18px; }
+.tactics-actions { display: flex; gap: 5px; }
+.tactics-action { min-height: 30px; padding: 0 8px; color: #53664a; background: #edf1e5; border: 0; border-radius: 11px; font: inherit; font-size: 7px; font-weight: 800; cursor: pointer; }
+.tactics-action.primary { color: #1d2a20; background: #d4f34a; }
+.tactics-action:hover { filter: brightness(.96); }
+.tactics-pitch { height: 485px; margin-top: 0; border: 4px solid #edf0e8; border-radius: 23px; box-shadow: 0 0 0 1px #d8dfd2; }
+.tactics-pitch-preview { height: 360px; }
+.tactics-player-slot { display: flex; width: 72px; min-height: 58px; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px 3px; color: #f3f3eb; background: #1e3526df; border: 1px solid #eaffc557; border-radius: 14px; box-shadow: 0 2px 6px #13201955; cursor: pointer; }
+.tactics-player-slot:hover { background: #2e4a2f; transform: translate(-50%, -50%) scale(1.04); }
+.tactics-player-slot.selected { color: #1c291e; background: #d4f34a; border-color: #f5f8e9; box-shadow: 0 0 0 3px #d4f34a55; }
+.tactics-player-slot b { display: grid; width: 22px; height: 22px; place-items: center; color: #1d2a20; background: #d4f34a; border: 1px solid #f4f5e9; border-radius: 50%; font-family: 'DM Sans', sans-serif; font-size: 7px; }
+.tactics-player-slot.selected b { color: #f1f3e9; background: #314731; border-color: #314731; }
+.tactics-player-slot > span { max-width: 68px; overflow: hidden; color: inherit; font-size: 6px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.tactics-player-slot > small { color: inherit; font-size: 5px; font-weight: 800; opacity: .8; }
+.tactics-player-slot.empty { color: #e2eadc; background: #263a2cb5; border-style: dashed; border-color: #ffffff9c; }
+.tactics-player-slot.empty b { width: 18px; height: 18px; color: #253329; background: #e7edda; }
+.bench-panel { padding: 11px; }
+.bench-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; }
+.bench-heading h2 { margin-top: 2px; color: #29382c; font-family: 'Barlow Condensed', sans-serif; font-size: 19px; }
+.bench-heading > span { color: #788477; font-size: 6px; font-weight: 800; }
+.swap-guidance { margin: 8px 0; padding: 7px 9px; color: #687568; background: #f2f4ed; border-radius: 10px; font-size: 7px; }
+.tactics-reserves { display: flex; max-height: 218px; flex-direction: column; gap: 5px; overflow-y: auto; padding-right: 2px; }
+.reserve-player-card { display: grid; grid-template-columns: 25px minmax(0, 1fr) 25px; align-items: center; gap: 7px; min-height: 42px; padding: 5px 8px; color: #29372c; background: #f6f7f2; border: 1px solid #edf0e8; border-radius: 12px; text-align: left; cursor: pointer; }
+.reserve-player-card:hover { background: #edf2e1; border-color: #dce7c2; }
+.reserve-player-card > span { display: grid; width: 24px; height: 26px; place-items: center; color: #4c6331; background: #e9efdc; border-radius: 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 10px; }
+.reserve-player-card > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.reserve-player-card > div strong { overflow: hidden; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.reserve-player-card > div small { color: #7e887d; font-size: 6px; }
+.reserve-player-card > b { color: #526c31; font-family: 'Barlow Condensed', sans-serif; font-size: 14px; text-align: right; }
+.tactics-subhead { padding: 12px; color: #f1f3e9; background: #26382c; border-radius: 19px; }
+.tactics-subhead .eyebrow { color: #bdc8b8; }
+.tactics-subhead h2 { margin-top: 3px; font-family: 'Barlow Condensed', sans-serif; font-size: 22px; }
+.tactics-subhead p { margin-top: 4px; color: #c0c9bd; font-size: 7px; }
+.role-assignment-list, .tactics-assignments-panel { padding: 5px 11px; }
+.role-assignment-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) minmax(105px, 1.2fr); align-items: center; gap: 7px; min-height: 42px; }
+.role-assignment-row + .role-assignment-row, .tactics-assignment + .tactics-assignment { border-top: 1px solid #edf0e8; }
+.role-position { color: #60753a; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 800; }
+.role-player-name { overflow: hidden; color: #39473a; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.role-assignment-row select, .tactics-assignment select { min-width: 0; min-height: 29px; padding: 0 7px; color: #455545; background: #f4f6ef; border: 1px solid #e8ece3; border-radius: 10px; font: inherit; font-size: 7px; }
+.tactics-assignment { display: grid; grid-template-columns: minmax(0, 1fr) minmax(115px, 1fr); align-items: center; gap: 8px; min-height: 42px; }
+.tactics-assignment > span { color: #4a584b; font-size: 8px; font-weight: 700; }
+.leadership-player-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 0; }
+.leadership-player-row + .leadership-player-row { border-top: 1px solid #edf0e8; }
+.leadership-player-row > div { display: flex; flex-direction: column; gap: 3px; }
+.leadership-player-row > div strong { color: #344435; font-size: 8px; }
+.leadership-player-row > div small { color: #7c877c; font-size: 6px; }
+.influence-badge { flex: 0 0 auto; padding: 5px 7px; color: #486938; background: #e6f0de; border-radius: 10px; font-size: 6px; font-weight: 800; }
+.influence-badge.high { color: #657436; background: #f1efd8; }
+.influence-badge.influential { color: #6d796d; background: #eef0eb; }
+.formation-library > .eyebrow, .mentality-panel > .eyebrow { display: block; margin-bottom: 8px; color: #7a8579; font-weight: 800; letter-spacing: .08em; }
+.formation-options, .mentality-options, .style-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.formation-option, .mentality-option, .style-option { min-height: 31px; padding: 0 10px; color: #5f6d60; background: #eef1e9; border: 1px solid #e4e9df; border-radius: 18px; font: inherit; font-size: 7px; font-weight: 800; cursor: pointer; }
+.formation-option.active, .mentality-option.active, .style-option.active { color: #f1f3e9; background: #2c4030; border-color: #2c4030; }
+.formation-option:hover, .mentality-option:hover, .style-option:hover { border-color: #a8bb75; }
+@media (max-width: 360px) {
+  .tactics-pitch { height: 455px; }
+  .tactics-pitch-preview { height: 340px; }
+  .tactics-player-slot { width: 63px; min-height: 54px; }
+  .role-assignment-row { grid-template-columns: 31px minmax(0, 1fr) minmax(94px, 1.15fr); gap: 5px; }
+  .role-assignment-row select { padding: 0 5px; font-size: 6px; }
+}
+
 @media (max-width: 360px) {
   .market-list-head, .market-player-row { grid-template-columns: 21px minmax(58px, 1fr) 16px 22px 18px 22px 33px 36px 21px; gap: 2px; padding-right: 4px; padding-left: 4px; }
   .market-player-name { font-size: 6px; }

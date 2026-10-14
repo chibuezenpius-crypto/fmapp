@@ -19,6 +19,11 @@ function createPlayer(
   value: number,
   attributes: Partial<PlayerAttributes>,
 ): Player {
+  const primaryNationalities = ['England', 'England', 'Nigeria', 'England', 'Portugal', 'England', 'Nigeria', 'Scotland', 'Portugal', 'Ireland', 'Wales']
+  const primaryCodes = ['ENG', 'ENG', 'NGA', 'ENG', 'POR', 'ENG', 'NGA', 'SCO', 'POR', 'IRL', 'WAL']
+  const secondaryNationalities = ['Wales', 'Ireland', 'England', 'Wales', 'Spain', 'Ghana', 'Ghana', 'England', 'Angola', 'England', 'Ireland']
+  const secondaryCodes = ['WAL', 'IRL', 'ENG', 'WAL', 'ESP', 'GHA', 'GHA', 'ENG', 'ANG', 'ENG', 'IRL']
+  const nationalityIndex = (shirtNumber - 1) % primaryNationalities.length
   return {
     id, name, shirtNumber, position, age, overall, potential, value,
     fitness: 92 + shirtNumber % 8,
@@ -29,8 +34,8 @@ function createPlayer(
       dateOfBirth: `${2026 - age}-04-${String((shirtNumber % 27) + 1).padStart(2, '0')}`,
       placeOfBirth: ['Manchester', 'Liverpool', 'Leeds', 'Bristol', 'London'][shirtNumber % 5],
       nationalities: [
-        { country: ['England', 'England', 'Nigeria', 'England', 'Portugal', 'England', 'Nigeria', 'Scotland', 'Portugal', 'Ireland', 'Wales'][shirtNumber - 1], code: ['ENG', 'ENG', 'NGA', 'ENG', 'POR', 'ENG', 'NGA', 'SCO', 'POR', 'IRL', 'WAL'][shirtNumber - 1], type: 'Primary' },
-        { country: ['Wales', 'Ireland', 'England', 'Wales', 'Spain', 'Ghana', 'Ghana', 'England', 'Angola', 'England', 'Ireland'][shirtNumber - 1], code: ['WAL', 'IRL', 'ENG', 'WAL', 'ESP', 'GHA', 'GHA', 'ENG', 'ANG', 'ENG', 'IRL'][shirtNumber - 1], type: 'Secondary' },
+        { country: primaryNationalities[nationalityIndex], code: primaryCodes[nationalityIndex], type: 'Primary' },
+        { country: secondaryNationalities[nationalityIndex], code: secondaryCodes[nationalityIndex], type: 'Secondary' },
       ],
       languages: [{ name: 'English', proficiency: 'Native' }],
       preferredFoot: shirtNumber % 3 === 0 ? 'Left' : 'Right',
@@ -93,17 +98,24 @@ function createPlayer(
 }
 
 export const squad: Player[] = [
-  createPlayer('p-01', 'Elliot Ward', 1, 'GK', 29, 78, 79, 5200000, { positioning: 16, decisions: 15, jumpingReach: 16, teamwork: 14 }),
+  createPlayer('p-01', 'Elliot Ward', 1, 'GK', 29, 78, 79, 5200000, { positioning: 16, decisions: 15, jumpingReach: 16, teamwork: 14, leadership: 15 }),
   createPlayer('p-02', 'Callum Price', 2, 'D (R)', 25, 75, 79, 4100000, { crossing: 15, pace: 15, tackling: 14, stamina: 15 }),
   createPlayer('p-03', 'Tariq Mensah', 3, 'D (L)', 23, 76, 83, 5900000, { crossing: 14, pace: 16, marking: 14, agility: 15 }),
-  createPlayer('p-04', 'Lewis Grant', 4, 'D (C)', 28, 79, 79, 6800000, { heading: 16, marking: 16, tackling: 15, strength: 16 }),
+  createPlayer('p-04', 'Lewis Grant', 4, 'D (C)', 28, 79, 79, 6800000, { heading: 16, marking: 16, tackling: 15, strength: 16, leadership: 18 }),
   createPlayer('p-05', 'Mateo Silva', 5, 'D (C)', 26, 77, 80, 6200000, { heading: 15, marking: 15, passing: 13, positioning: 15 }),
-  createPlayer('p-06', 'Noah Bennett', 6, 'DM', 24, 78, 84, 8200000, { tackling: 16, passing: 15, teamwork: 16, stamina: 16 }),
+  createPlayer('p-06', 'Noah Bennett', 6, 'DM', 24, 78, 84, 8200000, { tackling: 16, passing: 15, teamwork: 16, stamina: 16, leadership: 14 }),
   createPlayer('p-07', 'Jamie Okafor', 7, 'M (R)', 22, 77, 86, 9600000, { dribbling: 16, crossing: 15, pace: 17, acceleration: 17 }),
-  createPlayer('p-08', 'Rory Campbell', 8, 'M (C)', 27, 80, 81, 10400000, { passing: 17, vision: 16, technique: 16, decisions: 16 }),
+  createPlayer('p-08', 'Rory Campbell', 8, 'M (C)', 27, 80, 81, 10400000, { passing: 17, vision: 16, technique: 16, decisions: 16, leadership: 16 }),
   createPlayer('p-09', 'Adrian Costa', 9, 'ST (C)', 25, 82, 85, 15800000, { finishing: 17, firstTouch: 16, offTheBall: 17, pace: 15 }),
   createPlayer('p-10', 'Finn Gallagher', 10, 'AM (C)', 24, 81, 87, 17200000, { dribbling: 16, technique: 17, vision: 17, longShots: 15 }),
   createPlayer('p-11', 'Dylan Hughes', 11, 'M (L)', 21, 74, 85, 7100000, { dribbling: 15, crossing: 14, pace: 16, determination: 16 }),
+  createPlayer('p-12', 'Harvey Cole', 12, 'GK', 26, 70, 73, 1400000, { positioning: 13, decisions: 12, jumpingReach: 13 }),
+  createPlayer('p-13', 'Ben Turner', 14, 'D (C)', 22, 73, 80, 4200000, { marking: 14, tackling: 14, strength: 13 }),
+  createPlayer('p-14', 'Isaac Doyle', 16, 'M (C)', 21, 72, 82, 3900000, { passing: 14, teamwork: 15, stamina: 14 }),
+  createPlayer('p-15', 'Theo Martin', 18, 'M (C)', 25, 71, 72, 2600000, { passing: 13, workRate: 14, decisions: 12 }),
+  createPlayer('p-16', 'Rafael Costa', 20, 'ST (C)', 23, 75, 82, 6400000, { finishing: 15, pace: 15, offTheBall: 15 }),
+  createPlayer('p-17', 'Liam Foster', 22, 'D (L)', 20, 70, 81, 3100000, { pace: 15, crossing: 13, stamina: 14 }),
+  createPlayer('p-18', 'Samir Khan', 24, 'AM (C)', 19, 69, 84, 3500000, { technique: 14, vision: 14, dribbling: 13 }),
 ]
 
 export const club: Club = {
