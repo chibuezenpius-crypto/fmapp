@@ -3,8 +3,8 @@
 
 :root {
 	font-family: 'DM Sans', sans-serif;
-	color: #18211c;
-	background: #101713;
+	color: #101829;
+	background: #0a101d;
 	font-synthesis: none;
 	text-rendering: optimizeLegibility;
 	-webkit-font-smoothing: antialiased;
@@ -14,4 +14,4 @@
 * { box-sizing: border-box; }
 body { min-width: 320px; min-height: 100vh; margin: 0; }
 button { font: inherit; }
-::selection { color: #17221b; background: #d4f34a; }
+::selection { color: #0f172a; background: #5b9bff; }

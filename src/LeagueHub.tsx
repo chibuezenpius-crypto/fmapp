@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { leagueCompetitions } from './data/mockData'
+import { club, currentMatchday, leagueCompetitions, leagueHistory, leaguePlayerStats, leagueStandings, totalMatchdays } from './data/mockData'
 import rawGlobalLeagues from './data/globalLeaguesAndTeams.json'
 import rawInternationalTournaments from './data/internationalTournaments.json'
 import LeagueClubSquad from './LeagueClubSquad'
@@ -17,7 +17,7 @@ const globalLeagues = rawGlobalLeagues as unknown as GlobalLeaguesDatabase
 
 function adaptGlobalLeague(countryLeague: GlobalCountryLeague): LeagueCompetition {
   const sample = leagueCompetitions.find((competition) => competition.category === 'Domestic Leagues') ?? leagueCompetitions[0]
-  const standings = countryLeague.teams.map((team) => ({ ...team.standing, clubId: team.id, clubName: team.name }))
+  const standings = leagueStandings(countryLeague)
   return {
     ...sample,
     id: countryLeague.id,
@@ -25,9 +25,11 @@ function adaptGlobalLeague(countryLeague: GlobalCountryLeague): LeagueCompetitio
     country: countryLeague.countryName,
     category: 'Domestic Leagues',
     season: countryLeague.season,
-    matchday: 12,
-    totalMatchdays: 34,
+    matchday: currentMatchday(countryLeague),
+    totalMatchdays: totalMatchdays(countryLeague),
     standings,
+    playerStats: leaguePlayerStats(countryLeague.teams.map((team) => team.id)),
+    history: leagueHistory(countryLeague),
     teamStats: countryLeague.teams.map((team, index) => ({ clubId: team.id, clubName: team.name, possession: 58 - (index % 8) * 3, goals: team.standing.goalsFor, cleanSheets: Math.max(1, 8 - Math.floor(index / 3)), cards: 14 + index % 9 })),
   }
 }
@@ -85,6 +87,7 @@ function adaptTournament(tournament: InternationalTournament): LeagueCompetition
     totalMatchdays: fieldCodes.length,
     standings,
     teamStats: standings.map((team, index) => ({ clubId: team.clubId, clubName: team.clubName, possession: 55 + index % 6 * 3, goals: team.goalsFor, cleanSheets: Math.max(0, 3 - team.goalsAgainst % 4), cards: 3 + index % 7 })),
+    playerStats: { goals: [], assists: [], cleanSheets: [] },
     rules: tournament.rules,
     history: tournament.history.map((record) => ({ ...record, points: 0 })),
   }
@@ -114,7 +117,7 @@ function TournamentStages({ tournament, stageId, onStageChange, onSelectCountry 
 function LeagueTable({ competition, renderClub, onSelectClub }: { competition: LeagueCompetition; renderClub?: (clubId: string) => React.ReactNode; onSelectClub?: (clubId: string) => void }) {
   return <div className="table-wrap league-table-wrap">
     <div className="table-head"><span>CLUB</span><span>P</span><span>W-D-L</span><span>GF</span><span>GA</span><span>GD</span><span>PTS</span></div>
-    {competition.standings.map((standing) => <div className={`table-row league-standing ${standing.clubName === 'Northbridge FC' ? 'own-club' : ''}`} key={standing.clubId}>
+    {competition.standings.map((standing) => <div className={`table-row league-standing ${standing.clubId === club.id ? 'own-club' : ''}`} key={standing.clubId}>
       <span className="table-club"><i>{String(standing.position).padStart(2, '0')}</i>{renderClub?.(standing.clubId)}{onSelectClub ? <button aria-label={`Open ${standing.clubName} squad`} className="entity-link" onClick={() => onSelectClub(standing.clubId)} type="button">{standing.clubName}</button> : standing.clubName}</span><span>{standing.played}</span><span>{standing.won}-{standing.drawn}-{standing.lost}</span><span>{standing.goalsFor}</span><span>{standing.goalsAgainst}</span><span>{standing.goalDifference > 0 ? `+${standing.goalDifference}` : standing.goalDifference}</span><strong>{standing.points}</strong>
     </div>)}
   </div>
@@ -131,7 +134,7 @@ interface LeagueHubProps {
 
 export default function LeagueHub({ selectedCompetitionId, onSelectCompetition, onSelectCountry, selectedClubId, onSelectClub, onSelectPlayer }: LeagueHubProps) {
   const [category, setCategory] = useState<LeagueCategory>('Domestic Leagues')
-  const [openRegion, setOpenRegion] = useState('England')
+  const [openRegion, setOpenRegion] = useState('Nigeria')
   const [section, setSection] = useState<LeagueSection>('Standings')
   const [playerStat, setPlayerStat] = useState<PlayerStatKey>('goals')
   const [tournamentStageId, setTournamentStageId] = useState('group-stage')

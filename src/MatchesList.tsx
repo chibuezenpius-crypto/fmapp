@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Star } from 'lucide-react'
-import { club } from './data/mockData'
+import { club, league } from './data/mockData'
 import type { MatchInfo } from './types/game'
 
 type MatchFilter = 'All' | 'Live' | 'Upcoming' | 'Finished' | 'Favourites'
@@ -33,7 +33,7 @@ export default function MatchesList({ matches, onSelectMatch }: { matches: Match
   }, {})
 
   return <>
-    <div className="page-intro"><span className="eyebrow">FIXTURES & RESULTS</span><h1>Match centre</h1><p>North Country Premier · 2026/27</p></div>
+    <div className="page-intro"><span className="eyebrow">FIXTURES & RESULTS</span><h1>Match centre</h1><p>{league.name} · {league.season}</p></div>
     <div className="ls-date-strip" role="group" aria-label="Match date">
       <button aria-pressed={selectedDate === null} onClick={() => setSelectedDate(null)} type="button"><span>ALL</span><strong>Dates</strong></button>
       {dates.map((date) => <button aria-pressed={selectedDate === date} key={date} onClick={() => setSelectedDate(date)} type="button"><span>{weekday.format(parse(date)).toUpperCase()}</span><strong>{dayMonth.format(parse(date))}</strong></button>)}
@@ -52,12 +52,12 @@ export default function MatchesList({ matches, onSelectMatch }: { matches: Match
         const awayOwn = match.awayClubId === club.id
         return <div className={`ls-row ${match.status.toLowerCase()}`} key={match.id}>
           <button aria-label={`Open ${match.homeClubName} versus ${match.awayClubName} match details`} className="ls-row-main" onClick={() => onSelectMatch(match.id)} type="button">
-            <span className="ls-row-time"><strong>{live ? 'LIVE' : done ? 'FT' : match.kickOff}</strong><small>{dayMonth.format(parse(match.date))}</small></span>
-            <span className="ls-row-teams">
-              <span className={homeOwn ? 'own' : ''}><i className={`fixture-club-crest ${homeOwn ? '' : 'away'}`}>{match.homeClubName.slice(0, 1)}</i><b>{match.homeClubName}</b></span>
-              <span className={awayOwn ? 'own' : ''}><i className={`fixture-club-crest ${awayOwn ? '' : 'away'}`}>{match.awayClubName.slice(0, 1)}</i><b>{match.awayClubName}</b></span>
+            <span className={`ls-team ${homeOwn ? 'own' : ''}`}><i className={`fixture-club-crest ${homeOwn ? '' : 'away'}`}>{match.homeClubName.slice(0, 1)}</i><b>{match.homeClubName}</b></span>
+            <span className="ls-row-center">
+              <span className="ls-row-time"><strong>{live ? 'LIVE' : done ? 'FT' : match.kickOff}</strong><small>{dayMonth.format(parse(match.date))}</small></span>
+              <span className="ls-row-score"><strong>{match.score?.home ?? '-'}</strong><em>-</em><strong>{match.score?.away ?? '-'}</strong></span>
             </span>
-            <span className="ls-row-score"><strong>{match.score?.home ?? '-'}</strong><strong>{match.score?.away ?? '-'}</strong></span>
+            <span className={`ls-team ${awayOwn ? 'own' : ''}`}><i className={`fixture-club-crest ${awayOwn ? '' : 'away'}`}>{match.awayClubName.slice(0, 1)}</i><b>{match.awayClubName}</b></span>
           </button>
           <button aria-label={favourite ? 'Remove from favourites' : 'Add to favourites'} aria-pressed={favourite} className="ls-row-star" onClick={() => toggleFavourite(match.id)} type="button"><Star aria-hidden="true" fill={favourite ? 'currentColor' : 'none'} size={15} /></button>
         </div>

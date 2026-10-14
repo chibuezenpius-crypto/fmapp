@@ -113,7 +113,7 @@ function TeamRow({ team, score, won, onSelectCountry }: { team: BracketTeam; sco
 }
 
 function BracketMatchCard({ match, onSelectCountry }: { match: BracketMatch; onSelectCountry?: (country: string) => void }) {
-  return <article className="w-40 shrink-0 rounded-2xl border border-[#e2e6d9] bg-white p-3 text-slate-800 shadow-sm">
+  return <article className="w-40 shrink-0 rounded-2xl border border-[#cfd9f0] bg-white p-3 text-slate-800 shadow-sm">
     <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-slate-400"><span>{match.date}</span><span>{match.status}</span></div>
     <div className="space-y-1.5">
       <TeamRow team={match.home} score={match.homeScore} won={match.winner.code === match.home.code} onSelectCountry={onSelectCountry} />
@@ -135,7 +135,7 @@ function Trophy() {
 function Branch({ side, rounds, onSelectCountry }: { side: 'left' | 'right'; rounds: BracketRound[]; onSelectCountry?: (country: string) => void }) {
   const left = side === 'left'
   const ordered = left ? rounds : [...rounds].reverse()
-  const line = 'border-[#c9d1bf]'
+  const line = 'border-[#b0bee0]'
   return <div className="flex">
     {ordered.map((round) => {
       const roundIndex = rounds.indexOf(round)
@@ -143,7 +143,7 @@ function Branch({ side, rounds, onSelectCountry }: { side: 'left' | 'right'; rou
       const paired = round.matches.length > 1
       const prevEdge = left ? 'left-0 border-t' : 'right-0 border-t'
       return <section className="flex flex-col" key={`${side}-${round.name}`}>
-        <h3 className="mb-2 px-4 text-center text-[10px] font-bold uppercase tracking-wider text-[#334633]">{round.name}</h3>
+        <h3 className="mb-2 px-4 text-center text-[10px] font-bold uppercase tracking-wider text-[#223257]">{round.name}</h3>
         <div className="flex flex-1 flex-col">
           {round.matches.map((match, index) => <div className="relative flex flex-1 items-center justify-center px-4 py-1.5" key={`${side}-${round.name}-${index}`}>
             {hasPrev && <span className={`absolute top-1/2 w-4 ${prevEdge} ${line}`} />}
@@ -169,18 +169,18 @@ export default function KnockoutBracket({ tournament, participants = [], roundNa
   const finalAway = right.finalist ?? entrants[1] ?? entrants[0]
   const thirdPlace = knockoutStage?.rounds?.find((round) => round.toLowerCase().includes('third-place'))
 
-  if (!finalHome || !finalAway) return <p className="rounded-2xl border border-[#e2e6d9] bg-white p-4 text-center text-sm text-slate-500">Bracket not available yet.</p>
+  if (!finalHome || !finalAway) return <p className="rounded-2xl border border-[#cfd9f0] bg-white p-4 text-center text-sm text-slate-500">Bracket not available yet.</p>
   const finalMatch = simulateRound([finalHome, finalAway], 'Final', roundNames.length).matches[0]
 
-  return <div className="overflow-x-auto rounded-[20px] border border-[#e2e6d9] bg-[#f3f3eb] p-3 snap-x" aria-label={`${title} knockout bracket`}>
+  return <div className="overflow-x-auto rounded-[20px] border border-[#cfd9f0] bg-[#e6ebf8] p-3 snap-x" aria-label={`${title} knockout bracket`}>
     <div className="flex min-w-max items-stretch">
       <Branch side="left" rounds={left.rounds} onSelectCountry={onSelectCountry} />
       <section className="relative flex snap-center flex-col items-center justify-center gap-2 px-4">
-        <span className={`absolute left-0 top-1/2 w-4 border-t ${left.rounds.length ? 'border-[#c9d1bf]' : 'border-transparent'}`} />
-        <span className={`absolute right-0 top-1/2 w-4 border-t ${right.rounds.length ? 'border-[#c9d1bf]' : 'border-transparent'}`} />
-        <span className="text-[10px] font-bold uppercase tracking-wider text-[#a07d00]">Final</span>
+        <span className={`absolute left-0 top-1/2 w-4 border-t ${left.rounds.length ? 'border-[#b0bee0]' : 'border-transparent'}`} />
+        <span className={`absolute right-0 top-1/2 w-4 border-t ${right.rounds.length ? 'border-[#b0bee0]' : 'border-transparent'}`} />
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[#0030a0]">Final</span>
         <Trophy />
-        <span className="max-w-40 text-center text-xs font-bold text-[#17221b]">{title}</span>
+        <span className="max-w-40 text-center text-xs font-bold text-[#0f172a]">{title}</span>
         <BracketMatchCard match={finalMatch} onSelectCountry={onSelectCountry} />
         <span className="text-[10px] text-slate-400">{season ?? tournament?.season ?? ''}</span>
         {thirdPlace && <small className="text-[10px] text-slate-500">{thirdPlace}</small>}

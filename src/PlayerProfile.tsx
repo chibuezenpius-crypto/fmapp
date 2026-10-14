@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import type { Player, PlayerAttributes, PlayerAchievement } from './types/game'
-import { findGeneratedClub } from './data/clubSquads'
-import { squad } from './data/mockData'
+import { club, isOwnPlayer, releasePlayer, renewContract, signPlayer } from './data/mockData'
+import { createRng } from './utils/proceduralGenerator'
+import { findGeneratedClub, getClubSquad } from './data/clubSquads'
 import Flag from './Flag'
 
 export type ProfileSection = 'Overview' | 'Personal Info' | 'Contracts' | 'History' | 'Relationships' | 'Achievements'
@@ -20,13 +22,14 @@ interface PlayerProfileProps {
   onSelectClub: (name: string) => void
   onSelectPlayer: (player: Player) => void
   onSelectCountry: (country: string) => void
+  onClubChange?: () => void
 }
 
 const money = (amount: number) => `£${new Intl.NumberFormat('en-GB').format(amount)}`
 const displayDate = (date: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`))
 const ratingTone = (rating: number) => rating >= 15 ? 'positive' : rating < 9 ? 'negative' : 'neutral'
 
-const playerClubName = (player: Player) => findGeneratedClub(player.contract.clubId)?.clubName ?? 'Northbridge FC'
+const playerClubName = (player: Player) => findGeneratedClub(player.contract.clubId)?.clubName ?? 'Free Agent'
 
 function ClubReference({ name, selectedClubName, onSelectClub }: { name: string; selectedClubName: string | null; onSelectClub: (name: string) => void }) {
   return <button aria-pressed={selectedClubName === name} className={`entity-link ${selectedClubName === name ? 'selected' : ''}`} onClick={() => onSelectClub(name)} type="button">{name}</button>
@@ -34,6 +37,70 @@ function ClubReference({ name, selectedClubName, onSelectClub }: { name: string;
 
 function PlayerReference({ player, onSelectPlayer }: { player: Player; onSelectPlayer: (player: Player) => void }) {
   return <button className="entity-link" onClick={() => onSelectPlayer(player)} type="button">{player.name}</button>
+}
+
+const SHORTLIST_KEY = 'fmapp-transfer-shortlist'
+const readShortlist = (): string[] => {
+  try { return JSON.parse(window.localStorage.getItem(SHORTLIST_KEY) ?? '[]') } catch { return [] }
+}
+const shortMoney = (amount: number) => `£${(amount / 1000000).toFixed(1)}m`
+const scoutedPlayers = new Set<string>()
+
+function PlayerActions({ player, onClubChange }: { player: Player; onClubChange?: () => void }) {
+  const [, refresh] = useState(0)
+  const [panel, setPanel] = useState<'none' | 'renew' | 'bid' | 'release'>('none')
+  const [message, setMessage] = useState('')
+  const [shortlisted, setShortlisted] = useState(() => readShortlist().includes(player.id))
+  const own = isOwnPlayer(player)
+  const done = (text: string) => { setMessage(text); setPanel('none'); refresh((count) => count + 1); onClubChange?.() }
+
+  const renew = (years: number, raise: number) => {
+    const wage = Math.round(player.contract.weeklyWage * (1 + raise / 100) / 50) * 50
+    const needed = { 'Very Good': 0, Good: 5, Okay: 10, Poor: 20 }[player.morale]
+    const accepted = raise >= needed
+    const reason = accepted ? 'Happy with the project and terms' : `Wants a wage rise of at least ${needed}%`
+    renewContract(player, years, wage, accepted ? 'Accepted' : 'Declined', reason)
+    done(accepted ? `${player.name} signed a ${years}-year deal on ${money(wage)}/wk.` : `${player.name} rejected the offer: ${reason}.`)
+  }
+
+  const bid = (premium: number) => {
+    const offer = Math.round(player.value * (1 + premium / 100) / 50000) * 50000
+    const demanded = Math.round(player.value * (1 + createRng(`bid:${player.id}`)() * 0.3))
+    const accepted = offer >= demanded || (player.contract.releaseClause !== undefined && offer >= player.contract.releaseClause)
+    if (!accepted) return done(`${playerClubName(player)} rejected the ${shortMoney(offer)} bid. They want more.`)
+    done(signPlayer(player, offer))
+  }
+
+  const scout = () => {
+    scoutedPlayers.add(player.id)
+    setMessage(`Scout report: potential ${Math.max(player.overall, player.potential - 3)}-${Math.min(99, player.potential + 3)}, asking around ${shortMoney(player.value)}.`)
+  }
+
+  const toggleShortlist = () => {
+    const current = readShortlist()
+    const next = current.includes(player.id) ? current.filter((id) => id !== player.id) : [...current, player.id]
+    window.localStorage.setItem(SHORTLIST_KEY, JSON.stringify(next))
+    setShortlisted(next.includes(player.id))
+  }
+
+  if (!own && player.contract.clubId === club.id) return null
+
+  return <section className="player-actions" aria-label="Player actions">
+    <div className="player-action-buttons">
+      {own ? <>
+        <button className="player-action primary" onClick={() => setPanel(panel === 'renew' ? 'none' : 'renew')} type="button">Renew contract</button>
+        <button className="player-action danger" onClick={() => setPanel(panel === 'release' ? 'none' : 'release')} type="button">Release</button>
+      </> : <>
+        <button className="player-action primary" onClick={() => setPanel(panel === 'bid' ? 'none' : 'bid')} type="button">Place bid</button>
+        <button className="player-action" onClick={scout} type="button">{scoutedPlayers.has(player.id) ? 'Scouted' : 'Scout'}</button>
+        <button aria-pressed={shortlisted} className="player-action" onClick={toggleShortlist} type="button">{shortlisted ? '★ Shortlisted' : '☆ Shortlist'}</button>
+      </>}
+    </div>
+    {panel === 'renew' && <div className="player-action-panel"><span className="eyebrow">OFFER · CURRENT {money(player.contract.weeklyWage)}/WK</span>{[2, 3, 4].map((years) => <div className="player-offer-row" key={years}><strong>{years} years</strong>{[0, 10, 20].map((raise) => <button key={raise} onClick={() => renew(years, raise)} type="button">{raise === 0 ? 'Same wage' : `+${raise}%`}</button>)}</div>)}</div>}
+    {panel === 'bid' && <div className="player-action-panel"><span className="eyebrow">BID · VALUE {shortMoney(player.value)} · BUDGET {shortMoney(club.finances.transferBudget)}</span><div className="player-offer-row">{[0, 15, 30].map((premium) => <button disabled={player.value * (1 + premium / 100) > club.finances.transferBudget} key={premium} onClick={() => bid(premium)} type="button">{shortMoney(Math.round(player.value * (1 + premium / 100) / 50000) * 50000)}</button>)}</div></div>}
+    {panel === 'release' && <div className="player-action-panel"><span className="eyebrow">RELEASE {player.name.toUpperCase()}?</span><div className="player-offer-row"><button className="danger" onClick={() => done(releasePlayer(player))} type="button">Confirm release</button><button onClick={() => setPanel('none')} type="button">Cancel</button></div></div>}
+    {message && <p className="player-action-message" role="status">{message}</p>}
+  </section>
 }
 
 function RatingBar({ label, value }: { label: string; value: number }) {
@@ -48,7 +115,8 @@ function AchievementList({ title, achievements, emptyText }: { title: string; ac
   </section>
 }
 
-export default function PlayerProfile({ player, section, selectedClubName, onSectionChange, onSelectClub, onSelectPlayer, onSelectCountry }: PlayerProfileProps) {
+export default function PlayerProfile({ player, section, selectedClubName, onSectionChange, onSelectClub, onSelectPlayer, onSelectCountry, onClubChange }: PlayerProfileProps) {
+  const squad = getClubSquad(player.contract.clubId)
   const profile = player.personalInfo
   const contract = player.contract
   const averageRating = player.seasonStats.at(-1)?.averageRating ?? player.form
@@ -67,6 +135,8 @@ export default function PlayerProfile({ player, section, selectedClubName, onSec
       <div><span>FORM</span><strong>{player.form.toFixed(1)} <small>/ 10</small></strong><div className="status-track"><i style={{ width: `${player.form * 10}%` }} /></div></div>
       <div><span>MOOD</span><strong className={`mood-badge mood-${player.morale.toLowerCase().replace(' ', '-')}`}>{player.morale}</strong></div>
     </div>
+
+    <PlayerActions key={player.id} player={player} onClubChange={onClubChange} />
 
     <div className="profile-tabs" role="tablist" aria-label="Player profile sections">
       {sections.map((item) => <button aria-selected={section === item} className={section === item ? 'profile-tab active' : 'profile-tab'} key={item} onClick={() => onSectionChange(item)} role="tab" type="button">{item}</button>)}

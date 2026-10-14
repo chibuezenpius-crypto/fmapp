@@ -1,578 +1,279 @@
-import type { Club, ClubConfidenceData, League, LeagueCategory, LeagueCompetition, LeagueStanding, MatchInfo, MatchLineupPlayer, ManagerProfile, Player, PlayerAttributes, RefereeProfile, SquadHealthMetrics } from '../types/game'
+import rawGlobalLeagues from './globalLeaguesAndTeams.json'
+import { findGeneratedClub, getClubSquad } from './clubSquads'
+import { createRng, generatePlayerIdentity } from '../utils/proceduralGenerator'
+import { DEFAULT_SLOTS, fitPlayersToSlots } from '../utils/lineup'
+import type {
+  Club, ClubConfidenceData, GlobalCountryLeague, GlobalLeagueTeam, GlobalLeaguesDatabase, League, LeagueCompetition, LeagueStanding,
+  ManagerProfile, MatchCommentaryEvent, MatchInfo, MatchLineup, MatchLineupPlayer, Player, ProceduralClubBadge, RefereeProfile, SquadHealthMetrics,
+} from '../types/game'
 
-const attributeBase: PlayerAttributes = {
-  crossing: 10, dribbling: 10, finishing: 10, firstTouch: 10, heading: 10, longShots: 10,
-  marking: 10, passing: 10, tackling: 10, technique: 10, vision: 10, teamwork: 10,
-  decisions: 10, determination: 10, offTheBall: 10, positioning: 10, leadership: 10,
-  workRate: 10, pace: 10, acceleration: 10, stamina: 10, strength: 10, agility: 10,
-  jumpingReach: 10,
+export const DEFAULT_CLUB_ID = 'nga-06'
+
+const globalLeagues = (rawGlobalLeagues as unknown as GlobalLeaguesDatabase).countries
+const teamIndex = new Map<string, { team: GlobalLeagueTeam; league: GlobalCountryLeague }>()
+for (const countryLeague of globalLeagues) for (const team of countryLeague.teams) teamIndex.set(team.id, { team, league: countryLeague })
+
+export const getTeam = (clubId: string) => teamIndex.get(clubId)?.team
+export const getClubBadge = (clubId: string): ProceduralClubBadge => getTeam(clubId)?.badge ?? { viewBox: '0 0 48 56', shape: 'shield', initials: '?', primaryColor: '#335', secondaryColor: '#ccd' }
+export const getClubIdByName = (name: string) => [...teamIndex.values()].find((entry) => entry.team.name === name)?.team.id
+
+const ownEntry = teamIndex.get(DEFAULT_CLUB_ID)!
+const ownTeam = ownEntry.team
+const ownLeague = ownEntry.league
+
+export const leagueStandings = (countryLeague: GlobalCountryLeague): LeagueStanding[] =>
+  [...countryLeague.teams].sort((a, b) => a.standing.position - b.standing.position).map((team) => ({ ...team.standing, clubId: team.id, clubName: team.name }))
+
+export const currentMatchday = (countryLeague: GlobalCountryLeague) => Math.max(...countryLeague.teams.map((team) => team.standing.played))
+export const totalMatchdays = (countryLeague: GlobalCountryLeague) => (countryLeague.teams.length - 1) * 2
+
+// Starters come first in a fixed order so index-based views (club pitch) stay stable.
+const orderedSquad = (clubId: string) => {
+  const players = getClubSquad(clubId)
+  const starters = fitPlayersToSlots([
+    { position: 'GK' }, { position: 'D (R)' }, { position: 'D (L)' }, { position: 'D (C)' }, { position: 'D (C)' }, { position: 'DM' },
+    { position: 'M (R)' }, { position: 'M (C)' }, { position: 'ST (C)' }, { position: 'AM (C)' }, { position: 'M (L)' },
+  ], players).map((id) => players.find((player) => player.id === id)!)
+  return [...starters, ...players.filter((player) => !starters.includes(player))]
 }
 
-function createPlayer(
-  id: string,
-  name: string,
-  shirtNumber: number,
-  position: Player['position'],
-  age: number,
-  overall: number,
-  potential: number,
-  value: number,
-  attributes: Partial<PlayerAttributes>,
-): Player {
-  const primaryNationalities = ['England', 'England', 'Nigeria', 'England', 'Portugal', 'England', 'Nigeria', 'Scotland', 'Portugal', 'Ireland', 'Wales']
-  const primaryCodes = ['ENG', 'ENG', 'NGA', 'ENG', 'POR', 'ENG', 'NGA', 'SCO', 'POR', 'IRL', 'WAL']
-  const secondaryNationalities = ['Wales', 'Ireland', 'England', 'Wales', 'Spain', 'Ghana', 'Ghana', 'England', 'Angola', 'England', 'Ireland']
-  const secondaryCodes = ['WAL', 'IRL', 'ENG', 'WAL', 'ESP', 'GHA', 'GHA', 'ENG', 'ANG', 'ENG', 'IRL']
-  const nationalityIndex = (shirtNumber - 1) % primaryNationalities.length
-  return {
-    id, name, shirtNumber, position, age, overall, potential, value,
-    fitness: 92 + shirtNumber % 8,
-    form: 6.4 + (shirtNumber % 5) * 0.3,
-    morale: shirtNumber % 4 === 0 ? 'Very Good' : 'Good',
-    attributes: { ...attributeBase, ...attributes },
-    personalInfo: {
-      dateOfBirth: `${2026 - age}-04-${String((shirtNumber % 27) + 1).padStart(2, '0')}`,
-      placeOfBirth: ['Manchester', 'Liverpool', 'Leeds', 'Bristol', 'London'][shirtNumber % 5],
-      nationalities: [
-        { country: primaryNationalities[nationalityIndex], code: primaryCodes[nationalityIndex], type: 'Primary' },
-        { country: secondaryNationalities[nationalityIndex], code: secondaryCodes[nationalityIndex], type: 'Secondary' },
-      ],
-      languages: [{ name: 'English', proficiency: 'Native' }],
-      preferredFoot: shirtNumber % 3 === 0 ? 'Left' : 'Right',
-      heightCm: 174 + (shirtNumber % 13),
-      hobbies: ['Golf', 'Music'],
-      teamOpinion: 70 + (shirtNumber % 25),
-      personality: ['Model Professional', 'Resolute', 'Perfectionist', 'Driven', 'Professional'][shirtNumber % 5],
-      characterTrait: shirtNumber % 2 === 0 ? 'Professional' : 'Loyal',
-    },
-    contract: {
-      clubId: 'northbridge-fc',
-      startDate: '2024-07-01',
-      endDate: '2028-06-30',
-      weeklyWage: 4500 + (overall - 70) * 500,
-      squadRole: overall >= 80 ? 'Key Player' : overall >= 75 ? 'Regular Starter' : 'Squad Player',
-      ...(shirtNumber === 9 ? { releaseClause: 28000000 } : {}),
-      ...(shirtNumber === 10 ? { sponsor: { brand: 'Northstar', annualValue: 24000, endDate: '2027-06-30' } } : {}),
-      interestedClubs: [
-        { clubName: 'Westhaven Athletic', interest: 'Scouting', lastContact: '2026-10-08' },
-        { clubName: 'Redmere City', interest: 'Monitoring', lastContact: '2026-09-21' },
-      ],
-      offerHistory: [
-        { clubName: 'Oldcastle Rovers', date: '2026-07-12', status: 'Declined', weeklyWage: 18000, reason: 'Player chose to stay at Northbridge' },
-        { clubName: 'Seaborne FC', date: '2025-01-18', status: 'Accepted', weeklyWage: 12000, reason: 'Agreed terms before joining Northbridge' },
-      ],
-    },
-    transferHistory: [{
-      date: '2024-07-01', fromClub: shirtNumber % 2 === 0 ? 'Eastford Town' : 'Free Agent',
-      toClub: 'Northbridge FC', fee: shirtNumber % 2 === 0 ? 1200000 : 0,
-      type: shirtNumber % 2 === 0 ? 'Permanent' : 'Free Transfer',
-    }],
-    seasonStats: [
-      { season: '2024/25', clubName: 'Eastford Town', appearances: 14 + shirtNumber % 4, goals: shirtNumber === 9 ? 8 : shirtNumber === 10 ? 4 : 1, assists: shirtNumber % 5, cleanSheets: shirtNumber === 1 ? 5 : 0, averageRating: 6.6 + (shirtNumber % 4) * 0.1 },
-      { season: '2025/26', clubName: 'Northbridge FC', appearances: 29 + shirtNumber % 3, goals: shirtNumber === 9 ? 16 : shirtNumber === 10 ? 9 : 2, assists: 2 + shirtNumber % 5, cleanSheets: shirtNumber === 1 ? 9 : 0, averageRating: 6.9 + (shirtNumber % 4) * 0.1 },
-      { season: '2026/27', clubName: 'Northbridge FC', appearances: 11, goals: shirtNumber === 9 ? 7 : shirtNumber === 10 ? 4 : 1, assists: 1 + shirtNumber % 3, cleanSheets: shirtNumber === 1 ? 4 : 0, averageRating: 7.0 + (shirtNumber % 4) * 0.1 },
-    ],
-    careerTotals: {
-      appearances: 54 + shirtNumber % 6,
-      goals: shirtNumber === 9 ? 31 : shirtNumber === 10 ? 18 : 4 + shirtNumber % 3,
-      assists: 8 + shirtNumber % 8,
-      cleanSheets: shirtNumber === 1 ? 18 : 0,
-      trophies: shirtNumber % 3 === 0 ? 1 : 0,
-    },
-    relationships: {
-      manager: 76 + shirtNumber % 20,
-      teammates: [
-        { playerName: 'Finn Gallagher', relationship: 88, note: 'Strong understanding on the pitch' },
-        { playerName: 'Rory Campbell', relationship: 79, note: 'Good training-ground connection' },
-        { playerName: 'Lewis Grant', relationship: 67, note: 'Professional relationship' },
-      ].filter((teammate) => teammate.playerName !== name),
-      favoritePersonnel: ['Alex Morgan', 'Rory Campbell'],
-      dislikedPersonnel: ['Gareth Nolan'],
-    },
-    achievements: {
-      trophies: shirtNumber % 3 === 0 ? [{ season: '2025/26', title: 'North Country Premier', detail: 'League champions with Northbridge FC' }] : [],
-      individualAwards: shirtNumber === 9 ? [{ season: '2025/26', title: 'Golden Boot', detail: 'Top scorer with 16 league goals' }] : [],
-      seasonRecognitions: shirtNumber === 10 ? [{ season: '2025/26', title: 'Team of the Season', detail: 'North Country Premier selection' }] : [],
-    },
-  }
-}
+export const squad: Player[] = orderedSquad(DEFAULT_CLUB_ID)
 
-export const squad: Player[] = [
-  createPlayer('p-01', 'Elliot Ward', 1, 'GK', 29, 78, 79, 5200000, { positioning: 16, decisions: 15, jumpingReach: 16, teamwork: 14, leadership: 15 }),
-  createPlayer('p-02', 'Callum Price', 2, 'D (R)', 25, 75, 79, 4100000, { crossing: 15, pace: 15, tackling: 14, stamina: 15 }),
-  createPlayer('p-03', 'Tariq Mensah', 3, 'D (L)', 23, 76, 83, 5900000, { crossing: 14, pace: 16, marking: 14, agility: 15 }),
-  createPlayer('p-04', 'Lewis Grant', 4, 'D (C)', 28, 79, 79, 6800000, { heading: 16, marking: 16, tackling: 15, strength: 16, leadership: 18 }),
-  createPlayer('p-05', 'Mateo Silva', 5, 'D (C)', 26, 77, 80, 6200000, { heading: 15, marking: 15, passing: 13, positioning: 15 }),
-  createPlayer('p-06', 'Noah Bennett', 6, 'DM', 24, 78, 84, 8200000, { tackling: 16, passing: 15, teamwork: 16, stamina: 16, leadership: 14 }),
-  createPlayer('p-07', 'Jamie Okafor', 7, 'M (R)', 22, 77, 86, 9600000, { dribbling: 16, crossing: 15, pace: 17, acceleration: 17 }),
-  createPlayer('p-08', 'Rory Campbell', 8, 'M (C)', 27, 80, 81, 10400000, { passing: 17, vision: 16, technique: 16, decisions: 16, leadership: 16 }),
-  createPlayer('p-09', 'Adrian Costa', 9, 'ST (C)', 25, 82, 85, 15800000, { finishing: 17, firstTouch: 16, offTheBall: 17, pace: 15 }),
-  createPlayer('p-10', 'Finn Gallagher', 10, 'AM (C)', 24, 81, 87, 17200000, { dribbling: 16, technique: 17, vision: 17, longShots: 15 }),
-  createPlayer('p-11', 'Dylan Hughes', 11, 'M (L)', 21, 74, 85, 7100000, { dribbling: 15, crossing: 14, pace: 16, determination: 16 }),
-  createPlayer('p-12', 'Harvey Cole', 12, 'GK', 26, 70, 73, 1400000, { positioning: 13, decisions: 12, jumpingReach: 13 }),
-  createPlayer('p-13', 'Ben Turner', 14, 'D (C)', 22, 73, 80, 4200000, { marking: 14, tackling: 14, strength: 13 }),
-  createPlayer('p-14', 'Isaac Doyle', 16, 'M (C)', 21, 72, 82, 3900000, { passing: 14, teamwork: 15, stamina: 14 }),
-  createPlayer('p-15', 'Theo Martin', 18, 'M (C)', 25, 71, 72, 2600000, { passing: 13, workRate: 14, decisions: 12 }),
-  createPlayer('p-16', 'Rafael Costa', 20, 'ST (C)', 23, 75, 82, 6400000, { finishing: 15, pace: 15, offTheBall: 15 }),
-  createPlayer('p-17', 'Liam Foster', 22, 'D (L)', 20, 70, 81, 3100000, { pace: 15, crossing: 13, stamina: 14 }),
-  createPlayer('p-18', 'Samir Khan', 24, 'AM (C)', 19, 69, 84, 3500000, { technique: 14, vision: 14, dribbling: 13 }),
-]
+const weeklyWages = squad.reduce((sum, player) => sum + player.contract.weeklyWage, 0)
 
 export const club: Club = {
-  id: 'northbridge-fc',
-  name: 'Northbridge FC',
-  nickname: 'The Foundry',
-  shortName: 'NBR',
-  founded: 1898,
-  colors: { primary: '#d4f34a', secondary: '#13221c' },
-  prestige: 74,
-  manager: { name: 'Alex Morgan', nationality: 'English', age: 38, reputation: 3 },
-  stadium: { name: 'Foundry Park', capacity: 28450, attendance: 24118 },
-  finances: { transferBudget: 12500000, wageBudget: 248000, weeklyWages: 193500, balance: 18400000, sponsorshipIncomeAnnual: 6800000, ticketSalesPerHomeMatch: 684000, operationsPerMonth: 2250000 },
+  id: ownTeam.id,
+  name: ownTeam.name,
+  nickname: 'The Bridgemen',
+  shortName: 'ONC',
+  founded: ownTeam.founded,
+  colors: ownTeam.colors,
+  prestige: 58,
+  manager: { name: 'Emeka Nwosu', nationality: 'Nigerian', age: 46, reputation: 3 },
+  stadium: { name: 'Niger Bridge Arena', capacity: 22400, attendance: 17850 },
+  finances: { transferBudget: 3500000, wageBudget: Math.round(weeklyWages * 1.12 / 500) * 500, weeklyWages, balance: 6200000, sponsorshipIncomeAnnual: 2600000, ticketSalesPerHomeMatch: 214000, operationsPerMonth: 640000 },
   sponsors: [
-    { name: 'Northstar Energy', valueAnnual: 4200000, category: 'Front of shirt', endDate: '2028-06-30' },
-    { name: 'Foundry Bank', valueAnnual: 1800000, category: 'Official partner', endDate: '2027-06-30' },
-    { name: 'Kestrel Sports', valueAnnual: 800000, category: 'Kit supplier', endDate: '2029-06-30' },
+    { name: 'Anambra Breweries', valueAnnual: 1500000, category: 'Front of shirt', endDate: '2028-06-30' },
+    { name: 'Bridgehead Bank', valueAnnual: 700000, category: 'Official partner', endDate: '2027-06-30' },
+    { name: 'Kestrel Sports', valueAnnual: 400000, category: 'Kit supplier', endDate: '2029-06-30' },
   ],
-  facilities: { trainingLevel: 4, youthLevel: 3, maxLevel: 5 },
+  facilities: { trainingLevel: 3, youthLevel: 3, stadiumLevel: 3, maxLevel: 5 },
   staff: [
-    { id: 'staff-manager', name: 'Alex Morgan', role: 'Manager', nationality: 'English', age: 38, profileId: 'alex-morgan' },
-    { id: 'staff-assistant', name: 'Priya Shah', role: 'Assistant Manager', nationality: 'English', age: 44, profileId: 'priya-shah' },
-    { id: 'staff-coach-1', name: 'Martin Keane', role: 'First Team Coach', nationality: 'Irish', age: 51, profileId: 'martin-keane' },
+    { id: 'staff-manager', name: 'Emeka Nwosu', role: 'Manager', nationality: 'Nigerian', age: 46, profileId: 'emeka-nwosu' },
+    { id: 'staff-assistant', name: 'Ngozi Okafor', role: 'Assistant Manager', nationality: 'Nigerian', age: 41, profileId: 'ngozi-okafor' },
+    { id: 'staff-coach-1', name: 'Chukwudi Eze', role: 'First Team Coach', nationality: 'Nigerian', age: 52, profileId: 'chukwudi-eze' },
     { id: 'staff-coach-2', name: 'Luis Ortega', role: 'Technical Coach', nationality: 'Spanish', age: 39, profileId: 'luis-ortega' },
-    { id: 'staff-scout', name: 'Diana Okoye', role: 'Chief Scout', nationality: 'Nigerian', age: 42, profileId: 'diana-okoye' },
+    { id: 'staff-scout', name: 'Adaeze Obi', role: 'Chief Scout', nationality: 'Nigerian', age: 38, profileId: 'adaeze-obi' },
     { id: 'staff-physio', name: 'Owen Ellis', role: 'Head Physio', nationality: 'Welsh', age: 36, profileId: 'owen-ellis' },
   ],
   history: {
     achievements: [
-      { season: '2025/26', title: 'North Country Premier Champions', detail: 'First league title in 38 years' },
-      { season: '2023/24', title: 'North Cup Winners', detail: 'Won the final 2-1 at Foundry Park' },
-      { season: '2018/19', title: 'Promotion', detail: 'Promoted as second-division runners-up' },
+      { season: '2021/22', title: 'Federation Cup Winners', detail: 'Won the final 2-1 at Niger Bridge Arena' },
+      { season: '2012/13', title: 'Promotion', detail: 'Promoted as second-division runners-up' },
     ],
     records: [
-      { title: 'Most appearances', record: '412 appearances', holder: 'Arthur Bell' },
-      { title: 'Most goals', record: '186 goals', holder: 'Eddie Shaw' },
-      { title: 'Biggest win', record: '8-0 vs Millbrook', holder: 'League Cup · 1974' },
+      { title: 'Most appearances', record: '388 appearances', holder: 'Obiora Anyanwu' },
+      { title: 'Most goals', record: '161 goals', holder: 'Ifeanyi Dike' },
+      { title: 'Biggest win', record: '7-0 vs Okigwe Bridge', holder: 'Premier League · 1996' },
     ],
     pastSeasonPositions: [
-      { season: '2025/26', competition: 'North Country Premier', position: 1, teamCount: 20 },
-      { season: '2024/25', competition: 'North Country Premier', position: 6, teamCount: 20 },
-      { season: '2023/24', competition: 'North Country Premier', position: 9, teamCount: 20 },
-      { season: '2022/23', competition: 'North Country Premier', position: 12, teamCount: 20 },
+      { season: '2025/26', competition: ownLeague.name, position: 5, teamCount: 18 },
+      { season: '2024/25', competition: ownLeague.name, position: 8, teamCount: 18 },
+      { season: '2023/24', competition: ownLeague.name, position: 6, teamCount: 18 },
+      { season: '2022/23', competition: ownLeague.name, position: 11, teamCount: 18 },
     ],
   },
-  formation: '4-2-3-1',
-  leagueId: 'north-country-premier',
+  formation: '4-3-3',
+  leagueId: ownLeague.id,
   nextMatchId: 'match-01',
   squad,
 }
 
+const standings = leagueStandings(ownLeague)
+const ownStanding = standings.find((standing) => standing.clubId === club.id)!
+
 export const league: League = {
-  id: 'north-country-premier',
-  name: 'North Country Premier',
-  country: 'England',
-  season: '2026/27',
-  matchday: 12,
-  totalMatchdays: 38,
-  standings: [
-    { position: 1, clubId: 'westhaven', clubName: 'Westhaven Athletic', played: 11, won: 8, drawn: 2, lost: 1, goalsFor: 24, goalsAgainst: 10, goalDifference: 14, points: 26, form: ['W', 'W', 'D', 'W', 'W'] },
-    { position: 2, clubId: club.id, clubName: club.name, played: 11, won: 7, drawn: 3, lost: 1, goalsFor: 21, goalsAgainst: 10, goalDifference: 11, points: 24, form: ['W', 'D', 'W', 'W', 'D'] },
-    { position: 3, clubId: 'redmere', clubName: 'Redmere City', played: 11, won: 7, drawn: 1, lost: 3, goalsFor: 20, goalsAgainst: 13, goalDifference: 7, points: 22, form: ['L', 'W', 'W', 'D', 'W'] },
-    { position: 4, clubId: 'oldcastle', clubName: 'Oldcastle Rovers', played: 11, won: 6, drawn: 3, lost: 2, goalsFor: 18, goalsAgainst: 12, goalDifference: 6, points: 21, form: ['D', 'W', 'W', 'L', 'W'] },
-    { position: 5, clubId: 'seaborne', clubName: 'Seaborne FC', played: 11, won: 6, drawn: 2, lost: 3, goalsFor: 19, goalsAgainst: 15, goalDifference: 4, points: 20, form: ['W', 'L', 'W', 'D', 'W'] },
+  id: ownLeague.id,
+  name: ownLeague.name,
+  country: ownLeague.countryName,
+  season: ownLeague.season,
+  matchday: currentMatchday(ownLeague),
+  totalMatchdays: totalMatchdays(ownLeague),
+  standings,
+}
+
+const clubShortName = (clubId: string) => getTeam(clubId)?.name ?? clubId
+
+// ---------- Personnel ----------
+const managerIdentity = (clubId: string, countryCode: string) => {
+  const identity = generatePlayerIdentity({ birthCountryCode: countryCode, random: createRng(`${clubId}:manager`) })
+  const random = createRng(`${clubId}:manager:traits`)
+  const formations = ['4-3-3', '4-2-3-1', '4-4-2', '3-5-2']
+  const personalities = ['Front-Foot Leader', 'Tactical Pragmatist', 'Calm Organizer', 'Progressive Builder', 'Player Advocate']
+  return { identity, age: 38 + Math.floor(random() * 22), formation: formations[Math.floor(random() * formations.length)], personality: personalities[Math.floor(random() * personalities.length)] }
+}
+
+const opponentManagers = new Map<string, ManagerProfile>()
+const managerFor = (clubId: string): ManagerProfile => {
+  if (clubId === club.id) return ownManager
+  const cached = opponentManagers.get(clubId)
+  if (cached) return cached
+  const entry = teamIndex.get(clubId)!
+  const { identity, age, formation, personality } = managerIdentity(clubId, entry.league.countryCode)
+  const rank = entry.team.standing.position
+  const profile: ManagerProfile = {
+    id: `manager-${clubId}`, name: identity.name, age, nationality: identity.birthCountry, languages: identity.languages.slice(0, 2),
+    attributes: { tacticalKnowledge: 16 - Math.floor(rank / 6), manManagement: 15 - Math.floor(rank / 7), discipline: 14 },
+    personality, preferredFormation: formation,
+    tacticalDNA: [{ label: 'Passing', value: 'Balanced' }, { label: 'Pressing', value: 'Mid block' }, { label: 'Tempo', value: 'Measured' }],
+    trophies: [], awards: [],
+    seasonRecords: [{ season: entry.league.season, clubName: entry.team.name, wins: entry.team.standing.won, draws: entry.team.standing.drawn, losses: entry.team.standing.lost }],
+  }
+  opponentManagers.set(clubId, profile)
+  return profile
+}
+
+const ownManager: ManagerProfile = {
+  id: 'emeka-nwosu', name: club.manager.name, age: club.manager.age, nationality: club.manager.nationality,
+  languages: [{ name: 'English', proficiency: 'Native' }, { name: 'Igbo', proficiency: 'Native' }],
+  attributes: { tacticalKnowledge: 15, manManagement: 16, discipline: 14 }, personality: 'Progressive Builder', preferredFormation: club.formation,
+  tacticalDNA: [{ label: 'Passing', value: 'Short and patient' }, { label: 'Pressing', value: 'High intensity' }, { label: 'Tempo', value: 'Quick transitions' }],
+  trophies: [{ season: '2021/22', title: 'Federation Cup', clubName: club.name }],
+  awards: [{ season: '2021/22', title: 'Cup Manager of the Year', detail: `Led ${club.name} to the Federation Cup` }],
+  seasonRecords: [
+    { season: ownLeague.season, clubName: club.name, wins: ownStanding.won, draws: ownStanding.drawn, losses: ownStanding.lost },
+    { season: '2025/26', clubName: club.name, wins: 16, draws: 7, losses: 11 },
+    { season: '2024/25', clubName: club.name, wins: 13, draws: 8, losses: 13 },
   ],
 }
 
-export const managerProfiles: ManagerProfile[] = [
-  {
-    id: 'alex-morgan', name: 'Alex Morgan', age: 38, nationality: 'English', languages: [{ name: 'English', proficiency: 'Native' }],
-    attributes: { tacticalKnowledge: 16, manManagement: 15, discipline: 14 }, personality: 'Progressive Builder', preferredFormation: '4-3-3',
-    tacticalDNA: [{ label: 'Passing', value: 'Short and patient' }, { label: 'Pressing', value: 'High intensity' }, { label: 'Tempo', value: 'Quick transitions' }],
-    trophies: [{ season: '2025/26', title: 'North Country Premier', clubName: 'Northbridge FC' }],
-    awards: [{ season: '2025/26', title: 'Manager of the Season', detail: 'Led Northbridge to the league title' }],
-    seasonRecords: [
-      { season: '2026/27', clubName: 'Northbridge FC', wins: 7, draws: 3, losses: 1 },
-      { season: '2025/26', clubName: 'Northbridge FC', wins: 25, draws: 8, losses: 5 },
-      { season: '2024/25', clubName: 'Northbridge FC', wins: 18, draws: 9, losses: 11 },
-    ],
-  },
-  ...([
-    ['priya-shah', 'Priya Shah', 44, 'English', '4-2-3-1', 'Collaborative Mentor'],
-    ['martin-keane', 'Martin Keane', 51, 'Irish', '4-4-2', 'Calm Organizer'],
-    ['luis-ortega', 'Luis Ortega', 39, 'Spanish', '4-3-3', 'Technical Innovator'],
-    ['diana-okoye', 'Diana Okoye', 42, 'Nigerian', '4-2-3-1', 'Analytical Scout'],
-    ['owen-ellis', 'Owen Ellis', 36, 'Welsh', '4-3-3', 'Player Advocate'],
-    ['thomas-ivers', 'Thomas Ivers', 47, 'English', '4-3-3', 'Front-Foot Leader'],
-    ['daniel-ferreira', 'Daniel Ferreira', 43, 'Portuguese', '4-2-3-1', 'Tactical Pragmatist'],
-  ] as const).map(([id, name, age, nationality, formation, personality]) => ({
-    id, name, age: Number(age), nationality, languages: [{ name: nationality === 'Spanish' ? 'Spanish' : 'English', proficiency: 'Native' as const }],
-    attributes: { tacticalKnowledge: 13, manManagement: 14, discipline: 13 }, personality, preferredFormation: formation,
-    tacticalDNA: [{ label: 'Passing', value: 'Balanced' }, { label: 'Pressing', value: 'Mid block' }, { label: 'Tempo', value: 'Measured' }],
-    trophies: [], awards: [], seasonRecords: [{ season: '2026/27', clubName: nationality === 'Portuguese' ? 'Redmere City' : 'Westhaven Athletic', wins: 7, draws: 2, losses: 2 }],
-  })),
-]
+const staffProfiles: ManagerProfile[] = ([
+  ['ngozi-okafor', 'Ngozi Okafor', 41, 'Nigerian', '4-2-3-1', 'Collaborative Mentor', 'English'],
+  ['chukwudi-eze', 'Chukwudi Eze', 52, 'Nigerian', '4-4-2', 'Calm Organizer', 'English'],
+  ['luis-ortega', 'Luis Ortega', 39, 'Spanish', '4-3-3', 'Technical Innovator', 'Spanish'],
+  ['adaeze-obi', 'Adaeze Obi', 38, 'Nigerian', '4-2-3-1', 'Analytical Scout', 'English'],
+  ['owen-ellis', 'Owen Ellis', 36, 'Welsh', '4-3-3', 'Player Advocate', 'English'],
+] as const).map(([id, name, age, nationality, formation, personality, language]) => ({
+  id, name, age: Number(age), nationality, languages: [{ name: language, proficiency: 'Native' as const }],
+  attributes: { tacticalKnowledge: 13, manManagement: 14, discipline: 13 }, personality, preferredFormation: formation,
+  tacticalDNA: [{ label: 'Passing', value: 'Balanced' }, { label: 'Pressing', value: 'Mid block' }, { label: 'Tempo', value: 'Measured' }],
+  trophies: [], awards: [], seasonRecords: [{ season: ownLeague.season, clubName: club.name, wins: ownStanding.won, draws: ownStanding.drawn, losses: ownStanding.lost }],
+}))
 
 export const refereeProfiles: RefereeProfile[] = [
-  { id: 'martin-ellery', name: 'Martin Ellery', age: 46, nationality: 'English', countryCode: 'ENG', languages: [{ name: 'English', proficiency: 'Native' }], strictness: 'Balanced', yellowCardsPerMatch: 3.8, redCardsPerMatch: 0.16, foulThreshold: 13 },
-  { id: 'stephen-marsh', name: 'Stephen Marsh', age: 41, nationality: 'Welsh', countryCode: 'WAL', languages: [{ name: 'English', proficiency: 'Native' }, { name: 'Welsh', proficiency: 'Fluent' }], strictness: 'Strict', yellowCardsPerMatch: 4.6, redCardsPerMatch: 0.24, foulThreshold: 11 },
+  { id: 'samuel-adeyemi', name: 'Samuel Adeyemi', age: 44, nationality: 'Nigerian', countryCode: 'NGA', languages: [{ name: 'English', proficiency: 'Native' }, { name: 'Yoruba', proficiency: 'Native' }], strictness: 'Balanced', yellowCardsPerMatch: 3.8, redCardsPerMatch: 0.16, foulThreshold: 13 },
+  { id: 'ibrahim-danjuma', name: 'Ibrahim Danjuma', age: 40, nationality: 'Nigerian', countryCode: 'NGA', languages: [{ name: 'English', proficiency: 'Native' }, { name: 'Hausa', proficiency: 'Native' }], strictness: 'Strict', yellowCardsPerMatch: 4.6, redCardsPerMatch: 0.24, foulThreshold: 11 },
 ]
 
-const defaultLeagueRules = ['Three points for a win, one for a draw.', 'Bottom three clubs are relegated at season end.', 'Maximum of five substitutions across three stoppages.', 'Squads must register no more than 25 senior players.']
+// ---------- Fixtures ----------
+const opponentIds = { recent: 'nga-07', next: 'nga-01', second: 'nga-08', third: 'nga-02' }
 
-function createCompetition(id: string, name: string, country: string, category: LeagueCategory, format: 'League' | 'Cup'): LeagueCompetition {
-  const standings = league.standings.map((standing, index) => ({
-    ...standing,
-    clubName: index === 1 ? club.name : category === 'Domestic Leagues' && country === 'England' ? standing.clubName : `${['Westhaven', 'Northbridge', 'Redmere', 'Oldcastle', 'Seaborne'][index]} ${country === 'Nigeria' ? 'United' : country === 'Spain' ? 'CF' : 'FC'}`,
-  }))
-  const additionalClubNames = [
-    'Kingsbridge Athletic', 'Northport County', 'Harrowgate FC', 'Lakeside Rovers', 'Stonefield Town',
-    'Riverside Albion', 'Dunmore City', 'Ashcombe United', 'Portwell FC', 'Briarwood Town',
-    'Eastmoor Athletic', 'Cedar Vale FC', 'Millbrook Rovers', 'Southgate County', 'Westcliff Town',
-  ]
-  const fullStandings: LeagueStanding[] = [...standings, ...additionalClubNames.map((baseName, index) => {
-    const points = 18 - index
-    const won = Math.floor(points / 3)
-    const drawn = points % 3
-    const goalsFor = 18 - Math.floor(index / 2)
-    const goalDifference = 2 - index
-    const goalsAgainst = goalsFor - goalDifference
-    const suffix = country === 'Nigeria' ? 'United' : country === 'Spain' ? 'CF' : 'FC'
-    return {
-      position: index + 6,
-      clubId: `${id}-club-${index + 6}`,
-      clubName: `${baseName.replace(/ (Athletic|County|FC|Rovers|Town|City|Albion|United)$/, '')} ${suffix}`,
-      played: 11,
-      won,
-      drawn,
-      lost: 11 - won - drawn,
-      goalsFor,
-      goalsAgainst,
-      goalDifference,
-      points,
-      form: (index % 3 === 0 ? ['W', 'D', 'L', 'W', 'L'] : ['D', 'L', 'W', 'L', 'D']) as ('W' | 'D' | 'L')[],
-    }
-  })]
-  const playerStats = {
-    goals: club.squad.map((player) => ({ playerId: player.id, name: player.name, clubName: club.name, value: player.careerTotals.goals })).sort((first, second) => second.value - first.value).slice(0, 5),
-    assists: club.squad.map((player) => ({ playerId: player.id, name: player.name, clubName: club.name, value: player.careerTotals.assists })).sort((first, second) => second.value - first.value).slice(0, 5),
-    cleanSheets: club.squad.filter((player) => player.position === 'GK').map((player) => ({ playerId: player.id, name: player.name, clubName: club.name, value: player.careerTotals.cleanSheets })),
+const bestPlayer = new Map<MatchLineup, string>()
+const lineupFor = (clubId: string, side: 'home' | 'away'): MatchLineup => {
+  const players = clubId === club.id ? squad : getClubSquad(clubId)
+  const ids = fitPlayersToSlots(DEFAULT_SLOTS, players)
+  const starters = ids.map((id) => players.find((player) => player.id === id)!)
+  const bench = players.filter((player) => !ids.includes(player.id)).sort((a, b) => b.overall - a.overall).slice(0, 7)
+  const toLineupPlayer = (player: Player, index: number, slot?: (typeof DEFAULT_SLOTS)[number]): MatchLineupPlayer => ({
+    id: `${clubId}-${index + 1}`, playerId: player.id, name: player.name, shirtNumber: player.shirtNumber,
+    position: slot?.label ?? player.position, x: slot ? (side === 'home' ? slot.x : 100 - slot.x) : 0, y: slot ? (side === 'home' ? slot.y : 100 - slot.y) : 0,
+  })
+  const lineup: MatchLineup = {
+    formation: '4-3-3', coach: managerFor(clubId).name,
+    startingXI: starters.map((player, index) => toLineupPlayer(player, index, DEFAULT_SLOTS[index])),
+    substitutes: bench.map((player, index) => toLineupPlayer(player, index + 11)),
   }
+  bestPlayer.set(lineup, [...starters].sort((a, b) => b.overall - a.overall)[0].name)
+  return lineup
+}
+
+const keyPlayer = (lineup: MatchLineup) => bestPlayer.get(lineup) ?? lineup.startingXI[0].name
+
+const meetings = (homeId: string, awayId: string, referenceDate: string) => {
+  const random = createRng(`${[homeId, awayId].sort().join('|')}:h2h`)
+  const recentMeetings = [0, 1, 2, 3].map((index) => {
+    const home = index % 2 === 0 ? awayId : homeId
+    const away = index % 2 === 0 ? homeId : awayId
+    const date = new Date(`${referenceDate}T12:00:00`)
+    date.setMonth(date.getMonth() - 5 * (index + 1))
+    return { date: date.toISOString().slice(0, 10), homeClubName: clubShortName(home), awayClubName: clubShortName(away), homeScore: Math.floor(random() * 4), awayScore: Math.floor(random() * 3) }
+  })
+  let homeWins = 0, draws = 0, awayWins = 0
+  for (const meeting of recentMeetings) {
+    const homeSide = meeting.homeClubName === clubShortName(homeId)
+    const diff = meeting.homeScore - meeting.awayScore
+    if (diff === 0) draws += 1
+    else if ((diff > 0) === homeSide) homeWins += 1
+    else awayWins += 1
+  }
+  return { homeWins: homeWins + 4, draws: draws + 2, awayWins: awayWins + 3, recentMeetings }
+}
+
+const baseMatch = (id: string, matchday: number, date: string, kickOff: string, homeId: string, awayId: string, referee: string, weather: string): MatchInfo => {
+  const lineups = { home: lineupFor(homeId, 'home'), away: lineupFor(awayId, 'away') }
   return {
-    id, name, country, category, season: '2026/27', matchday: format === 'Cup' ? 4 : 12, totalMatchdays: format === 'Cup' ? 8 : 38,
-    standings: fullStandings, playerStats,
-    teamStats: fullStandings.slice(0, 5).map((standing, index) => ({ clubId: standing.clubId, clubName: standing.clubName, possession: 58 - index * 3, goals: standing.goalsFor, cleanSheets: 5 - Math.floor(index / 2), cards: 12 + index * 2 })),
-    rules: format === 'Cup' ? ['Single-match knockout rounds until the semi-final.', 'Extra time and penalties if scores are level.', 'Five substitutions are permitted.', 'The winner qualifies for next season’s continental competition.'] : defaultLeagueRules,
-    history: [
-      { season: '2025/26', champion: standings[0].clubName, runnerUp: standings[1].clubName, points: 82 },
-      { season: '2024/25', champion: standings[2].clubName, runnerUp: standings[0].clubName, points: 78 },
-      { season: '2023/24', champion: standings[1].clubName, runnerUp: standings[3].clubName, points: 75 },
-    ],
+    id, competition: league.name, matchday, date, kickOff,
+    homeClubId: homeId, homeClubName: clubShortName(homeId), awayClubId: awayId, awayClubName: clubShortName(awayId),
+    venue: homeId === club.id ? club.stadium.name : `${clubShortName(homeId)} Stadium`,
+    referee, weather, status: 'Upcoming',
+    formation: { home: lineups.home.formation, away: lineups.away.formation },
+    coaches: { home: lineups.home.coach, away: lineups.away.coach },
+    keyPlayers: { home: keyPlayer(lineups.home), away: keyPlayer(lineups.away) },
+    lastFiveForm: { home: [...(teamIndex.get(homeId)!.team.standing.form)], away: [...(teamIndex.get(awayId)!.team.standing.form)] },
+    headToHead: meetings(homeId, awayId, date),
+    lineups, commentary: [], stats: undefined,
   }
 }
 
-export const leagueCompetitions: LeagueCompetition[] = [
-  createCompetition(league.id, league.name, 'England', 'Domestic Leagues', 'League'),
-  createCompetition('eng-championship', 'Championship', 'England', 'Domestic Leagues', 'League'),
-  createCompetition('eng-fa-cup', 'FA Cup', 'England', 'Domestic Leagues', 'Cup'),
-  createCompetition('nga-premier', 'Premier League', 'Nigeria', 'Domestic Leagues', 'League'),
-  createCompetition('nga-championship', 'Championship', 'Nigeria', 'Domestic Leagues', 'League'),
-  createCompetition('nga-federation-cup', 'Federation Cup', 'Nigeria', 'Domestic Leagues', 'Cup'),
-  createCompetition('esp-primera', 'Primera División', 'Spain', 'Domestic Leagues', 'League'),
-  createCompetition('esp-segunda', 'Segunda División', 'Spain', 'Domestic Leagues', 'League'),
-  createCompetition('esp-copa', 'Copa Nacional', 'Spain', 'Domestic Leagues', 'Cup'),
-  createCompetition('por-primeira', 'Primeira Liga', 'Portugal', 'Domestic Leagues', 'League'),
-  createCompetition('por-taca', 'Taça Nacional', 'Portugal', 'Domestic Leagues', 'Cup'),
-  createCompetition('sco-premiership', 'Premiership', 'Scotland', 'Domestic Leagues', 'League'),
-  createCompetition('sco-championship', 'Championship', 'Scotland', 'Domestic Leagues', 'League'),
-  createCompetition('sco-cup', 'Scottish Cup', 'Scotland', 'Domestic Leagues', 'Cup'),
-  createCompetition('irl-premier', 'Premier Division', 'Ireland', 'Domestic Leagues', 'League'),
-  createCompetition('irl-cup', 'FAI Cup', 'Ireland', 'Domestic Leagues', 'Cup'),
-  createCompetition('wal-premier', 'Cymru Premier', 'Wales', 'Domestic Leagues', 'League'),
-  createCompetition('gha-premier', 'Premier League', 'Ghana', 'Domestic Leagues', 'League'),
-  createCompetition('ang-girabola', 'Girabola', 'Angola', 'Domestic Leagues', 'League'),
-  createCompetition('continental-champions', 'Champions Cup', 'Europe', 'Continental Competitions', 'League'),
-  createCompetition('continental-league', 'Continental League', 'Europe', 'Continental Competitions', 'League'),
-  createCompetition('continental-africa', 'African Champions League', 'Africa', 'Continental Competitions', 'League'),
-  createCompetition('international-world', 'World Cup', 'International', 'International', 'Cup'),
-  createCompetition('international-euro', 'European Nations Cup', 'Europe', 'International', 'Cup'),
-  createCompetition('international-afcon', 'African Nations Cup', 'Africa', 'International', 'Cup'),
-]
+const nextMatchday = ownStanding.played + 1
 
-export const transferMarketPlayers: Player[] = [
-  ...club.squad,
-  {
-    ...club.squad[8], id: 'market-01', name: 'Victor Nwankwo', shirtNumber: 19, age: 23, position: 'ST (C)', overall: 79, value: 12600000,
-    personalInfo: { ...club.squad[8].personalInfo, nationalities: [{ country: 'Nigeria', code: 'NGA', type: 'Primary' }, { country: 'Angola', code: 'ANG', type: 'Secondary' }] },
-    contract: { ...club.squad[8].contract, clubId: 'redmere', releaseClause: 18000000 },
-  },
-  {
-    ...club.squad[3], id: 'market-02', name: 'Mateo Alvarez', shirtNumber: 5, age: 26, position: 'D (C)', overall: 80, value: 14800000,
-    personalInfo: { ...club.squad[3].personalInfo, nationalities: [{ country: 'Spain', code: 'ESP', type: 'Primary' }, { country: 'England', code: 'ENG', type: 'Secondary' }] },
-    contract: { ...club.squad[3].contract, clubId: 'oldcastle', releaseClause: 22000000 },
-  },
-]
-
-const northbridgeStartingXI: MatchLineupPlayer[] = [
-  { id: 'nbr-1', playerId: 'p-01', name: 'Elliot Ward', shirtNumber: 1, position: 'GK', x: 50, y: 91 },
-  { id: 'nbr-2', playerId: 'p-02', name: 'Callum Price', shirtNumber: 2, position: 'RB', x: 84, y: 77 },
-  { id: 'nbr-3', playerId: 'p-04', name: 'Lewis Grant', shirtNumber: 4, position: 'CB', x: 62, y: 78 },
-  { id: 'nbr-4', playerId: 'p-05', name: 'Mateo Silva', shirtNumber: 5, position: 'CB', x: 38, y: 78 },
-  { id: 'nbr-5', playerId: 'p-03', name: 'Tariq Mensah', shirtNumber: 3, position: 'LB', x: 16, y: 77 },
-  { id: 'nbr-6', playerId: 'p-06', name: 'Noah Bennett', shirtNumber: 6, position: 'DM', x: 50, y: 63 },
-  { id: 'nbr-7', playerId: 'p-08', name: 'Rory Campbell', shirtNumber: 8, position: 'CM', x: 36, y: 53 },
-  { id: 'nbr-8', playerId: 'p-10', name: 'Finn Gallagher', shirtNumber: 10, position: 'CM', x: 64, y: 53 },
-  { id: 'nbr-9', playerId: 'p-07', name: 'Jamie Okafor', shirtNumber: 7, position: 'RW', x: 83, y: 35 },
-  { id: 'nbr-10', playerId: 'p-09', name: 'Adrian Costa', shirtNumber: 9, position: 'ST', x: 50, y: 28 },
-  { id: 'nbr-11', playerId: 'p-11', name: 'Dylan Hughes', shirtNumber: 11, position: 'LW', x: 17, y: 35 },
-]
-
-const westhavenStartingXI: MatchLineupPlayer[] = [
-  { id: 'wha-1', name: 'Peter Lang', shirtNumber: 1, position: 'GK', x: 50, y: 9 },
-  { id: 'wha-2', name: 'Owen Miles', shirtNumber: 2, position: 'RB', x: 16, y: 23 },
-  { id: 'wha-3', name: 'Darius Cole', shirtNumber: 5, position: 'CB', x: 38, y: 22 },
-  { id: 'wha-4', name: 'Benji Stone', shirtNumber: 4, position: 'CB', x: 62, y: 22 },
-  { id: 'wha-5', name: 'Luis Romero', shirtNumber: 3, position: 'LB', x: 84, y: 23 },
-  { id: 'wha-6', name: 'Caleb Frost', shirtNumber: 6, position: 'DM', x: 50, y: 38 },
-  { id: 'wha-7', name: 'Marcus Bell', shirtNumber: 8, position: 'CM', x: 35, y: 47 },
-  { id: 'wha-8', name: 'Tomas Gray', shirtNumber: 10, position: 'CM', x: 65, y: 47 },
-  { id: 'wha-9', name: 'Kai Turner', shirtNumber: 7, position: 'RW', x: 17, y: 65 },
-  { id: 'wha-10', name: 'Drew Wallace', shirtNumber: 9, position: 'ST', x: 50, y: 72 },
-  { id: 'wha-11', name: 'Isaac Webb', shirtNumber: 11, position: 'LW', x: 83, y: 65 },
-]
-
-const northbridgeBench: MatchLineupPlayer[] = [
-  { id: 'nbr-sub-12', name: 'Harvey Cole', shirtNumber: 12, position: 'GK', x: 0, y: 0 },
-  { id: 'nbr-sub-14', name: 'Ben Turner', shirtNumber: 14, position: 'DEF', x: 0, y: 0 },
-  { id: 'nbr-sub-16', name: 'Isaac Doyle', shirtNumber: 16, position: 'MID', x: 0, y: 0 },
-  { id: 'nbr-sub-18', name: 'Theo Martin', shirtNumber: 18, position: 'MID', x: 0, y: 0 },
-  { id: 'nbr-sub-20', name: 'Rafael Costa', shirtNumber: 20, position: 'FWD', x: 0, y: 0 },
-]
-
-const westhavenBench: MatchLineupPlayer[] = [
-  { id: 'wha-sub-12', name: 'Sam Riley', shirtNumber: 12, position: 'GK', x: 0, y: 0 },
-  { id: 'wha-sub-14', name: 'Milo Evans', shirtNumber: 14, position: 'DEF', x: 0, y: 0 },
-  { id: 'wha-sub-16', name: 'George Nwosu', shirtNumber: 16, position: 'MID', x: 0, y: 0 },
-  { id: 'wha-sub-18', name: 'Leo Finch', shirtNumber: 18, position: 'MID', x: 0, y: 0 },
-  { id: 'wha-sub-20', name: 'Alfie Brooks', shirtNumber: 20, position: 'FWD', x: 0, y: 0 },
-]
-
-const recentMeetings = [
-  { date: '2026-03-14', homeClubName: 'Northbridge FC', awayClubName: 'Westhaven Athletic', homeScore: 2, awayScore: 1 },
-  { date: '2025-11-02', homeClubName: 'Westhaven Athletic', awayClubName: 'Northbridge FC', homeScore: 1, awayScore: 1 },
-  { date: '2025-04-19', homeClubName: 'Northbridge FC', awayClubName: 'Westhaven Athletic', homeScore: 0, awayScore: 2 },
-  { date: '2024-12-07', homeClubName: 'Westhaven Athletic', awayClubName: 'Northbridge FC', homeScore: 0, awayScore: 1 },
-]
-
-export const nextMatch: MatchInfo = {
-  id: 'match-01',
-  competition: league.name,
-  matchday: 12,
-  date: '2026-10-17',
-  kickOff: '15:00',
-  homeClubId: club.id,
-  homeClubName: club.name,
-  awayClubId: 'westhaven',
-  awayClubName: 'Westhaven Athletic',
-  venue: club.stadium.name,
-  referee: 'Martin Ellery',
-  weather: 'Cloudy, 14°C',
-  status: 'Upcoming',
-  formation: { home: club.formation, away: '4-3-3' },
-  coaches: { home: club.manager.name, away: 'Thomas Ivers' },
-  keyPlayers: { home: 'Adrian Costa', away: 'Marcus Bell' },
-  lastFiveForm: { home: ['W', 'D', 'W', 'W', 'D'], away: ['W', 'W', 'D', 'W', 'W'] },
-  headToHead: { homeWins: 8, draws: 6, awayWins: 6, recentMeetings },
-  lineups: {
-    home: { formation: '4-3-3', coach: club.manager.name, startingXI: northbridgeStartingXI, substitutes: northbridgeBench },
-    away: { formation: '4-3-3', coach: 'Thomas Ivers', startingXI: westhavenStartingXI, substitutes: westhavenBench },
-  },
-  commentary: [],
-  stats: undefined,
+const buildRecentMatch = (): MatchInfo => {
+  const match = baseMatch('match-previous', ownStanding.played, '2026-10-10', '15:00', club.id, opponentIds.recent, 'Ibrahim Danjuma', 'Light rain, 24°C')
+  const home = match.lineups.home.startingXI
+  const away = match.lineups.away.startingXI
+  const byLabel = (lineup: MatchLineupPlayer[], label: string, nth = 0) => lineup.filter((player) => player.position === label)[nth]
+  const commentary: MatchCommentaryEvent[] = [
+    { minute: 90, team: 'home', type: 'Foul', player: byLabel(home, 'CB').name, detail: 'Wins the final aerial duel as the referee blows for full time.' },
+    { minute: 86, team: 'away', type: 'Red Card', player: byLabel(away, 'CB', 1).name, detail: 'Sent off for a second bookable offence after stopping a counter.' },
+    { minute: 84, team: 'home', type: 'Substitution', player: match.lineups.home.substitutes[match.lineups.home.substitutes.length - 1].name, detail: `Replaces ${byLabel(home, 'ST').name} for the closing minutes.` },
+    { minute: 78, team: 'away', type: 'Save', player: byLabel(home, 'GK').name, detail: `Gets down quickly to turn ${byLabel(away, 'CM').name}'s low drive around the post.` },
+    { minute: 71, team: 'away', type: 'Yellow Card', player: byLabel(away, 'DM').name, detail: 'Booked for a late challenge in midfield.' },
+    { minute: 63, team: 'home', type: 'Goal', player: byLabel(home, 'RW').name, detail: `Finds the bottom corner after a neat exchange with ${byLabel(home, 'ST').name}.` },
+    { minute: 52, team: 'away', type: 'Goal', player: byLabel(away, 'ST').name, detail: 'Levels the score with a header from the six-yard box.' },
+    { minute: 38, team: 'home', type: 'Goal', player: byLabel(home, 'ST').name, detail: `Turns home ${byLabel(home, 'LW').name}'s driven cross at the near post.` },
+    { minute: 24, team: 'home', type: 'Yellow Card', player: byLabel(home, 'DM').name, detail: 'Cautioned for stopping a counter-attack.' },
+  ]
+  return {
+    ...match, status: 'Completed', score: { home: 2, away: 1 }, commentary,
+    stats: { possession: { home: 56, away: 44 }, shots: { home: 15, away: 9 }, shotsOnTarget: { home: 7, away: 3 }, passAccuracy: { home: 86, away: 79 }, fouls: { home: 11, away: 14 } },
+  }
 }
 
-export const recentMatch: MatchInfo = {
-  id: 'match-previous',
-  competition: league.name,
-  matchday: 11,
-  date: '2026-10-10',
-  kickOff: '15:00',
-  homeClubId: club.id,
-  homeClubName: club.name,
-  awayClubId: 'redmere',
-  awayClubName: 'Redmere City',
-  venue: club.stadium.name,
-  referee: 'Stephen Marsh',
-  weather: 'Light rain, 12°C',
-  status: 'Completed',
-  score: { home: 2, away: 1 },
-  formation: { home: '4-3-3', away: '4-2-3-1' },
-  coaches: { home: club.manager.name, away: 'Daniel Ferreira' },
-  keyPlayers: { home: 'Finn Gallagher', away: 'Nico Silva' },
-  lastFiveForm: { home: ['W', 'D', 'W', 'W', 'D'], away: ['L', 'W', 'D', 'L', 'W'] },
-  headToHead: {
-    homeWins: 11,
-    draws: 4,
-    awayWins: 7,
-    recentMeetings: [
-      { date: '2026-10-10', homeClubName: club.name, awayClubName: 'Redmere City', homeScore: 2, awayScore: 1 },
-      { date: '2026-02-21', homeClubName: 'Redmere City', awayClubName: club.name, homeScore: 0, awayScore: 0 },
-      { date: '2025-09-13', homeClubName: club.name, awayClubName: 'Redmere City', homeScore: 1, awayScore: 2 },
-      { date: '2025-03-08', homeClubName: 'Redmere City', awayClubName: club.name, homeScore: 1, awayScore: 3 },
-    ],
-  },
-  lineups: {
-    home: { formation: '4-3-3', coach: club.manager.name, startingXI: northbridgeStartingXI, substitutes: northbridgeBench },
-    away: {
-      formation: '4-2-3-1', coach: 'Daniel Ferreira',
-      startingXI: [
-        { id: 'red-1', name: 'Oscar Knight', shirtNumber: 1, position: 'GK', x: 50, y: 9 },
-        { id: 'red-2', name: 'Toby Lane', shirtNumber: 2, position: 'RB', x: 16, y: 23 },
-        { id: 'red-3', name: 'Ethan Vale', shirtNumber: 5, position: 'CB', x: 38, y: 22 },
-        { id: 'red-4', name: 'Rui Mendes', shirtNumber: 4, position: 'CB', x: 62, y: 22 },
-        { id: 'red-5', name: 'Aaron Bell', shirtNumber: 3, position: 'LB', x: 84, y: 23 },
-        { id: 'red-6', name: 'Nico Silva', shirtNumber: 6, position: 'DM', x: 38, y: 43 },
-        { id: 'red-7', name: 'Jonas Park', shirtNumber: 8, position: 'DM', x: 62, y: 43 },
-        { id: 'red-8', name: 'Mason King', shirtNumber: 10, position: 'AM', x: 50, y: 55 },
-        { id: 'red-9', name: 'Caleb Ward', shirtNumber: 7, position: 'RW', x: 17, y: 65 },
-        { id: 'red-10', name: 'Hugo Alves', shirtNumber: 9, position: 'ST', x: 50, y: 72 },
-        { id: 'red-11', name: 'Elliot James', shirtNumber: 11, position: 'LW', x: 83, y: 65 },
-      ],
-      substitutes: westhavenBench,
-    },
-  },
-  commentary: [
-    { minute: 90, team: 'home', type: 'Foul', player: 'Lewis Grant', detail: 'Wins the final aerial duel as the referee blows for full time.' },
-    { minute: 86, team: 'away', type: 'Red Card', player: 'Rui Mendes', detail: 'Sent off for a second bookable offence after stopping a counter.' },
-    { minute: 84, team: 'home', type: 'Substitution', player: 'Rafael Costa', detail: 'Replaces Adrian Costa for the closing minutes.' },
-    { minute: 78, team: 'away', type: 'Save', player: 'Elliot Ward', detail: 'Gets down quickly to turn Silva’s low drive around the post.' },
-    { minute: 71, team: 'away', type: 'Yellow Card', player: 'Nico Silva', detail: 'Booked for a late challenge in midfield.' },
-    { minute: 63, team: 'home', type: 'Goal', player: 'Finn Gallagher', detail: 'Finds the bottom corner after a neat exchange with Costa.' },
-    { minute: 52, team: 'away', type: 'Goal', player: 'Hugo Alves', detail: 'Levels the score with a header from the six-yard box.' },
-    { minute: 38, team: 'home', type: 'Goal', player: 'Adrian Costa', detail: 'Turns home Okafor’s driven cross at the near post.' },
-    { minute: 24, team: 'home', type: 'Yellow Card', player: 'Noah Bennett', detail: 'Cautioned for stopping a counter-attack.' },
-  ],
-  stats: {
-    possession: { home: 56, away: 44 },
-    shots: { home: 15, away: 9 },
-    shotsOnTarget: { home: 7, away: 3 },
-    passAccuracy: { home: 86, away: 79 },
-    fouls: { home: 11, away: 14 },
-  },
-}
-
-export const upcomingMatch2: MatchInfo = {
-  id: 'match-02',
-  competition: league.name,
-  matchday: 13,
-  date: '2026-10-24',
-  kickOff: '15:00',
-  homeClubId: 'redmere',
-  homeClubName: 'Redmere City',
-  awayClubId: club.id,
-  awayClubName: club.name,
-  venue: 'Redmere Park',
-  referee: 'Stephen Marsh',
-  weather: 'Clear, 13°C',
-  status: 'Upcoming',
-  formation: { home: '4-2-3-1', away: club.formation },
-  coaches: { home: 'Daniel Ferreira', away: club.manager.name },
-  keyPlayers: { home: 'Nico Silva', away: 'Finn Gallagher' },
-  lastFiveForm: { home: ['L', 'W', 'W', 'D', 'W'], away: ['W', 'D', 'W', 'W', 'D'] },
-  headToHead: {
-    homeWins: 7,
-    draws: 4,
-    awayWins: 11,
-    recentMeetings: [
-      { date: '2026-10-10', homeClubName: club.name, awayClubName: 'Redmere City', homeScore: 2, awayScore: 1 },
-      { date: '2026-02-21', homeClubName: 'Redmere City', awayClubName: club.name, homeScore: 0, awayScore: 0 },
-      { date: '2025-09-13', homeClubName: club.name, awayClubName: 'Redmere City', homeScore: 1, awayScore: 2 },
-    ],
-  },
-  lineups: {
-    home: {
-      formation: '4-2-3-1',
-      coach: 'Daniel Ferreira',
-      startingXI: [
-        { id: 'red-1', name: 'Oscar Knight', shirtNumber: 1, position: 'GK', x: 50, y: 9 },
-        { id: 'red-2', name: 'Toby Lane', shirtNumber: 2, position: 'RB', x: 16, y: 23 },
-        { id: 'red-3', name: 'Ethan Vale', shirtNumber: 5, position: 'CB', x: 38, y: 22 },
-        { id: 'red-4', name: 'Rui Mendes', shirtNumber: 4, position: 'CB', x: 62, y: 22 },
-        { id: 'red-5', name: 'Aaron Bell', shirtNumber: 3, position: 'LB', x: 84, y: 23 },
-        { id: 'red-6', name: 'Nico Silva', shirtNumber: 6, position: 'DM', x: 38, y: 43 },
-        { id: 'red-7', name: 'Jonas Park', shirtNumber: 8, position: 'DM', x: 62, y: 43 },
-        { id: 'red-8', name: 'Mason King', shirtNumber: 10, position: 'AM', x: 50, y: 55 },
-        { id: 'red-9', name: 'Caleb Ward', shirtNumber: 7, position: 'RW', x: 17, y: 65 },
-        { id: 'red-10', name: 'Hugo Alves', shirtNumber: 9, position: 'ST', x: 50, y: 72 },
-        { id: 'red-11', name: 'Elliot James', shirtNumber: 11, position: 'LW', x: 83, y: 65 },
-      ],
-      substitutes: westhavenBench,
-    },
-    away: { formation: '4-3-3', coach: club.manager.name, startingXI: northbridgeStartingXI, substitutes: northbridgeBench },
-  },
-  commentary: [],
-  stats: undefined,
-}
-
-export const upcomingMatch3: MatchInfo = {
-  id: 'match-03',
-  competition: league.name,
-  matchday: 14,
-  date: '2026-10-31',
-  kickOff: '17:30',
-  homeClubId: club.id,
-  homeClubName: club.name,
-  awayClubId: 'oldcastle',
-  awayClubName: 'Oldcastle Rovers',
-  venue: club.stadium.name,
-  referee: 'Martin Ellery',
-  weather: 'Breezy, 11°C',
-  status: 'Upcoming',
-  formation: { home: club.formation, away: '4-4-2' },
-  coaches: { home: club.manager.name, away: 'Gareth Nolan' },
-  keyPlayers: { home: 'Adrian Costa', away: 'Leon Mercer' },
-  lastFiveForm: { home: ['W', 'D', 'W', 'W', 'D'], away: ['D', 'W', 'W', 'L', 'W'] },
-  headToHead: {
-    homeWins: 9,
-    draws: 5,
-    awayWins: 5,
-    recentMeetings: [
-      { date: '2026-04-04', homeClubName: 'Oldcastle Rovers', awayClubName: club.name, homeScore: 1, awayScore: 2 },
-      { date: '2025-11-22', homeClubName: club.name, awayClubName: 'Oldcastle Rovers', homeScore: 1, awayScore: 0 },
-    ],
-  },
-  lineups: {
-    home: { formation: '4-3-3', coach: club.manager.name, startingXI: northbridgeStartingXI, substitutes: northbridgeBench },
-    away: {
-      formation: '4-4-2',
-      coach: 'Gareth Nolan',
-      startingXI: westhavenStartingXI,
-      substitutes: westhavenBench,
-    },
-  },
-  commentary: [],
-  stats: undefined,
-}
+export const recentMatch: MatchInfo = buildRecentMatch()
+export const nextMatch: MatchInfo = baseMatch('match-01', nextMatchday, '2026-10-17', '15:00', club.id, opponentIds.next, 'Samuel Adeyemi', 'Cloudy, 27°C')
+export const upcomingMatch2: MatchInfo = baseMatch('match-02', nextMatchday + 1, '2026-10-24', '15:00', opponentIds.second, club.id, 'Ibrahim Danjuma', 'Clear, 29°C')
+export const upcomingMatch3: MatchInfo = baseMatch('match-03', nextMatchday + 2, '2026-10-31', '17:30', club.id, opponentIds.third, 'Samuel Adeyemi', 'Humid, 26°C')
 
 export const upcomingFixtures: MatchInfo[] = [nextMatch, upcomingMatch2, upcomingMatch3]
-
 export const matchFixtures: MatchInfo[] = [recentMatch, nextMatch, upcomingMatch2, upcomingMatch3]
 
-export const clubConfidence: ClubConfidenceData = {
-  board: {
-    percentage: 88,
-    status: 'Very Good',
-    note: 'Delighted with 2nd place standing and healthy wage balance',
-  },
-  fan: {
-    percentage: 82,
-    status: 'Good',
-    note: 'Energized by attacking football ahead of Westhaven clash',
-  },
-  player: {
-    percentage: 79,
-    status: 'Good',
-    note: 'Strong dressing room faith in current tactical setup',
-  },
+export const managerProfiles: ManagerProfile[] = [
+  ownManager,
+  ...staffProfiles,
+  ...matchFixtures.flatMap((match) => [match.homeClubId, match.awayClubId]).filter((id, index, all) => id !== club.id && all.indexOf(id) === index).map(managerFor),
+]
+
+// ---------- Home dashboard metrics ----------
+const leader = standings[0]
+const ownForm = ownStanding.form
+export const homeMetrics = {
+  position: ownStanding.position,
+  teamCount: standings.length,
+  pointsBehindLeader: leader.points - ownStanding.points,
+  leaderName: leader.clubName,
+  form: ownForm,
+  formSummary: [['W', 'win'], ['D', 'draw'], ['L', 'loss']].map(([code, label]) => { const count = ownForm.filter((result) => result === code).length; return `${count} ${count === 1 ? label : label === 'loss' ? 'losses' : `${label}s`}` }).join(' · '),
+  wageRoom: club.finances.wageBudget - club.finances.weeklyWages,
 }
 
 export const squadHealthMetrics: SquadHealthMetrics = {
@@ -580,9 +281,142 @@ export const squadHealthMetrics: SquadHealthMetrics = {
   injuriesNote: 'Full squad available',
   suspensions: 0,
   suspensionsNote: 'No disciplinary bans',
-  squadMorale: 'Very Good',
-  moralePercentage: 92,
-  teamChemistry: 88,
-  chemistryNote: 'Fluid tactical cohesion',
-  averageFitness: 96,
+  squadMorale: 'Good',
+  moralePercentage: Math.round(squad.reduce((sum, player) => sum + player.personalInfo.teamOpinion, 0) / squad.length),
+  teamChemistry: 78,
+  chemistryNote: 'Settling into a shared system',
+  averageFitness: Math.round(squad.reduce((sum, player) => sum + player.fitness, 0) / squad.length),
+}
+
+export const clubConfidence: ClubConfidenceData = {
+  board: { percentage: 72, status: 'Good', note: `Pleased with ${ownStanding.position}th place and a healthy wage balance` },
+  fan: { percentage: 68, status: 'Good', note: `Looking forward to hosting ${nextMatch.awayClubName}` },
+  player: { percentage: 74, status: 'Good', note: 'Solid dressing room faith in the tactical setup' },
+}
+
+// ---------- Cups & continental competitions (built from real clubs) ----------
+const defaultCupRules = ['Single-match knockout rounds until the semi-final.', 'Extra time and penalties if scores are level.', 'Five substitutions are permitted.', 'The winner qualifies for next season’s continental competition.']
+
+const competitionFromClubs = (id: string, name: string, country: string, category: LeagueCompetition['category'], teams: GlobalLeagueTeam[], rounds: number, rules: string[], history: LeagueCompetition['history']): LeagueCompetition => {
+  const random = createRng(`${id}:table`)
+  const table: LeagueStanding[] = teams.map((team) => {
+    const won = Math.floor(random() * (rounds + 1))
+    const drawn = Math.floor(random() * (rounds - won + 1))
+    const goalsFor = won * 2 + drawn + Math.floor(random() * 3)
+    const goalsAgainst = Math.max(0, goalsFor - won * 2 + Math.floor(random() * 4))
+    return { position: 0, clubId: team.id, clubName: team.name, played: rounds, won, drawn, lost: rounds - won - drawn, goalsFor, goalsAgainst, goalDifference: goalsFor - goalsAgainst, points: won * 3 + drawn, form: team.standing.form }
+  }).sort((a, b) => b.points - a.points || b.goalDifference - a.goalDifference).map((standing, index) => ({ ...standing, position: index + 1 }))
+  const playerStats = leaguePlayerStats(table.map((standing) => standing.clubId))
+  return {
+    id, name, country, category, season: ownLeague.season, matchday: rounds, totalMatchdays: rounds, standings: table, playerStats,
+    teamStats: table.slice(0, 5).map((standing, index) => ({ clubId: standing.clubId, clubName: standing.clubName, possession: 58 - index * 3, goals: standing.goalsFor, cleanSheets: 4 - Math.floor(index / 2), cards: 8 + index * 2 })),
+    rules, history,
+  }
+}
+
+export function leaguePlayerStats(clubIds: string[]): LeagueCompetition['playerStats'] {
+  const rows = clubIds.flatMap((clubId) => getClubSquad(clubId).map((player) => ({ player, clubName: clubShortName(clubId), stats: player.seasonStats[player.seasonStats.length - 1] }))).filter((row) => row.stats)
+  const top = (pick: (row: (typeof rows)[number]) => number, filter: (row: (typeof rows)[number]) => boolean = () => true) =>
+    rows.filter(filter).map((row) => ({ playerId: row.player.id, name: row.player.name, clubName: row.clubName, value: pick(row) })).sort((a, b) => b.value - a.value).slice(0, 10)
+  return {
+    goals: top((row) => row.stats.goals),
+    assists: top((row) => row.stats.assists),
+    cleanSheets: top((row) => row.stats.cleanSheets, (row) => row.player.position === 'GK'),
+  }
+}
+
+export function leagueHistory(countryLeague: GlobalCountryLeague): LeagueCompetition['history'] {
+  const random = createRng(`${countryLeague.id}:history`)
+  const contenders = leagueStandings(countryLeague).slice(0, 6).filter((standing) => standing.clubId !== club.id)
+  return ['2025/26', '2024/25', '2023/24'].map((season, index) => {
+    const champion = contenders[(index * 2) % contenders.length]
+    const runnerUp = contenders[(index * 2 + 1) % contenders.length]
+    return { season, champion: champion.clubName, runnerUp: runnerUp.clubName, points: 70 + Math.floor(random() * 12) }
+  })
+}
+
+const leagueTeams = (leagueId: string, from: number, to: number) =>
+  [...globalLeagues.find((item) => item.id === leagueId)!.teams].sort((a, b) => a.standing.position - b.standing.position).slice(from, to)
+
+const cupTeams = (leagueId: string) => leagueTeams(leagueId, 0, 8)
+const topClubs = (leagueIds: string[], from: number, to: number) => leagueIds.flatMap((leagueId) => leagueTeams(leagueId, from, to))
+
+const cupHistory = (leagueId: string, includeOwn = false): LeagueCompetition['history'] => {
+  const teams = cupTeams(leagueId)
+  return ['2025/26', '2024/25', '2023/24'].map((season, index) => ({ season, champion: teams[(index + 2) % teams.length].name, runnerUp: teams[(index + 4) % teams.length].name, points: 0 }))
+    .concat(includeOwn ? [{ season: '2021/22', champion: club.name, runnerUp: cupTeams(leagueId)[0].name, points: 0 }] : [])
+}
+
+export const leagueCompetitions: LeagueCompetition[] = [
+  competitionFromClubs('nga-federation-cup', 'Federation Cup', 'Nigeria', 'Domestic Leagues', cupTeams('nga-top-division').filter((team) => team.id !== club.id).slice(0, 7).concat(ownTeam), 4, defaultCupRules, cupHistory('nga-top-division', true)),
+  competitionFromClubs('eng-fa-cup', 'FA Cup', 'England', 'Domestic Leagues', cupTeams('eng-top-division'), 4, defaultCupRules, cupHistory('eng-top-division')),
+  competitionFromClubs('esp-copa', 'Copa Nacional', 'Spain', 'Domestic Leagues', cupTeams('esp-top-division'), 4, defaultCupRules, cupHistory('esp-top-division')),
+  competitionFromClubs('por-taca', 'Taça Nacional', 'Portugal', 'Domestic Leagues', cupTeams('por-top-division'), 4, defaultCupRules, cupHistory('por-top-division')),
+  competitionFromClubs('sco-cup', 'Scottish Cup', 'Scotland', 'Domestic Leagues', cupTeams('sco-top-division'), 4, defaultCupRules, cupHistory('sco-top-division')),
+  competitionFromClubs('irl-cup', 'FAI Cup', 'Ireland', 'Domestic Leagues', cupTeams('irl-top-division'), 4, defaultCupRules, cupHistory('irl-top-division')),
+  competitionFromClubs('continental-champions', 'Champions Cup', 'Europe', 'Continental Competitions', topClubs(['eng-top-division', 'esp-top-division', 'ger-top-division', 'ita-top-division'], 0, 4), 6, ['Group phase followed by knockout rounds.', 'Top four clubs from each major league qualify.', 'Five substitutions are permitted.'], [
+    { season: '2025/26', champion: leagueTeams('esp-top-division', 0, 1)[0].name, runnerUp: leagueTeams('eng-top-division', 0, 1)[0].name, points: 0 },
+    { season: '2024/25', champion: leagueTeams('ger-top-division', 0, 1)[0].name, runnerUp: leagueTeams('ita-top-division', 0, 1)[0].name, points: 0 },
+  ]),
+  competitionFromClubs('continental-league', 'Continental League', 'Europe', 'Continental Competitions', topClubs(['fra-top-division', 'por-top-division', 'ned-top-division', 'bel-top-division'], 0, 4), 6, ['Group phase followed by knockout rounds.', 'Clubs finishing just outside the top spots qualify.', 'Five substitutions are permitted.'], [
+    { season: '2025/26', champion: leagueTeams('por-top-division', 1, 2)[0].name, runnerUp: leagueTeams('fra-top-division', 1, 2)[0].name, points: 0 },
+    { season: '2024/25', champion: leagueTeams('ned-top-division', 0, 1)[0].name, runnerUp: leagueTeams('bel-top-division', 0, 1)[0].name, points: 0 },
+  ]),
+  competitionFromClubs('continental-africa', 'African Champions League', 'Africa', 'Continental Competitions', topClubs(['nga-top-division', 'gha-top-division', 'egy-top-division', 'mar-top-division'], 0, 4), 6, ['Group phase followed by knockout rounds.', 'Top four clubs from each qualifying league enter.', 'Five substitutions are permitted.'], [
+    { season: '2025/26', champion: leagueTeams('egy-top-division', 0, 1)[0].name, runnerUp: leagueTeams('mar-top-division', 0, 1)[0].name, points: 0 },
+    { season: '2024/25', champion: leagueTeams('nga-top-division', 0, 1)[0].name, runnerUp: leagueTeams('gha-top-division', 0, 1)[0].name, points: 0 },
+  ]),
+]
+
+// ---------- Transfer market (players from other clubs) ----------
+let marketCache: Player[] | null = null
+export function getTransferMarketPlayers(): Player[] {
+  if (marketCache) return marketCache
+  const sources = [...leagueTeams(ownLeague.id, 0, 18), ...['eng-top-division', 'esp-top-division', 'por-top-division', 'gha-top-division', 'bra-top-division'].flatMap((id) => leagueTeams(id, 0, 6))]
+  marketCache = sources.filter((team) => team.id !== club.id).flatMap((team) => [...getClubSquad(team.id)].sort((a, b) => b.overall - a.overall).slice(0, 3))
+  return marketCache
+}
+
+export const playerClubName = (clubId: string) => findGeneratedClub(clubId)?.clubName ?? 'Free Agent'
+
+
+export const SQUAD_MIN = 18
+export const SQUAD_MAX = 30
+export const isOwnPlayer = (player: Player) => club.squad.some((member) => member.id === player.id)
+
+const removeFrom = (list: Player[] | undefined, player: Player) => {
+  const index = list ? list.findIndex((member) => member.id === player.id) : -1
+  if (list && index >= 0) list.splice(index, 1)
+}
+
+export function releasePlayer(player: Player): string {
+  if (!isOwnPlayer(player)) return 'This player is not in your squad.'
+  if (club.squad.length <= SQUAD_MIN) return `You need at least ${SQUAD_MIN} players in the squad.`
+  removeFrom(club.squad, player)
+  club.finances.weeklyWages -= player.contract.weeklyWage
+  player.contract = { ...player.contract, clubId: '', squadRole: 'Squad Player' }
+  getTransferMarketPlayers().push(player)
+  return `${player.name} has been released and is now a free agent.`
+}
+
+export function signPlayer(player: Player, fee: number): string {
+  if (club.squad.length >= SQUAD_MAX) return `Your squad is full (${SQUAD_MAX}).`
+  if (fee > club.finances.transferBudget) return 'You cannot afford this fee.'
+  removeFrom(getClubSquad(player.contract.clubId), player)
+  removeFrom(getTransferMarketPlayers(), player)
+  club.finances.transferBudget -= fee
+  club.finances.weeklyWages += player.contract.weeklyWage
+  player.contract = { ...player.contract, clubId: club.id }
+  player.shirtNumber = Math.max(...club.squad.map((member) => member.shirtNumber)) + 1
+  club.squad.push(player)
+  return `${player.name} signed for £${(fee / 1000000).toFixed(1)}m.`
+}
+
+export function renewContract(player: Player, years: number, weeklyWage: number, status: 'Accepted' | 'Declined', reason: string) {
+  player.contract.offerHistory = [{ clubName: club.name, date: '2026-10-15', status, weeklyWage, reason }, ...player.contract.offerHistory]
+  if (status !== 'Accepted') return
+  club.finances.weeklyWages += weeklyWage - player.contract.weeklyWage
+  const end = new Date(`${player.contract.endDate}T12:00:00`)
+  end.setFullYear(Math.max(end.getFullYear(), 2026) + years)
+  player.contract = { ...player.contract, weeklyWage, endDate: end.toISOString().slice(0, 10) }
 }

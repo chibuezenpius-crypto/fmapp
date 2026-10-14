@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { club } from './data/mockData'
+import { club, getClubBadge } from './data/mockData'
+import { getClubSquad } from './data/clubSquads'
+import ClubBadge from './ClubBadge'
 import type { MatchInfo, MatchLineupPlayer, Player } from './types/game'
-import { squad } from './data/mockData'
 
 export type MatchSection = 'Overview' | 'Head to Head' | 'Lineups' | 'Commentary' | 'Match Stats'
 
@@ -23,8 +24,8 @@ function ClubReference({ name, selectedClubName, onSelectClub, onOpenClub }: { n
   return <button aria-pressed={!isOwnClub && selectedClubName === name} className={`entity-link ${!isOwnClub && selectedClubName === name ? 'selected' : ''}`} onClick={() => isOwnClub ? onOpenClub() : onSelectClub(name)} type="button">{name}</button>
 }
 
-function PlayerReference({ name, onSelectPlayer }: { name: string; onSelectPlayer: (player: Player) => void }) {
-  const player = squad.find((candidate) => candidate.name === name)
+function PlayerReference({ name, clubIds, onSelectPlayer }: { name: string; clubIds: string[]; onSelectPlayer: (player: Player) => void }) {
+  const player = clubIds.flatMap(getClubSquad).find((candidate) => candidate.name === name)
   return player ? <button className="entity-link" onClick={() => onSelectPlayer(player)} type="button">{name}</button> : <strong>{name}</strong>
 }
 
@@ -32,8 +33,8 @@ function FormStrip({ results }: { results: ('W' | 'D' | 'L')[] }) {
   return <span className="match-form-strip">{results.map((result, index) => <i className={`form-${result.toLowerCase()}`} key={`${result}-${index}`}>{result}</i>)}</span>
 }
 
-function MatchPitchPlayer({ player, team, onSelectPlayer }: { player: MatchLineupPlayer; team: 'home' | 'away'; onSelectPlayer: (player: Player) => void }) {
-  const squadPlayer = player.playerId ? squad.find((candidate) => candidate.id === player.playerId) : undefined
+function MatchPitchPlayer({ player, team, clubId, onSelectPlayer }: { player: MatchLineupPlayer; team: 'home' | 'away'; clubId: string; onSelectPlayer: (player: Player) => void }) {
+  const squadPlayer = player.playerId ? getClubSquad(clubId).find((candidate) => candidate.id === player.playerId) : undefined
   const content = <><span className="match-pitch-shirt">{String(player.shirtNumber).padStart(2, '0')}</span><strong>{player.name.split(' ')[0]}</strong><small>{player.position}</small></>
   return squadPlayer ? <button aria-label={`Open ${player.name} profile`} className={`match-pitch-player ${team}`} onClick={() => onSelectPlayer(squadPlayer)} style={{ left: `${player.x}%`, top: `${player.y}%` }} type="button">{content}</button>
     : <div className={`match-pitch-player ${team}`} style={{ left: `${player.x}%`, top: `${player.y}%` }}>{content}</div>
@@ -59,9 +60,9 @@ export default function MatchCenter({ match, selectedClubName, onSelectClub, onO
     <header className="match-center-banner">
       <div className="match-center-topline"><span>{match.competition.toUpperCase()} · MATCHDAY {match.matchday}</span><span className={`match-status ${match.status.toLowerCase()}`}>{match.status === 'Completed' ? 'FULL TIME' : 'UPCOMING'}</span></div>
       <div className="match-center-teams">
-        <div className="match-center-team home"><span className="match-team-crest">N</span><ClubReference name={match.homeClubName} selectedClubName={selectedClubName} onSelectClub={onSelectClub} onOpenClub={onOpenClub} /></div>
+        <div className="match-center-team home"><span className="match-team-crest"><ClubBadge badge={getClubBadge(match.homeClubId)} name={match.homeClubName} /></span><ClubReference name={match.homeClubName} selectedClubName={selectedClubName} onSelectClub={onSelectClub} onOpenClub={onOpenClub} /></div>
         <div className="match-center-score">{match.score ? <><strong>{match.score.home}</strong><i>:</i><strong>{match.score.away}</strong></> : <><strong>{new Date(`${match.date}T12:00:00`).getDate()}</strong><i>VS</i><strong>{new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(new Date(`${match.date}T12:00:00`)).toUpperCase()}</strong></>}</div>
-        <div className="match-center-team away"><span className="match-team-crest away">{match.awayClubName.slice(0, 1)}</span><ClubReference name={match.awayClubName} selectedClubName={selectedClubName} onSelectClub={onSelectClub} onOpenClub={onOpenClub} /></div>
+        <div className="match-center-team away"><span className="match-team-crest away"><ClubBadge badge={getClubBadge(match.awayClubId)} name={match.awayClubName} /></span><ClubReference name={match.awayClubName} selectedClubName={selectedClubName} onSelectClub={onSelectClub} onOpenClub={onOpenClub} /></div>
       </div>
       <div className="match-center-date"><span>{dateFormat.format(new Date(`${match.date}T12:00:00`))}</span><span>{match.kickOff} · {match.venue}</span></div>
     </header>
@@ -75,7 +76,7 @@ export default function MatchCenter({ match, selectedClubName, onSelectClub, onO
         <section className="match-overview-venue"><div className="match-venue-icon">⌂</div><div><span className="eyebrow">VENUE</span><strong>{match.venue}</strong><span>{match.weather}</span></div><div className="venue-capacity"><span>CAPACITY</span><strong>{club.stadium.capacity.toLocaleString('en-GB')}</strong></div></section>
         <section className="match-overview-facts"><div><span>REFEREE</span><strong><button className="entity-link" onClick={() => onSelectPersonnel(match.referee)} type="button">{match.referee}</button></strong></div><div><span>KICK-OFF</span><strong>{match.kickOff}</strong></div><div><span>HOME COACH</span><strong><button className="entity-link" onClick={() => onSelectPersonnel(match.coaches.home)} type="button">{match.coaches.home}</button></strong></div><div><span>AWAY COACH</span><strong><button className="entity-link" onClick={() => onSelectPersonnel(match.coaches.away)} type="button">{match.coaches.away}</button></strong></div></section>
         <section className="match-watch-section"><div className="match-section-heading"><div><span className="eyebrow">ONES TO WATCH</span><h2>Key players</h2></div><span>PRE-MATCH</span></div><div className="match-watch-grid">
-          <article className="match-watch-card home"><span className="watch-side">HOME</span><span className="watch-player-mark">{match.keyPlayers.home.split(' ').map((part) => part[0]).join('')}</span><div><span className="eyebrow">NORTHBRIDGE FC</span><PlayerReference name={match.keyPlayers.home} onSelectPlayer={onSelectPlayer} /></div></article>
+          <article className="match-watch-card home"><span className="watch-side">HOME</span><span className="watch-player-mark">{match.keyPlayers.home.split(' ').map((part) => part[0]).join('')}</span><div><span className="eyebrow">{match.homeClubName.toUpperCase()}</span><PlayerReference name={match.keyPlayers.home} clubIds={[match.homeClubId, match.awayClubId]} onSelectPlayer={onSelectPlayer} /></div></article>
           <article className="match-watch-card away"><span className="watch-side">AWAY</span><span className="watch-player-mark">{match.keyPlayers.away.split(' ').map((part) => part[0]).join('')}</span><div><span className="eyebrow">{match.awayClubName.toUpperCase()}</span><strong>{match.keyPlayers.away}</strong></div></article>
         </div></section>
         <section className="match-form-panel"><div className="match-section-heading"><div><span className="eyebrow">RECENT FORM</span><h2>Last five</h2></div></div><div className="match-form-team"><ClubReference name={match.homeClubName} selectedClubName={selectedClubName} onSelectClub={onSelectClub} onOpenClub={onOpenClub} /><FormStrip results={match.lastFiveForm.home} /></div><div className="match-form-team"><ClubReference name={match.awayClubName} selectedClubName={selectedClubName} onSelectClub={onSelectClub} onOpenClub={onOpenClub} /><FormStrip results={match.lastFiveForm.away} /></div></section>
@@ -90,8 +91,8 @@ export default function MatchCenter({ match, selectedClubName, onSelectClub, onO
       {section === 'Lineups' && <>
         <div className="lineup-heading"><div><span className="eyebrow">STARTING XI</span><h2>{match.lineups.home.formation} <small>vs</small> {match.lineups.away.formation}</h2></div><span>{match.status === 'Upcoming' ? 'EXPECTED' : 'CONFIRMED'}</span></div>
         <div className="match-lineup-pitch" aria-label={`${match.homeClubName} and ${match.awayClubName} lineups`}><div className="lineup-boundary" /><div className="lineup-halfway" /><div className="lineup-circle" /><div className="lineup-box top" /><div className="lineup-box bottom" /><div className="lineup-team-tag away">{match.awayClubName}</div><div className="lineup-team-tag home">{match.homeClubName}</div>
-          {match.lineups.away.startingXI.map((player) => <MatchPitchPlayer key={player.id} player={player} team="away" onSelectPlayer={onSelectPlayer} />)}
-          {match.lineups.home.startingXI.map((player) => <MatchPitchPlayer key={player.id} player={player} team="home" onSelectPlayer={onSelectPlayer} />)}
+          {match.lineups.away.startingXI.map((player) => <MatchPitchPlayer key={player.id} player={player} team="away" clubId={match.awayClubId} onSelectPlayer={onSelectPlayer} />)}
+          {match.lineups.home.startingXI.map((player) => <MatchPitchPlayer key={player.id} player={player} team="home" clubId={match.homeClubId} onSelectPlayer={onSelectPlayer} />)}
         </div>
         <div className="match-benches"><BenchList title={match.homeClubName} substitutes={match.lineups.home.substitutes} team="home" /><BenchList title={match.awayClubName} substitutes={match.lineups.away.substitutes} team="away" /></div>
       </>}

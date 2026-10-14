@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Player } from './types/game'
 import { club } from './data/mockData'
+import { fitPlayersToSlots } from './utils/lineup'
 
 const sections = ['Overview', 'Player Roles', 'Set Pieces', 'Captains & Leadership', 'Tactics Styles', 'Tactics Setup'] as const
 type TacticsSection = (typeof sections)[number]
@@ -156,8 +157,17 @@ const styleGuidance: Record<string, TacticalStyleGuidance> = {
   },
 }
 
-const initialLineup = ['p-01', 'p-02', 'p-04', 'p-05', 'p-03', 'p-06', 'p-08', 'p-10', 'p-07', 'p-09', 'p-11']
+const initialLineup = fitPlayersToSlots(formations['4-3-3'], club.squad)
 const influenceFor = (player: Player) => player.attributes.leadership >= 17 ? 'Very High' : player.attributes.leadership >= 14 ? 'High' : 'Influential'
+const rankedBy = (score: (player: Player) => number) => [...club.squad].sort((first, second) => score(second) - score(first))
+const [bestPasser, secondPasser] = rankedBy((player) => player.attributes.vision + player.attributes.technique + player.attributes.passing)
+const [bestFinisher] = rankedBy((player) => player.attributes.finishing + player.attributes.determination)
+const [bestLeader, secondLeader, thirdLeader, fourthLeader] = rankedBy((player) => player.attributes.leadership)
+const defaultSetPieceTakers: Record<AssignmentKey, string> = {
+  leftCorner: bestPasser.id, rightCorner: secondPasser.id, shortFreeKick: bestPasser.id, longFreeKick: secondPasser.id, penaltyOne: bestFinisher.id, penaltyTwo: bestPasser.id, penaltyThree: secondPasser.id,
+}
+const defaultLeadership: Record<LeadershipKey, string> = { captain: bestLeader.id, viceOne: secondLeader.id, viceTwo: thirdLeader.id, viceThree: fourthLeader.id }
+const onlySquadIds = <Key extends string>(saved?: Partial<Record<Key, string>>) => Object.fromEntries(Object.entries(saved ?? {}).filter(([, id]) => club.squad.some((player) => player.id === id))) as Partial<Record<Key, string>>
 interface SavedTacticsState {
   formation?: string
   lineup?: string[]
@@ -194,16 +204,6 @@ function roleGroup(position: string) {
   return 'MID'
 }
 
-function positionFit(playerPosition: string, slotPosition: string) {
-  if (playerPosition === slotPosition) return 3
-  if (slotPosition.startsWith('D') && playerPosition.startsWith('D')) return 2
-  if (slotPosition === 'DM' && playerPosition === 'M (C)') return 1
-  if (slotPosition === 'M (C)' && ['DM', 'AM (C)'].includes(playerPosition)) return 1
-  if (slotPosition.startsWith('M') && playerPosition.startsWith('D')) return 1
-  if (slotPosition === 'ST (C)' && playerPosition === 'AM (C)') return 1
-  return 0
-}
-
 function positionFamiliarity(playerPosition: string, slotPosition: string) {
   if (playerPosition === slotPosition) return 100
   const playerGroup = roleGroup(playerPosition)
@@ -220,21 +220,6 @@ function positionFamiliarity(playerPosition: string, slotPosition: string) {
 
 function familiarityTone(familiarity: number) {
   return familiarity < 50 ? 'poor' : familiarity < 75 ? 'warning' : 'good'
-}
-
-function fitPlayersToSlots(slots: TacticSlot[], availablePlayers: Player[], preferredIds: Set<string> = new Set()) {
-  const remaining = [...availablePlayers]
-  return slots.map((slot) => {
-    const ranked = [...remaining].sort((first, second) => {
-      const firstScore = positionFit(first.position, slot.position) * 100 + first.overall + first.fitness * 0.05 + (preferredIds.has(first.id) ? 5 : 0)
-      const secondScore = positionFit(second.position, slot.position) * 100 + second.overall + second.fitness * 0.05 + (preferredIds.has(second.id) ? 5 : 0)
-      return secondScore - firstScore
-    })
-    const selected = ranked[0]
-    if (!selected) return null
-    remaining.splice(remaining.findIndex((player) => player.id === selected.id), 1)
-    return selected
-  }).filter((player): player is Player => player !== null).map((player) => player.id)
 }
 
 function PlayerSelect({ label, players, value, onChange }: { label: string; players: Player[]; value: string; onChange: (id: string) => void }) {
@@ -257,11 +242,11 @@ export default function TacticsHub() {
   const [savedTactics] = useState(readSavedTactics)
   const [section, setSection] = useState<TacticsSection>('Overview')
   const [formation, setFormation] = useState(() => savedTactics?.formation && formations[savedTactics.formation] ? savedTactics.formation : '4-3-3')
-  const [lineup, setLineup] = useState<string[]>(() => savedTactics?.lineup?.filter((id) => club.squad.some((player) => player.id === id)) ?? initialLineup)
+  const [lineup, setLineup] = useState<string[]>(() => (savedTactics?.lineup?.filter((id) => club.squad.some((player) => player.id === id)).length === 11 ? savedTactics.lineup : null) ?? initialLineup)
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null)
   const [swapMessage, setSwapMessage] = useState('Select a starter, then choose a bench player to swap.')
   const [tacticalDNA, setTacticalDNA] = useState(() => Object.keys(styleGuidance).includes(savedTactics?.tacticalDNA ?? '') ? savedTactics!.tacticalDNA! : 'Gegenpress')
-  const [matchTempo, setMatchTempo] = useState(savedTactics?.matchTempo ?? 'Balanced')
+  const [matchTempo, setMatchTempo] = useState(['Slow', 'Balanced', 'Fast'].includes(savedTactics?.matchTempo ?? '') ? savedTactics!.matchTempo! : 'Balanced')
   const [aggressionLevel, setAggressionLevel] = useState(savedTactics?.aggressionLevel ?? 'Normal')
   const [pitchWidth, setPitchWidth] = useState(savedTactics?.pitchWidth ?? 'Balanced')
   const [attackFocus, setAttackFocus] = useState(savedTactics?.attackFocus ?? 'Both Wings')
@@ -270,12 +255,11 @@ export default function TacticsHub() {
   const [creativeFreedom, setCreativeFreedom] = useState(savedTactics?.creativeFreedom ?? 'Disciplined')
   const [roles, setRoles] = useState<Record<number, string>>(() => ({ ...Object.fromEntries(formations[savedTactics?.formation && formations[savedTactics.formation] ? savedTactics.formation : '4-3-3'].map((slot, index) => [index, slot.role])), ...savedTactics?.roles }))
   const [setPieceTakers, setSetPieceTakers] = useState<Record<AssignmentKey, string>>({
-    ...{
-    leftCorner: 'p-10', rightCorner: 'p-08', shortFreeKick: 'p-10', longFreeKick: 'p-08', penaltyOne: 'p-09', penaltyTwo: 'p-10', penaltyThree: 'p-08',
-    },
-    ...savedTactics?.setPieceTakers,
+    ...defaultSetPieceTakers,
+    ...onlySquadIds(savedTactics?.setPieceTakers),
   })
-  const [leadership, setLeadership] = useState<Record<LeadershipKey, string>>({ captain: 'p-04', viceOne: 'p-08', viceTwo: 'p-06', viceThree: 'p-01', ...savedTactics?.leadership })
+  const [saveMessage, setSaveMessage] = useState('')
+  const [leadership, setLeadership] = useState<Record<LeadershipKey, string>>({ ...defaultLeadership, ...onlySquadIds(savedTactics?.leadership) })
   const slots = formations[formation]
   const startingPlayers = lineup.map((id) => club.squad.find((player) => player.id === id) ?? null)
   const reserves = club.squad.filter((player) => !lineup.includes(player.id))
@@ -305,6 +289,15 @@ export default function TacticsHub() {
       return
     }
   }, [formation, lineup, roles, tacticalDNA, matchTempo, aggressionLevel, pitchWidth, attackFocus, defensiveLine, pressingIntensity, creativeFreedom, setPieceTakers, leadership])
+
+  const saveTactic = () => {
+    try {
+      window.localStorage.setItem('fmapp-tactics', JSON.stringify({ formation, lineup, roles, tacticalDNA, matchTempo, aggressionLevel, pitchWidth, attackFocus, defensiveLine, pressingIntensity, creativeFreedom, setPieceTakers, leadership }))
+      setSaveMessage('Tactic saved. It will be used for your next match.')
+    } catch {
+      setSaveMessage('Could not save the tactic on this device.')
+    }
+  }
 
   const autoPick = () => {
     setLineup(fitPlayersToSlots(slots, club.squad))
@@ -392,7 +385,7 @@ export default function TacticsHub() {
 
     {section === 'Tactics Styles' && <div className="tactics-section-content"><div className="tactics-subhead"><span className="eyebrow">PRESET TACTICAL DNA</span><h2>Tactics styles</h2><p>Choose a preset to see how it fits your squad.</p></div><div className="preset-style-grid">{Object.keys(styleGuidance).map((style) => <button aria-pressed={tacticalDNA === style} className={tacticalDNA === style ? 'preset-style-option active' : 'preset-style-option'} key={style} onClick={() => setTacticalDNA(style)} type="button"><span>{style}</span>{style === recommendedStyle && <b aria-label="Assistant Manager recommended" title="Assistant Manager recommended">★</b>}</button>)}</div><TacticalPitch formation={formation} slots={slots} players={startingPlayers} selectedSlot={null} onSelectSlot={() => undefined} preview tacticalDNA={tacticalDNA} /><AssistantAdvice compatibility={compatibility} recommendedFormation={recommendedFormation} recommendedStyle={recommendedStyle} tacticalDNA={tacticalDNA} advantages={guidance.advantages} disadvantages={guidance.disadvantages} excellingPlayers={excellingPlayers} strugglingPlayers={strugglingPlayers} /></div>}
 
-    {section === 'Tactics Setup' && <div className="tactics-section-content"><div className="tactics-subhead"><span className="eyebrow">MANUAL CONTROLS</span><h2>Tactics setup</h2><p>Fine-tune your match approach without applying a preset.</p></div><section className="formation-library"><span className="eyebrow">FORMATION</span><div className="formation-options">{Object.keys(formations).map((item) => <button aria-pressed={formation === item} className={formation === item ? 'formation-option active' : 'formation-option'} key={item} onClick={() => changeFormation(item)} type="button">{item}</button>)}</div></section><ManualChoice title="Match Tempo" options={['Slow', 'Balanced', 'Fast', 'Extreme']} value={matchTempo} onChange={setMatchTempo} /><ManualChoice title="Aggression Level" options={['Cautious', 'Normal', 'Hard']} value={aggressionLevel} onChange={setAggressionLevel} /><ManualChoice title="Pitch Width" options={['Narrow', 'Balanced', 'Wide']} value={pitchWidth} onChange={setPitchWidth} /><ManualChoice title="Attack Focus" options={['Left Wing', 'Right Wing', 'Both Wings', 'Center']} value={attackFocus} onChange={setAttackFocus} /><ManualChoice title="Defensive Line" options={['Deep Block', 'Mid Block', 'High Line']} value={defensiveLine} onChange={setDefensiveLine} /><ManualChoice title="Pressing Intensity" options={['Low', 'Standard', 'High']} value={pressingIntensity} onChange={setPressingIntensity} /><ManualChoice title="Creative Freedom" options={['Disciplined', 'Expressive']} value={creativeFreedom} onChange={setCreativeFreedom} /></div>}
+    {section === 'Tactics Setup' && <div className="tactics-section-content"><div className="tactics-subhead"><span className="eyebrow">MANUAL CONTROLS</span><h2>Tactics setup</h2><p>Fine-tune your match approach without applying a preset.</p></div><section className="formation-library"><span className="eyebrow">FORMATION</span><div className="formation-options">{Object.keys(formations).map((item) => <button aria-pressed={formation === item} className={formation === item ? 'formation-option active' : 'formation-option'} key={item} onClick={() => changeFormation(item)} type="button">{item}</button>)}</div></section><ManualChoice title="Match Tempo" options={['Slow', 'Balanced', 'Fast']} value={matchTempo} onChange={setMatchTempo} /><ManualChoice title="Aggression Level" options={['Cautious', 'Normal', 'Hard']} value={aggressionLevel} onChange={setAggressionLevel} /><ManualChoice title="Pitch Width" options={['Narrow', 'Balanced', 'Wide']} value={pitchWidth} onChange={setPitchWidth} /><ManualChoice title="Attack Focus" options={['Left Wing', 'Right Wing', 'Both Wings', 'Center']} value={attackFocus} onChange={setAttackFocus} /><ManualChoice title="Defensive Line" options={['Deep Block', 'Mid Block', 'High Line']} value={defensiveLine} onChange={setDefensiveLine} /><ManualChoice title="Pressing Intensity" options={['Low', 'Standard', 'High']} value={pressingIntensity} onChange={setPressingIntensity} /><ManualChoice title="Creative Freedom" options={['Disciplined', 'Expressive']} value={creativeFreedom} onChange={setCreativeFreedom} /><button className="save-tactic-button" onClick={saveTactic} type="button">Save tactic</button>{saveMessage && <p className="save-tactic-message" role="status">{saveMessage}</p>}</div>}
   </div>
 }
 

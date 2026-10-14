@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { transferMarketPlayers } from './data/mockData'
+import { getTransferMarketPlayers, playerClubName } from './data/mockData'
 import type { Player } from './types/game'
 import Flag from './Flag'
 
+const transferMarketPlayers = getTransferMarketPlayers()
 const money = (amount: number) => amount > 0 ? `£${(amount / 1000000).toFixed(1)}m` : 'No clause'
 function positionGroup(player: Player) {
   if (player.position === 'GK') return 'GK'
@@ -42,7 +43,7 @@ export default function TransferMarket({ onSelectPlayer, onSelectCountry }: { on
       const isShortlisted = shortlisted.includes(player.id)
       return <article className="market-player-row" key={player.id}>
         <img alt={`Portrait of ${player.name}`} className="market-avatar" data-info="avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80" />
-        <div className="market-player-identity"><button className="market-player-name" data-info="player-name" onClick={() => onSelectPlayer(player)} type="button">{player.name}</button><span data-info="club-name">{player.contract.clubId === 'northbridge-fc' ? 'Northbridge FC' : player.contract.clubId === 'redmere' ? 'Redmere City' : 'Oldcastle Rovers'}</span></div>
+        <div className="market-player-identity"><button className="market-player-name" data-info="player-name" onClick={() => onSelectPlayer(player)} type="button">{player.name}</button><span data-info="club-name">{playerClubName(player.contract.clubId)}</span></div>
         <span className="market-age" data-info="age">{player.age}</span>
         <span className="market-position" data-info="position">{player.position.replace(/[() ]/g, '')}</span>
         <span className="market-position market-nationality" data-info="nationality"><Flag code={nationality.code} countryName={nationality.country} onSelectCountry={onSelectCountry} /></span>
