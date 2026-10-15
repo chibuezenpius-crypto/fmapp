@@ -317,11 +317,20 @@ const competitionFromClubs = (id: string, name: string, country: string, categor
 export function leaguePlayerStats(clubIds: string[]): LeagueCompetition['playerStats'] {
   const rows = clubIds.flatMap((clubId) => getClubSquad(clubId).map((player) => ({ player, clubName: clubShortName(clubId), stats: player.seasonStats[player.seasonStats.length - 1] }))).filter((row) => row.stats)
   const top = (pick: (row: (typeof rows)[number]) => number, filter: (row: (typeof rows)[number]) => boolean = () => true) =>
-    rows.filter(filter).map((row) => ({ playerId: row.player.id, name: row.player.name, clubName: row.clubName, value: pick(row) })).sort((a, b) => b.value - a.value).slice(0, 10)
+    rows.filter(filter).map((row) => ({ playerId: row.player.id, name: row.player.name, clubName: row.clubName, value: pick(row), apps: row.stats.appearances })).sort((a, b) => b.value - a.value).slice(0, 10)
+  const cardsOf = (row: (typeof rows)[number]) => {
+    const random = createRng(`${row.player.id}:cards`)
+    const yellow = Math.round(row.stats.appearances * (0.04 + random() * 0.22))
+    const red = random() > 0.85 ? 1 : 0
+    return { yellow, red }
+  }
+  const cards = rows.map((row) => { const c = cardsOf(row); return { playerId: row.player.id, name: row.player.name, clubName: row.clubName, value: c.yellow + c.red, yellow: c.yellow, red: c.red, apps: row.stats.appearances } }).sort((a, b) => b.value - a.value).slice(0, 10)
   return {
     goals: top((row) => row.stats.goals),
     assists: top((row) => row.stats.assists),
     cleanSheets: top((row) => row.stats.cleanSheets, (row) => row.player.position === 'GK'),
+    cards,
+    rating: top((row) => row.stats.averageRating, (row) => row.stats.appearances >= 10),
   }
 }
 

@@ -1545,7 +1545,10 @@ button.match-pitch-player { cursor: pointer; }
 .tactics-tabs, .club-profile-tabs { display: flex; flex-wrap: wrap; overflow: visible; gap: 5px; padding: 5px; }
 .tactics-tab { flex: 1 1 calc(33.333% - 5px); min-width: 0; padding: 0 4px; font-size: 9px; white-space: normal; line-height: 1.1; }
 .club-profile-tab { flex: 1 1 calc(25% - 5px); min-width: 0; padding: 0 4px; font-size: 9px; white-space: normal; line-height: 1.1; }
-.club-profile-tab:nth-child(n+5) { flex-basis: calc(33.333% - 5px); }
+.club-fixture-competition { display: block; padding: 6px 11px 0; color: #5e74a6; font-size: 7px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.league-ranking-row { grid-template-columns: 24px minmax(0, 1fr) auto; }
+.league-ranking-row > b { display: flex; flex-direction: column; align-items: flex-end; line-height: 1; }
+.stat-apps { color: #6578a5; font-family: inherit; font-size: 7px; font-weight: 600; margin-top: 2px; white-space: nowrap; }
 
 /* Player actions */
 .player-actions { display: grid; gap: 8px; }
@@ -1565,3 +1568,57 @@ button.match-pitch-player { cursor: pointer; }
 /* Tactics save */
 .save-tactic-button { min-height: 46px; color: #fff; background: #0b4aa2; border: 0; border-radius: 14px; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
 .save-tactic-message { margin: 0; padding: 9px 12px; color: #0b4aa2; background: #dbe7ff; border-radius: 12px; font-size: 13px; font-weight: 600; text-align: center; }
+
+/* League view tabs: wrap into two rows when > 5 items */
+.league-view-tabs { flex-wrap: wrap; overflow: visible; }
+.league-view-tab { flex: 1 1 calc(33.333% - 4px); min-width: 0; white-space: normal; line-height: 1.1; text-align: center; }
+
+/* Fixture rows shared by Club > Fixtures and League > Fixtures */
+.club-fixtures-group { margin-bottom: 8px; overflow: hidden; background: #fff; border: 1px solid #cfd9f0; border-radius: 15px; }
+.club-fixtures-group-header { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 11px; color: #222e4b; background: #ebf0fb; border-bottom: 1px solid #e2e8f6; }
+.club-fixtures-group-header .fixture-club-crest { width: 16px; height: 18px; font-size: 9px; }
+.club-fixtures-group-header strong { flex: 1; font-size: 9px; font-weight: 700; }
+.club-fixtures-group-header span { color: #1542ac; font-size: 8px; font-weight: 800; }
+.club-fixture-row { border-top: 1px solid #e2e8f6; }
+.club-fixture-row:first-of-type { border-top: 0; }
+.club-fixture-row-main { display: grid; grid-template-columns: minmax(0,1fr) 56px minmax(0,1fr); align-items: center; gap: 6px; width: 100%; min-height: 52px; padding: 6px 11px; color: #43547c; font: inherit; text-align: left; background: transparent; border: 0; cursor: pointer; }
+.club-fixture-row-main:hover { background: #dce5fb; }
+.club-fixture-team { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.club-fixture-team b { overflow: hidden; color: #222e4b; font-size: 8px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.club-fixture-team.own b { color: #10358c; font-weight: 800; }
+.club-fixture-team.away-side { justify-content: flex-end; text-align: right; }
+.club-fixture-team .fixture-club-crest { flex: 0 0 auto; width: 16px; height: 18px; font-size: 9px; }
+.club-fixture-center { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 0 0 auto; }
+.club-fixture-time { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.club-fixture-time strong { color: #1542ac; font-size: 8px; font-weight: 800; }
+.club-fixture-row.upcoming .club-fixture-time strong { color: #222e4b; }
+.club-fixture-row.live .club-fixture-time strong { color: #bf6d53; }
+.club-fixture-time small { color: #5e74a6; font-size: 6px; font-weight: 700; white-space: nowrap; }
+.club-fixture-score { display: flex; align-items: center; gap: 3px; padding: 2px 6px; background: #f4f6fc; border-radius: 6px; }
+.club-fixture-score strong { color: #222e4b; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; line-height: 1; }
+.club-fixture-score em { color: #8a9dc5; font-style: normal; font-size: 10px; }
+
+/* League fixtures panel */
+.league-fixtures-panel { display: flex; flex-direction: column; gap: 8px; padding: 0; }
+.league-fixtures-group { overflow: hidden; background: #fff; border: 1px solid #cfd9f0; border-radius: 15px; }
+.league-empty-note { margin: 0; padding: 24px 16px; color: #778296; font-size: 11px; text-align: center; }
+/* Match center readability */
+.match-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; overflow: visible; }
+.match-tab { min-width: 0; padding: 0 2px; font-size: 10px; white-space: normal; line-height: 1.1; }
+.match-center-topline { font-size: 9px; }
+.match-center-team .entity-link { font-size: 12px; }
+.match-center-date { font-size: 10px; }
+.match-center-content .eyebrow, .match-overview-facts > div > span, .match-watch-card .eyebrow { font-size: 9px; }
+.match-overview-venue > div:nth-child(2) > span:last-child, .match-watch-card .entity-link, .match-watch-card > div > strong, .match-form-team > .entity-link, .match-overview-facts .entity-link, .match-overview-facts > div > strong { font-size: 12px; }
+.match-form-strip i { width: 22px; height: 22px; font-size: 10px; }
+.match-stat-values > span { font-size: 10px; }
+.match-pitch-player > strong { font-size: 9px; }
+.match-pitch-player > small { font-size: 8px; }
+
+.match-lineup-pitch { height: 700px; }
+.lineup-team-tag { font-size: 9px; }
+.match-pitch-player > strong, .match-pitch-player > small { font-size: 8px; }
+
+.match-overview-venue > div:nth-child(2) > span:last-child { font-size: 10px; }
+.match-overview-venue > div:nth-child(2) strong { font-size: 15px; }
+.match-watch-card .eyebrow { font-size: 8px; }

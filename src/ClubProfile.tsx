@@ -1,16 +1,16 @@
 import { useState } from 'react'
-import { club, getClubBadge } from './data/mockData'
+import { club, getClubBadge, matchFixtures } from './data/mockData'
 import ClubBadge from './ClubBadge'
-import type { AcademyProspect, Player, YouthManager } from './types/game'
+import type { AcademyProspect, MatchInfo, Player, YouthManager } from './types/game'
 import { ACADEMY_MAX_SIZE, SENIOR_SQUAD_MAX, generateIntake, generateYouthManager, useAcademy } from './utils/academy'
 import { resolveFlagCode } from './countryFlagUtils'
 
-export type ClubSection = 'Overview' | 'Squad' | 'Tactics' | 'Staff' | 'Sponsorship' | 'Facilities' | 'Academy'
+export type ClubSection = 'Overview' | 'Squad' | 'Tactics' | 'Staff' | 'Sponsorship' | 'Fixtures' | 'Facilities' | 'Academy'
 
 type PositionFilter = 'ALL' | 'GK' | 'DEF' | 'MID' | 'FWD'
 type SortMode = 'Value' | 'Rating' | 'Age'
 
-const sections: ClubSection[] = ['Overview', 'Squad', 'Tactics', 'Staff', 'Sponsorship', 'Facilities', 'Academy']
+const sections: ClubSection[] = ['Overview', 'Squad', 'Tactics', 'Staff', 'Sponsorship', 'Fixtures', 'Facilities', 'Academy']
 const FACILITY_COSTS = { training: 2500000, youth: 1800000, stadium: 3200000 }
 const money = (amount: number) => `£${new Intl.NumberFormat('en-GB').format(amount)}`
 const shortMoney = (amount: number) => `£${(amount / 1000000).toFixed(1)}m`
@@ -23,6 +23,7 @@ interface ClubProfileProps {
   onSelectClub: (name: string) => void
   onSelectPlayer: (player: Player) => void
   onSelectPersonnel: (idOrName: string) => void
+  onSelectMatch: (id: string) => void
 }
 
 function Flag({ code }: { code: string }) {
@@ -41,7 +42,7 @@ function PlayerButton({ player, onSelectPlayer, role, x, y }: { player: Player; 
   return <button aria-label={`Open ${player.name} profile`} className="club-pitch-player" onClick={() => onSelectPlayer(player)} style={{ left: x, top: y }} type="button"><span>{String(player.shirtNumber).padStart(2, '0')}</span><strong>{player.name}</strong>{role && <small>{role}</small>}</button>
 }
 
-export default function ClubProfile({ section, selectedClubName, onSectionChange, onSelectClub, onSelectPlayer, onSelectPersonnel }: ClubProfileProps) {
+export default function ClubProfile({ section, selectedClubName, onSectionChange, onSelectClub, onSelectPlayer, onSelectPersonnel, onSelectMatch }: ClubProfileProps) {
   const [positionFilter, setPositionFilter] = useState<PositionFilter>('ALL')
   const [sortMode, setSortMode] = useState<SortMode>('Value')
   const [, refresh] = useState(0)
@@ -175,6 +176,8 @@ export default function ClubProfile({ section, selectedClubName, onSectionChange
         <section className="club-finance-panel"><div className="club-panel-heading"><div><span className="eyebrow">REVENUE & SPEND</span><h2>Income streams</h2></div></div><div className="finance-line"><span>Sponsorship income <small>per season</small></span><strong>{shortMoney(club.finances.sponsorshipIncomeAnnual)}</strong></div><div className="finance-line"><span>Ticket sales <small>per home match</small></span><strong>{money(club.finances.ticketSalesPerHomeMatch)}</strong></div><div className="finance-line"><span>Weekly wages <small>of {money(club.finances.wageBudget)} budget</small></span><strong>{money(club.finances.weeklyWages)}</strong></div><div className="finance-line"><span>Monthly operations</span><strong>{money(club.finances.operationsPerMonth)}</strong></div></section>
       </>}
 
+      {section === 'Fixtures' && <ClubFixturesSection fixtures={matchFixtures} onSelectMatch={onSelectMatch} />}
+
       {section === 'Facilities' && <>
         <div className="club-subpage-heading"><div><span className="eyebrow">INVEST IN THE FUTURE</span><h2>Facilities</h2></div></div>
         <section className="club-balance-card"><span className="eyebrow">UPGRADE BUDGET</span><strong>{shortMoney(balance)}</strong><div className="balance-columns"><span>Transfer fund <b>{shortMoney(club.finances.transferBudget)}</b></span><span>Monthly operations <b>{money(club.finances.operationsPerMonth)}</b></span></div></section>
@@ -211,4 +214,73 @@ export default function ClubProfile({ section, selectedClubName, onSectionChange
 
 function FacilityUpgrade({ name, level, maxLevel, cost, canAfford, onUpgrade }: { name: string; level: number; maxLevel: number; cost: number; canAfford: boolean; onUpgrade: () => void }) {
   return <article className="facility-row"><div className="facility-level-mark">{level}</div><div className="facility-info"><strong>{name}</strong><span>Level {level} of {maxLevel}</span><div className="facility-levels">{Array.from({ length: maxLevel }, (_, index) => <i className={index < level ? 'filled' : ''} key={index} />)}</div></div><button aria-label={`Upgrade ${name} for ${shortMoney(cost)}`} className="facility-upgrade" disabled={level >= maxLevel || !canAfford} onClick={onUpgrade} type="button">{level >= maxLevel ? 'MAX' : `+ ${shortMoney(cost)}`}</button></article>
+}
+
+const dayMonth = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' })
+const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'short' })
+function parseDate(date: string) { return new Date(`${date}T12:00:00`) }
+
+function ClubFixturesSection({ fixtures, onSelectMatch }: { fixtures: MatchInfo[]; onSelectMatch: (id: string) => void }) {
+  const sorted = [...fixtures].sort((a, b) => `${a.date}${a.kickOff}`.localeCompare(`${b.date}${b.kickOff}`))
+  const groups: { label: string; list: MatchInfo[] }[] = []
+  const completed = sorted.filter((m) => m.status === 'Completed')
+  const live = sorted.filter((m) => m.status === 'Live')
+  const upcoming = sorted.filter((m) => m.status === 'Upcoming')
+  if (completed.length) groups.push({ label: 'Results', list: completed })
+  if (live.length) groups.push({ label: 'Live', list: live })
+  if (upcoming.length) groups.push({ label: 'Upcoming', list: upcoming })
+
+  return (
+    <>
+      <div className="club-subpage-heading">
+        <div><span className="eyebrow">SCHEDULE · {fixtures.length} MATCHES</span><h2>Fixtures &amp; results</h2></div>
+      </div>
+      {groups.map(({ label, list }) => (
+        <section className="club-fixtures-group" key={label}>
+          <header className="club-fixtures-group-header">
+            <i className="fixture-club-crest">{label.slice(0, 1)}</i>
+            <strong>{label}</strong>
+            <span>{list.length}</span>
+          </header>
+          {list.map((match) => {
+            const done = match.status === 'Completed'
+            const live = match.status === 'Live'
+            const homeOwn = match.homeClubId === club.id
+            const awayOwn = match.awayClubId === club.id
+            return (
+              <div className={`club-fixture-row ${match.status.toLowerCase()}`} key={match.id}>
+                <span className="club-fixture-competition">{match.competition}</span>
+                <button
+                  aria-label={`Open ${match.homeClubName} vs ${match.awayClubName} match details`}
+                  className="club-fixture-row-main"
+                  onClick={() => onSelectMatch(match.id)}
+                  type="button"
+                >
+                  <span className={`club-fixture-team ${homeOwn ? 'own' : ''}`}>
+                    <i className={`fixture-club-crest ${homeOwn ? '' : 'away'}`}>{match.homeClubName.slice(0, 1)}</i>
+                    <b>{match.homeClubName}</b>
+                  </span>
+                  <span className="club-fixture-center">
+                    <span className="club-fixture-time">
+                      <strong>{live ? 'LIVE' : done ? 'FT' : match.kickOff}</strong>
+                      <small>{weekday.format(parseDate(match.date)).toUpperCase()} {dayMonth.format(parseDate(match.date))}</small>
+                    </span>
+                    <span className="club-fixture-score">
+                      <strong>{match.score?.home ?? '-'}</strong>
+                      <em>-</em>
+                      <strong>{match.score?.away ?? '-'}</strong>
+                    </span>
+                  </span>
+                  <span className={`club-fixture-team away-side ${awayOwn ? 'own' : ''}`}>
+                    <b>{match.awayClubName}</b>
+                    <i className={`fixture-club-crest ${awayOwn ? '' : 'away'}`}>{match.awayClubName.slice(0, 1)}</i>
+                  </span>
+                </button>
+              </div>
+            )
+          })}
+        </section>
+      ))}
+    </>
+  )
 }

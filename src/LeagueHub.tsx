@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { club, currentMatchday, leagueCompetitions, leagueHistory, leaguePlayerStats, leagueStandings, totalMatchdays } from './data/mockData'
+import { club, currentMatchday, leagueCompetitions, leagueHistory, leaguePlayerStats, leagueStandings, matchFixtures, totalMatchdays } from './data/mockData'
 import rawGlobalLeagues from './data/globalLeaguesAndTeams.json'
 import rawInternationalTournaments from './data/internationalTournaments.json'
 import LeagueClubSquad from './LeagueClubSquad'
@@ -10,9 +10,9 @@ import KnockoutBracket from './KnockoutBracket'
 import { findWorldCountry, worldCountries } from './worldCountries'
 
 const categories: LeagueCategory[] = ['Domestic Leagues', 'Continental Competitions', 'International']
-const leagueSections = ['Standings', 'Player Stats', 'Team Stats', 'Rules', 'History'] as const
+const leagueSections = ['Standings', 'Player Stats', 'Team Stats', 'Fixtures', 'Rules', 'History'] as const
 type LeagueSection = (typeof leagueSections)[number]
-type PlayerStatKey = 'goals' | 'assists' | 'cleanSheets'
+type PlayerStatKey = 'goals' | 'assists' | 'cleanSheets' | 'cards' | 'rating'
 const globalLeagues = rawGlobalLeagues as unknown as GlobalLeaguesDatabase
 
 function adaptGlobalLeague(countryLeague: GlobalCountryLeague): LeagueCompetition {
@@ -87,7 +87,7 @@ function adaptTournament(tournament: InternationalTournament): LeagueCompetition
     totalMatchdays: fieldCodes.length,
     standings,
     teamStats: standings.map((team, index) => ({ clubId: team.clubId, clubName: team.clubName, possession: 55 + index % 6 * 3, goals: team.goalsFor, cleanSheets: Math.max(0, 3 - team.goalsAgainst % 4), cards: 3 + index % 7 })),
-    playerStats: { goals: [], assists: [], cleanSheets: [] },
+    playerStats: { goals: [], assists: [], cleanSheets: [], cards: [], rating: [] },
     rules: tournament.rules,
     history: tournament.history.map((record) => ({ ...record, points: 0 })),
   }
@@ -130,9 +130,10 @@ interface LeagueHubProps {
   selectedClubId: string | null
   onSelectClub: (clubId: string) => void
   onSelectPlayer: (player: Player) => void
+  onSelectMatch: (id: string) => void
 }
 
-export default function LeagueHub({ selectedCompetitionId, onSelectCompetition, onSelectCountry, selectedClubId, onSelectClub, onSelectPlayer }: LeagueHubProps) {
+export default function LeagueHub({ selectedCompetitionId, onSelectCompetition, onSelectCountry, selectedClubId, onSelectClub, onSelectPlayer, onSelectMatch }: LeagueHubProps) {
   const [category, setCategory] = useState<LeagueCategory>('Domestic Leagues')
   const [openRegion, setOpenRegion] = useState('Nigeria')
   const [section, setSection] = useState<LeagueSection>('Standings')
@@ -189,15 +190,82 @@ export default function LeagueHub({ selectedCompetitionId, onSelectCompetition, 
           return team ? <ClubBadge badge={team.badge} name={team.name} /> : null
         }} />}
 
-        {section === 'Player Stats' && <section className="league-data-panel"><div className="player-stat-switch">{([['goals', 'Goals'], ['assists', 'Assists'], ['cleanSheets', 'Clean Sheets']] as const).map(([key, label]) => <button aria-pressed={playerStat === key} className={playerStat === key ? 'player-stat-choice active' : 'player-stat-choice'} key={key} onClick={() => setPlayerStat(key)} type="button">{label}</button>)}</div>
-          <div className="league-ranking-list">{players.map((player, index) => <article className="league-ranking-row" key={player.playerId}><span>{String(index + 1).padStart(2, '0')}</span><div><strong>{player.name}</strong><small>{player.clubName}</small></div><b>{player.value}</b></article>)}</div>
+        {section === 'Player Stats' && <section className="league-data-panel"><div className="player-stat-switch">{([['goals', 'Goals'], ['assists', 'Assists'], ['cleanSheets', 'Clean Sheets'], ['cards', 'Cards'], ['rating', 'Rating']] as const).map(([key, label]) => <button aria-pressed={playerStat === key} className={playerStat === key ? 'player-stat-choice active' : 'player-stat-choice'} key={key} onClick={() => setPlayerStat(key)} type="button">{label}</button>)}</div>
+          <div className="league-ranking-list">{players.map((player, index) => <article className="league-ranking-row" key={player.playerId}><span>{String(index + 1).padStart(2, '0')}</span><div><strong>{player.name}</strong><small>{player.clubName}</small></div><b>{playerStat === 'rating' ? player.value.toFixed(2) : player.value}<small className="stat-apps"> {playerStat === 'cards' ? `${(player as { yellow?: number }).yellow ?? 0}Y ${(player as { red?: number }).red ?? 0}R · ` : ''}apps {player.apps}</small></b></article>)}</div>
         </section>}
 
         {section === 'Team Stats' && <section className="league-data-panel"><div className="team-stats-header"><span>TEAM</span><span>POSS</span><span>GOALS</span><span>CS</span><span>CARDS</span></div>{currentCompetition.teamStats.map((team, index) => <article className="team-stat-row" key={team.clubId}><span>{index + 1}. {team.clubName}</span><span>{team.possession}%</span><span>{team.goals}</span><span>{team.cleanSheets}</span><span>{team.cards}</span></article>)}</section>}
+
+        {section === 'Fixtures' && <LeagueFixturesSection competitionName={currentCompetition.name} onSelectMatch={onSelectMatch} />}
 
         {section === 'Rules' && <section className="league-data-panel league-rules-list">{currentCompetition.rules.map((rule, index) => <article className="league-rule-row" key={rule}><span>{String(index + 1).padStart(2, '0')}</span><p>{rule}</p></article>)}</section>}
 
         {section === 'History' && <section className="league-data-panel league-history-list">{currentCompetition.history.map((record) => <article className="league-history-row" key={record.season}><span>{record.season}</span><div><strong>{record.champion}</strong><small>Runners-up · {record.runnerUp}</small></div><b>{record.points} pts</b></article>)}</section>}
       </section>}
   </div>
+}
+
+function LeagueFixturesSection({ competitionName, onSelectMatch }: { competitionName: string; onSelectMatch: (id: string) => void }) {
+  const fixtures = matchFixtures.filter((m) => m.competition === competitionName)
+  const all = fixtures.length ? fixtures : matchFixtures
+  const sorted = [...all].sort((a, b) => `${a.date}${a.kickOff}`.localeCompare(`${b.date}${b.kickOff}`))
+  const groups: { label: string; list: typeof sorted }[] = []
+  const completed = sorted.filter((m) => m.status === 'Completed')
+  const live = sorted.filter((m) => m.status === 'Live')
+  const upcoming = sorted.filter((m) => m.status === 'Upcoming')
+  if (completed.length) groups.push({ label: 'Results', list: completed })
+  if (live.length) groups.push({ label: 'Live', list: live })
+  if (upcoming.length) groups.push({ label: 'Upcoming', list: upcoming })
+  const fmt = { day: new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }), wday: new Intl.DateTimeFormat('en-GB', { weekday: 'short' }) }
+  return (
+    <section className="league-data-panel league-fixtures-panel">
+      {groups.map(({ label, list }) => (
+        <div className="league-fixtures-group" key={label}>
+          <header className="club-fixtures-group-header">
+            <i className="fixture-club-crest">{label.slice(0, 1)}</i>
+            <strong>{label}</strong>
+            <span>{list.length}</span>
+          </header>
+          {list.map((match) => {
+            const done = match.status === 'Completed'
+            const isLive = match.status === 'Live'
+            const homeOwn = match.homeClubId === club.id
+            const awayOwn = match.awayClubId === club.id
+            const dateObj = new Date(`${match.date}T12:00:00`)
+            return (
+              <div className={`club-fixture-row ${match.status.toLowerCase()}`} key={match.id}>
+                <button
+                  aria-label={`Open ${match.homeClubName} vs ${match.awayClubName} match details`}
+                  className="club-fixture-row-main"
+                  onClick={() => onSelectMatch(match.id)}
+                  type="button"
+                >
+                  <span className={`club-fixture-team ${homeOwn ? 'own' : ''}`}>
+                    <i className={`fixture-club-crest ${homeOwn ? '' : 'away'}`}>{match.homeClubName.slice(0, 1)}</i>
+                    <b>{match.homeClubName}</b>
+                  </span>
+                  <span className="club-fixture-center">
+                    <span className="club-fixture-time">
+                      <strong>{isLive ? 'LIVE' : done ? 'FT' : match.kickOff}</strong>
+                      <small>{fmt.wday.format(dateObj).toUpperCase()} {fmt.day.format(dateObj)}</small>
+                    </span>
+                    <span className="club-fixture-score">
+                      <strong>{match.score?.home ?? '-'}</strong>
+                      <em>-</em>
+                      <strong>{match.score?.away ?? '-'}</strong>
+                    </span>
+                  </span>
+                  <span className={`club-fixture-team away-side ${awayOwn ? 'own' : ''}`}>
+                    <b>{match.awayClubName}</b>
+                    <i className={`fixture-club-crest ${awayOwn ? '' : 'away'}`}>{match.awayClubName.slice(0, 1)}</i>
+                  </span>
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      ))}
+      {!groups.length && <p className="league-empty-note">No fixtures recorded for this competition.</p>}
+    </section>
+  )
 }

@@ -35,9 +35,12 @@ function FormStrip({ results }: { results: ('W' | 'D' | 'L')[] }) {
 
 function MatchPitchPlayer({ player, team, clubId, onSelectPlayer }: { player: MatchLineupPlayer; team: 'home' | 'away'; clubId: string; onSelectPlayer: (player: Player) => void }) {
   const squadPlayer = player.playerId ? getClubSquad(clubId).find((candidate) => candidate.id === player.playerId) : undefined
+  const slotY = team === 'home' ? player.y : 100 - player.y
+  const halfY = 56 + (slotY - 28) / 63 * 31
+  const top = team === 'home' ? halfY : 100 - halfY
   const content = <><span className="match-pitch-shirt">{String(player.shirtNumber).padStart(2, '0')}</span><strong>{player.name.split(' ')[0]}</strong><small>{player.position}</small></>
-  return squadPlayer ? <button aria-label={`Open ${player.name} profile`} className={`match-pitch-player ${team}`} onClick={() => onSelectPlayer(squadPlayer)} style={{ left: `${player.x}%`, top: `${player.y}%` }} type="button">{content}</button>
-    : <div className={`match-pitch-player ${team}`} style={{ left: `${player.x}%`, top: `${player.y}%` }}>{content}</div>
+  return squadPlayer ? <button aria-label={`Open ${player.name} profile`} className={`match-pitch-player ${team}`} onClick={() => onSelectPlayer(squadPlayer)} style={{ left: `${player.x}%`, top: `${top}%` }} type="button">{content}</button>
+    : <div className={`match-pitch-player ${team}`} style={{ left: `${player.x}%`, top: `${top}%` }}>{content}</div>
 }
 
 function StatBar({ label, home, away, suffix = '' }: { label: string; home: number; away: number; suffix?: string }) {

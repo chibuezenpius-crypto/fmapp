@@ -197,9 +197,11 @@ export interface LeagueCompetition {
   totalMatchdays: number
   standings: LeagueStanding[]
   playerStats: {
-    goals: { playerId: string; name: string; clubName: string; value: number }[]
-    assists: { playerId: string; name: string; clubName: string; value: number }[]
-    cleanSheets: { playerId: string; name: string; clubName: string; value: number }[]
+    goals: { playerId: string; name: string; clubName: string; value: number; apps: number }[]
+    assists: { playerId: string; name: string; clubName: string; value: number; apps: number }[]
+    cleanSheets: { playerId: string; name: string; clubName: string; value: number; apps: number }[]
+    cards: { playerId: string; name: string; clubName: string; value: number; apps: number; yellow: number; red: number }[]
+    rating: { playerId: string; name: string; clubName: string; value: number; apps: number }[]
   }
   teamStats: { clubId: string; clubName: string; possession: number; goals: number; cleanSheets: number; cards: number }[]
   rules: string[]
