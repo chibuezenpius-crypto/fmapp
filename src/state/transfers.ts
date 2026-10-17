@@ -1,8 +1,8 @@
-import { club, getTransferMarketPlayers, isOwnPlayer, ownLeagueRules, playerClubName, removeFromList, reorderClubSquad, SQUAD_MAX, SQUAD_MIN } from '../data/mockData'
+import { club, getFFPWageLimit, getTransferMarketPlayers, getWageBudgetLimit, isOwnPlayer, ownLeagueRules, playerClubName, removeFromList, reorderClubSquad, SQUAD_MAX, SQUAD_MIN } from '../data/mockData'
 import { getClubSquad } from '../data/clubSquads'
 import { createRng } from '../utils/proceduralGenerator'
 import type { Player } from '../types/game'
-import { getDate, LEDGER_KEY, notify } from './gameStore'
+import { getDate, LEDGER_KEY, notify, reportGameMessage } from './gameStore'
 
 export interface BidTerms {
   fee: number
@@ -20,11 +20,17 @@ export interface DealResult {
 type LedgerEntry =
   | { type: 'sign'; playerId: string; fromClubId: string; fee: number; wage: number; endDate: string; date: string }
   | { type: 'release'; playerId: string; date: string }
-  | { type: 'renew'; playerId: string; wage: number; endDate: string; date: string }
+  | { type: 'renew'; playerId: string; wage: number; endDate: string; date: string; offer?: Player['contract']['offerHistory'][number] }
+  | { type: 'offer'; playerId: string; date: string; offer: Player['contract']['offerHistory'][number] }
 
 const money = (amount: number) => `£${(amount / 1000000).toFixed(1)}m`
 const round = (value: number, step: number) => Math.round(value / step) * step
-const wageLimit = () => club.finances.wageBudget * ownLeagueRules.financial.wageBudgetTolerance
+function wageRuleFailure(proposedWeeklyWages: number) {
+  if (!ownLeagueRules.financial.blockOverspending) return ''
+  if (proposedWeeklyWages > getWageBudgetLimit()) return `The wage bill would exceed the £${Math.round(getWageBudgetLimit()).toLocaleString('en-GB')}/wk budget limit.`
+  if (proposedWeeklyWages > getFFPWageLimit()) return `The wage bill would exceed the FFP wage-to-income limit of £${Math.round(getFFPWageLimit()).toLocaleString('en-GB')}/wk.`
+  return ''
+}
 
 const contractEnd = (years: number) => {
   const now = new Date(`${getDate()}T12:00:00Z`)
@@ -53,19 +59,41 @@ export function getWageDemand(player: Player): number {
 
 // ---------- Ledger ----------
 function readLedger(): LedgerEntry[] {
+  const saved = window.localStorage.getItem(LEDGER_KEY)
+  if (!saved) return []
   try {
-    const parsed: unknown = JSON.parse(window.localStorage.getItem(LEDGER_KEY) ?? '[]')
-    return Array.isArray(parsed) ? parsed as LedgerEntry[] : []
-  } catch {
-    return []
+    const parsed: unknown = JSON.parse(saved)
+    if (!Array.isArray(parsed) || !parsed.every(isLedgerEntry)) throw new Error('The transfer ledger has an invalid format.')
+    return parsed
+  } catch (error) {
+    throw new Error(error instanceof Error ? `Could not read the transfer ledger: ${error.message}` : 'Could not read the transfer ledger.')
   }
 }
 
-function record(entry: LedgerEntry) {
+function isLedgerEntry(value: unknown): value is LedgerEntry {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const entry = value as Record<string, unknown>
+  if (typeof entry.playerId !== 'string' || typeof entry.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date)) return false
+  if (entry.type === 'sign') return typeof entry.fromClubId === 'string' && Number.isFinite(entry.fee) && Number.isFinite(entry.wage) && typeof entry.endDate === 'string'
+  if (entry.type === 'release') return true
+  if (entry.type === 'offer') return isContractOffer(entry.offer)
+  return entry.type === 'renew' && Number.isFinite(entry.wage) && typeof entry.endDate === 'string' && (entry.offer === undefined || isContractOffer(entry.offer))
+}
+
+function isContractOffer(value: unknown): value is Player['contract']['offerHistory'][number] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const offer = value as Record<string, unknown>
+  return typeof offer.clubName === 'string' && typeof offer.date === 'string'
+    && (offer.status === 'Accepted' || offer.status === 'Declined')
+    && Number.isFinite(offer.weeklyWage) && typeof offer.reason === 'string'
+}
+
+function record(entry: LedgerEntry): string | null {
   try {
     window.localStorage.setItem(LEDGER_KEY, JSON.stringify([...readLedger(), entry]))
-  } catch {
-    // The deal still applies for this session even if persistence is unavailable.
+    return null
+  } catch (error) {
+    return error instanceof Error ? error.message : 'The transfer ledger could not be saved.'
   }
 }
 
@@ -82,6 +110,7 @@ function applySign(player: Player, fromClubId: string, fee: number, wage: number
   removeFromList(fromClubId ? getClubSquad(fromClubId) : undefined, player)
   removeFromList(getTransferMarketPlayers(), player)
   club.finances.transferBudget -= fee
+  club.finances.balance -= fee
   club.finances.weeklyWages += wage
   player.contract = { ...player.contract, clubId: club.id, weeklyWage: wage, endDate, startDate: date, squadRole: 'Squad Player' }
   player.shirtNumber = nextShirtNumber()
@@ -94,7 +123,8 @@ function applyRelease(player: Player) {
   removeFromList(club.squad, player)
   club.finances.weeklyWages -= player.contract.weeklyWage
   player.contract = { ...player.contract, clubId: '', squadRole: 'Squad Player' }
-  getTransferMarketPlayers().push(player)
+  const market = getTransferMarketPlayers()
+  if (!market.some((candidate) => candidate.id === player.id)) market.push(player)
 }
 
 function applyRenew(player: Player, wage: number, endDate: string) {
@@ -107,13 +137,17 @@ export function submitBid(player: Player, terms: BidTerms): DealResult {
   const date = getDate()
   const free = !player.contract.clubId
   if (isOwnPlayer(player)) return { status: 'failed', message: `${player.name} is already in your squad.` }
+  if (!getTransferMarketPlayers().some((candidate) => candidate.id === player.id)) return { status: 'failed', message: `${player.name} is no longer available in the transfer market.` }
+  if (!Number.isFinite(terms.fee) || terms.fee < 0 || !Number.isFinite(terms.wageMultiplier) || terms.wageMultiplier < 0.5 || terms.wageMultiplier > 2.5 || !Number.isInteger(terms.years) || terms.years < 1 || terms.years > 5) {
+    return { status: 'failed', message: 'The offer terms are invalid.' }
+  }
   if (club.squad.length >= SQUAD_MAX) return { status: 'failed', message: `Your squad is full (${SQUAD_MAX} players).` }
 
   const fee = free ? 0 : terms.fee
   const wage = round(getWageDemand(player) * terms.wageMultiplier, 50)
   const demand = getWageDemand(player)
 
-  if (fee > club.finances.transferBudget) return { status: 'failed', message: `You cannot afford ${money(fee)}. Your budget is ${money(club.finances.transferBudget)}.` }
+  if (fee > club.finances.transferBudget || fee > club.finances.balance) return { status: 'failed', message: `You cannot afford ${money(fee)}. Your budget is ${money(Math.min(club.finances.transferBudget, club.finances.balance))}.` }
 
   if (!free) {
     const clause = player.contract.releaseClause
@@ -131,8 +165,9 @@ export function submitBid(player: Player, terms: BidTerms): DealResult {
     }
   }
 
-  if (ownLeagueRules.financial.blockOverspending && club.finances.weeklyWages + wage > wageLimit()) {
-    return { status: 'failed', message: `Financial fair play: this ${wage.toLocaleString('en-GB')}/wk wage would take the wage bill above the £${Math.round(wageLimit()).toLocaleString('en-GB')}/wk limit.` }
+  const wageFailure = wageRuleFailure(club.finances.weeklyWages + wage)
+  if (wageFailure) {
+    return { status: 'failed', message: `Financial fair play: ${wageFailure}` }
   }
   if (wage < demand) {
     return { status: 'rejected', message: `${player.name} rejected personal terms: he wants at least £${demand.toLocaleString('en-GB')}/wk.` }
@@ -140,8 +175,9 @@ export function submitBid(player: Player, terms: BidTerms): DealResult {
 
   const fromClubId = player.contract.clubId
   const endDate = contractEnd(terms.years)
+  const persistError = record({ type: 'sign', playerId: player.id, fromClubId, fee, wage, endDate, date })
+  if (persistError) return { status: 'failed', message: `The deal was not completed because it could not be saved: ${persistError}` }
   applySign(player, fromClubId, fee, wage, endDate, date)
-  record({ type: 'sign', playerId: player.id, fromClubId, fee, wage, endDate, date })
   notify()
   return { status: 'accepted', message: `${player.name} signed for ${fee > 0 ? money(fee) : 'free'} on £${wage.toLocaleString('en-GB')}/wk until ${endDate.slice(0, 4)}.` }
 }
@@ -149,48 +185,69 @@ export function submitBid(player: Player, terms: BidTerms): DealResult {
 export function releasePlayer(player: Player): string {
   if (!isOwnPlayer(player)) return 'This player is not in your squad.'
   if (club.squad.length <= SQUAD_MIN) return `You need at least ${SQUAD_MIN} players in the squad.`
+  const persistError = record({ type: 'release', playerId: player.id, date: getDate() })
+  if (persistError) return `The release was not completed because it could not be saved: ${persistError}`
   applyRelease(player)
-  record({ type: 'release', playerId: player.id, date: getDate() })
   notify()
   return `${player.name} has been released and is now a free agent.`
 }
 
 export function renewContract(player: Player, years: number, raisePercent: number): DealResult {
+  if (!isOwnPlayer(player)) return { status: 'failed', message: `${player.name} is not in your squad.` }
+  if (!Number.isInteger(years) || years < 1 || years > 5 || !Number.isFinite(raisePercent) || raisePercent < 0 || raisePercent > 100) {
+    return { status: 'failed', message: 'The contract offer terms are invalid.' }
+  }
   const needed = { 'Very Good': 0, Good: 5, Okay: 10, Poor: 20 }[player.morale]
   const wage = round(player.contract.weeklyWage * (1 + raisePercent / 100), 50)
   const date = getDate()
   let reason = 'Happy with the project and terms'
   let accepted = raisePercent >= needed
   if (!accepted) reason = `Wants a wage rise of at least ${needed}%`
-  else if (ownLeagueRules.financial.blockOverspending && club.finances.weeklyWages + wage - player.contract.weeklyWage > wageLimit()) {
-    accepted = false
-    reason = 'The club cannot afford this wage under financial fair play'
+  else {
+    const failure = wageRuleFailure(club.finances.weeklyWages + wage - player.contract.weeklyWage)
+    if (failure) {
+      accepted = false
+      reason = `The club cannot afford this wage under financial fair play: ${failure}`
+    }
   }
-  player.contract = { ...player.contract, offerHistory: [{ clubName: club.name, date, status: accepted ? 'Accepted' : 'Declined', weeklyWage: wage, reason }, ...player.contract.offerHistory] }
+  const offer = { clubName: club.name, date, status: accepted ? 'Accepted' as const : 'Declined' as const, weeklyWage: wage, reason }
   if (!accepted) {
+    const persistError = record({ type: 'offer', playerId: player.id, date, offer })
+    if (persistError) return { status: 'failed', message: `The offer was not recorded because it could not be saved: ${persistError}` }
+    player.contract = { ...player.contract, offerHistory: [offer, ...player.contract.offerHistory] }
     notify()
     return { status: 'rejected', message: `${player.name} rejected the offer: ${reason}.` }
   }
   const endDate = contractEnd(years)
+  const persistError = record({ type: 'renew', playerId: player.id, wage, endDate, date, offer })
+  if (persistError) return { status: 'failed', message: `The renewal was not completed because it could not be saved: ${persistError}` }
+  player.contract = { ...player.contract, offerHistory: [offer, ...player.contract.offerHistory] }
   applyRenew(player, wage, endDate)
-  record({ type: 'renew', playerId: player.id, wage, endDate, date })
   notify()
   return { status: 'accepted', message: `${player.name} signed a ${years}-year deal on £${wage.toLocaleString('en-GB')}/wk.` }
 }
 
 // ---------- Restore a saved game ----------
 function restoreTransfers() {
-  for (const entry of readLedger()) {
-    if (entry.type === 'sign') {
-      const player = (entry.fromClubId ? getClubSquad(entry.fromClubId) : getTransferMarketPlayers()).find((member) => member.id === entry.playerId)
-        ?? getTransferMarketPlayers().find((member) => member.id === entry.playerId)
-      if (player) applySign(player, entry.fromClubId, entry.fee, entry.wage, entry.endDate, entry.date)
-    } else {
-      const player = club.squad.find((member) => member.id === entry.playerId)
-      if (!player) continue
-      if (entry.type === 'release') applyRelease(player)
-      else applyRenew(player, entry.wage, entry.endDate)
+  try {
+    for (const entry of readLedger()) {
+      if (entry.type === 'sign') {
+        const player = (entry.fromClubId ? getClubSquad(entry.fromClubId) : getTransferMarketPlayers()).find((member) => member.id === entry.playerId)
+          ?? getTransferMarketPlayers().find((member) => member.id === entry.playerId)
+        if (!player) throw new Error(`Cannot restore transfer for player "${entry.playerId}".`)
+        applySign(player, entry.fromClubId, entry.fee, entry.wage, entry.endDate, entry.date)
+      } else {
+        const player = club.squad.find((member) => member.id === entry.playerId)
+        if (!player) throw new Error(`Cannot restore contract update for player "${entry.playerId}".`)
+        if (entry.type === 'release') applyRelease(player)
+        else if (entry.type === 'renew') {
+          applyRenew(player, entry.wage, entry.endDate)
+          if (entry.offer) player.contract = { ...player.contract, offerHistory: [entry.offer, ...player.contract.offerHistory] }
+        } else player.contract = { ...player.contract, offerHistory: [entry.offer, ...player.contract.offerHistory] }
+      }
     }
+  } catch (error) {
+    reportGameMessage(error instanceof Error ? error.message : 'Could not restore saved transfers.')
   }
 }
 

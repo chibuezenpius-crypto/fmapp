@@ -541,7 +541,6 @@ export function generatePlayer(options: PlayerGenerationOptions = {}): Player {
   const potential = generatePotential(finalOverall, age, random)
   const personality = generatePersonality(age, finalOverall, random, options.teammateNames ?? [], options.personnelNames ?? [])
   const value = marketValue(finalOverall, potential, age)
-  const clubName = club?.name ?? 'Free Agent'
   const contractStart = addMonths(today, -intBetween(random, 1, 36))
   const contractEnd = addMonths(today, intBetween(random, 6, 54))
   const idSuffix = Array.from({ length: 3 }, () => Math.floor(unit(random) * 0xffffff).toString(16).padStart(6, '0')).join('')

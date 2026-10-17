@@ -102,15 +102,20 @@ export function getCompetitionRules(competitionId: string): CompetitionRules {
 
 export function describeRules(rules: CompetitionRules, extra: readonly string[] = []): string[] {
   const lines: string[] = []
-  if (rules.format === 'League') {
+  if (rules.format === 'League' || rules.format === 'Groups and knockout') {
     lines.push(`Points: ${rules.pointsForWin} for a win, ${rules.pointsForDraw} for a draw, ${rules.pointsForLoss} for a defeat.`)
     lines.push(`Table order: points, then ${rules.tiebreakers.map((rule) => rule.toLowerCase()).join(', then ')}.`)
+  }
+  if (rules.format === 'League') {
     lines.push(rules.promotionSlots > 0 ? `${rules.promotionSlots} clubs are promoted each season.` : 'Top division: there is no promotion above this league.')
     lines.push(`${rules.relegationSlots} clubs are relegated at the end of the season.`)
     if (rules.continentalSlots > 0) lines.push(`The top ${rules.continentalSlots} clubs qualify for continental competition.`)
-  } else {
+  } else if (rules.format === 'Cup') {
     lines.push('Knockout ties are decided over one match; the higher score advances.')
     if (rules.extraTimeAndPenalties) lines.push('Level ties go to extra time and then a penalty shoot-out.')
+  } else {
+    lines.push('Group-stage results determine qualification for the knockout rounds.')
+    if (rules.extraTimeAndPenalties) lines.push('Knockout ties level after 90 minutes go to extra time and then a penalty shoot-out.')
   }
   lines.push(`Squad size: ${rules.squadMin} to ${rules.squadMax} registered players; ${rules.matchdaySquadSize} in the matchday squad.`)
   lines.push(`Up to ${rules.maxSubstitutions} substitutions are permitted per match.`)

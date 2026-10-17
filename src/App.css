@@ -183,7 +183,8 @@
 .budget-strip strong { color: #5b9bff; font-size: 12px; }
 .advance-day-button { margin-left: auto; padding: 4px 10px; color: #0f172a; background: #f5c451; border: 0; border-radius: 8px; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; }
 .advance-day-button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-.advance-day-error { grid-column: 1 / -1; padding: 6px 8px; color: #ffd4cf; background: #5b1f1a; border-radius: 8px; font-size: 10px; line-height: 1.4; }
+.advance-day-error { display: flex; grid-column: 1 / -1; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; color: #ffd4cf; background: #5b1f1a; border-radius: 8px; font-size: 10px; line-height: 1.4; }
+.advance-day-error button { padding: 0 4px; color: inherit; background: transparent; border: 0; font: inherit; font-size: 14px; cursor: pointer; }
 .main-content { min-height: calc(100vh - 148px); padding: 21px 18px 35px; animation: arrive .25s ease both; }
 @keyframes arrive { from { opacity: .5; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 .eyebrow { display: block; color: #5c6f9c; font-size: 9px; font-weight: 800; letter-spacing: .12em; }
@@ -1456,6 +1457,9 @@ button.match-pitch-player { cursor: pointer; }
 .team-status-footer { margin-top: 8px; background: #e4eaf5; border-radius: 14px 14px 22px 22px; border-bottom: 3px solid #0b4aa2; }
 .confidence-card { gap: 8px; padding: 0; }
 .confidence-item { padding: 12px; background: #e4eaf5; border-bottom: 3px solid #0b4aa2; border-radius: 14px 14px 22px 22px; }
+.confidence-link { width: 100%; padding: 12px; color: inherit; border: 0; font: inherit; text-align: left; cursor: pointer; }
+.confidence-link:hover .confidence-title, .confidence-link:focus-visible .confidence-title { color: #0b4aa2; }
+.confidence-link:focus-visible { outline: 2px solid #2465e8; outline-offset: 2px; }
 .confidence-fill { background: #0b4aa2; }
 .confidence-track { background: #fff; }
 .metric-status-tag.clean, .metric-status-tag.morale, .metric-status-tag.chemistry { color: #fff; background: #0b4aa2; }

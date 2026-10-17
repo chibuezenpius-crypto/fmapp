@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { club, currentMatchday, league, leagueCompetitions, leagueHistory, leaguePlayerStats, leagueStandings, totalMatchdays } from './data/mockData'
+import { club, league, leagueCompetitions, leagueStandings, totalMatchdays } from './data/mockData'
+import { describeRules, getCompetitionRules } from './data/competitionRules'
 import rawGlobalLeagues from './data/globalLeaguesAndTeams.json'
 import rawInternationalTournaments from './data/internationalTournaments.json'
 import LeagueClubSquad from './LeagueClubSquad'
@@ -25,12 +26,13 @@ function adaptGlobalLeague(countryLeague: GlobalCountryLeague): LeagueCompetitio
     country: countryLeague.countryName,
     category: 'Domestic Leagues',
     season: countryLeague.season,
-    matchday: currentMatchday(countryLeague),
+    matchday: 0,
     totalMatchdays: totalMatchdays(countryLeague),
     standings,
-    playerStats: leaguePlayerStats(countryLeague.teams.map((team) => team.id)),
-    history: leagueHistory(countryLeague),
-    teamStats: countryLeague.teams.map((team, index) => ({ clubId: team.id, clubName: team.name, possession: 58 - (index % 8) * 3, goals: team.standing.goalsFor, cleanSheets: Math.max(1, 8 - Math.floor(index / 3)), cards: 14 + index % 9 })),
+    playerStats: { goals: [], assists: [], cleanSheets: [], cards: [], rating: [] },
+    history: [],
+    teamStats: countryLeague.teams.map((team) => ({ clubId: team.id, clubName: team.name, possession: 0, goals: 0, cleanSheets: 0, cards: 0 })),
+    rules: describeRules(getCompetitionRules(countryLeague.id)),
   }
 }
 
@@ -55,26 +57,21 @@ function adaptTournament(tournament: InternationalTournament): LeagueCompetition
   const fieldCodes = tournamentFieldCodes(tournament)
   const standings: LeagueStanding[] = fieldCodes.map((code, index) => {
     const country = findTournamentCountry(code)
-    const played = 3
-    const won = index % 3 === 0 ? 2 : 1
-    const drawn = index % 3 === 1 ? 1 : 0
-    const goalsFor = 4 + index % 5
-    const goalsAgainst = 2 + (index + 2) % 4
     return {
       position: index + 1,
       clubId: code,
       clubName: `${country?.countryName ?? code} National Team`,
-      played,
-      won,
-      drawn,
-      lost: played - won - drawn,
-      goalsFor,
-      goalsAgainst,
-      goalDifference: goalsFor - goalsAgainst,
-      points: won * 3 + drawn,
-      form: ['W', 'D', 'W'] as ('W' | 'D' | 'L')[],
+      played: 0,
+      won: 0,
+      drawn: 0,
+      lost: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      goalDifference: 0,
+      points: 0,
+      form: [],
     }
-  }).sort((first, second) => second.points - first.points || second.goalDifference - first.goalDifference)
+  }).sort((first, second) => first.clubName.localeCompare(second.clubName)).map((standing, index) => ({ ...standing, position: index + 1 }))
 
   return {
     ...sample,
@@ -86,22 +83,18 @@ function adaptTournament(tournament: InternationalTournament): LeagueCompetition
     matchday: 1,
     totalMatchdays: fieldCodes.length,
     standings,
-    teamStats: standings.map((team, index) => ({ clubId: team.clubId, clubName: team.clubName, possession: 55 + index % 6 * 3, goals: team.goalsFor, cleanSheets: Math.max(0, 3 - team.goalsAgainst % 4), cards: 3 + index % 7 })),
+    teamStats: standings.map((team) => ({ clubId: team.clubId, clubName: team.clubName, possession: 0, goals: 0, cleanSheets: 0, cards: 0 })),
     playerStats: { goals: [], assists: [], cleanSheets: [], cards: [], rating: [] },
-    rules: tournament.rules,
-    history: tournament.history.map((record) => ({ ...record, points: 0 })),
+    rules: describeRules(getCompetitionRules(tournament.id), tournament.rules),
+    history: [],
   }
 }
 
 function GroupTable({ group, onSelectCountry }: { group: TournamentGroup; onSelectCountry: (country: string) => void }) {
-  const rows = group.countryCodes.map((code, index) => {
+  const rows = group.countryCodes.map((code) => {
     const country = findTournamentCountry(code)
-    const played = group.countryCodes.length - 1
-    const won = Math.max(0, played - Math.ceil(index / 2))
-    const drawn = played - won - index % 2
-    const lost = played - won - drawn
-    return { code, country, played, won, drawn, lost, points: won * 3 + drawn }
-  }).sort((first, second) => second.points - first.points)
+    return { code, country, played: 0, won: 0, drawn: 0, lost: 0, points: 0 }
+  }).sort((first, second) => (first.country?.countryName ?? first.code).localeCompare(second.country?.countryName ?? second.code))
 
   return <section className="tournament-group-card"><h3>{group.name}</h3>{rows.map((row, index) => <div className="tournament-country-row" key={row.code}><span>{String(index + 1).padStart(2, '0')}</span><Flag code={row.country?.flagCode ?? row.code} countryName={row.country?.countryName ?? row.code} onSelectCountry={onSelectCountry} /><strong>{row.country?.countryName ?? row.code}</strong><small>{row.played} P · {row.won}-{row.drawn}-{row.lost}</small><b>{row.points}</b></div>)}</section>
 }
@@ -126,6 +119,8 @@ function LeagueTable({ competition, renderClub, onSelectClub }: { competition: L
 interface LeagueHubProps {
   matches: MatchInfo[]
   standings: LeagueStanding[]
+  playerStats: LeagueCompetition['playerStats']
+  teamStats: LeagueCompetition['teamStats']
   selectedCompetitionId: string | null
   onSelectCompetition: (id: string) => void
   onSelectCountry: (country: string) => void
@@ -135,7 +130,7 @@ interface LeagueHubProps {
   onSelectMatch: (id: string) => void
 }
 
-export default function LeagueHub({ matches, standings, selectedCompetitionId, onSelectCompetition, onSelectCountry, selectedClubId, onSelectClub, onSelectPlayer, onSelectMatch }: LeagueHubProps) {
+export default function LeagueHub({ matches, standings, playerStats, teamStats, selectedCompetitionId, onSelectCompetition, onSelectCountry, selectedClubId, onSelectClub, onSelectPlayer, onSelectMatch }: LeagueHubProps) {
   const [category, setCategory] = useState<LeagueCategory>('Domestic Leagues')
   const [openRegion, setOpenRegion] = useState('Nigeria')
   const [section, setSection] = useState<LeagueSection>('Standings')
@@ -154,6 +149,8 @@ export default function LeagueHub({ matches, standings, selectedCompetitionId, o
   const currentCompetition = baseCompetition?.id === league.id ? {
     ...baseCompetition,
     standings,
+    playerStats,
+    teamStats,
     matchday: Math.max(baseCompetition.matchday, ...standings.map((standing) => standing.played)),
   } : baseCompetition
   const isDomesticCup = !selectedGlobalCountry && !currentTournament && currentCompetition?.category === 'Domestic Leagues' && currentCompetition.totalMatchdays <= 8

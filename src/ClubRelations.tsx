@@ -1,4 +1,4 @@
-import { club, ownLeagueRules } from './data/mockData'
+import { club, getWageLimit } from './data/mockData'
 import { computeConfidence, getBoardObjectives } from './state/confidence'
 import { useGame } from './state/gameStore'
 import type { ClubConfidenceItem } from './types/game'
@@ -28,7 +28,7 @@ export function BoardOverview() {
     <section className="profile-section-block"><div className="profile-subheading"><h3>Financial expectations</h3></div>
       <div className="relations-list">
         <article className="relations-row"><div><strong>Transfer budget</strong><span>Available to spend</span></div><b>£{(finances.transferBudget / 1000000).toFixed(1)}m</b></article>
-        <article className="relations-row"><div><strong>Weekly wage bill</strong><span>Limit £{Math.round(finances.wageBudget * ownLeagueRules.financial.wageBudgetTolerance).toLocaleString('en-GB')}/wk</span></div><b>£{Math.round(finances.weeklyWages).toLocaleString('en-GB')}</b></article>
+        <article className="relations-row"><div><strong>Weekly wage bill</strong><span>Compliance limit £{Math.round(getWageLimit()).toLocaleString('en-GB')}/wk</span></div><b>£{Math.round(finances.weeklyWages).toLocaleString('en-GB')}</b></article>
         <article className="relations-row"><div><strong>Club balance</strong><span>Cash reserves</span></div><b>£{(finances.balance / 1000000).toFixed(1)}m</b></article>
       </div>
     </section>

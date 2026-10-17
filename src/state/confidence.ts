@@ -1,4 +1,4 @@
-import { club, getSquadHealth, getTeam, ownLeagueRules, SQUAD_MAX, SQUAD_MIN } from '../data/mockData'
+import { club, getSquadHealth, getTeam, getWageLimit, ownLeagueRules, SQUAD_MAX, SQUAD_MIN } from '../data/mockData'
 import type { ClubConfidenceData, ClubConfidenceItem } from '../types/game'
 import type { GameView } from './gameStore'
 
@@ -22,7 +22,7 @@ export function getBoardObjectives(view: GameView): BoardObjective[] {
   const played = own?.played ?? 0
   const target = expectedPosition()
   const wageBill = club.finances.weeklyWages
-  const wageLimit = club.finances.wageBudget * ownLeagueRules.financial.wageBudgetTolerance
+  const wageLimit = getWageLimit()
   const youngsters = club.squad.filter((player) => player.age <= 21).length
   const position = own?.position ?? 99
   return [
@@ -45,7 +45,7 @@ export function computeConfidence(view: GameView): ClubConfidenceData {
   const played = own?.played ?? 0
   const formScore = (own?.form ?? []).reduce((sum, result) => sum + (result === 'W' ? 1 : result === 'L' ? -1 : 0), 0)
   const pointsPerGame = played ? (own?.points ?? 0) / played : 0
-  const overspend = club.finances.weeklyWages > club.finances.wageBudget * ownLeagueRules.financial.wageBudgetTolerance
+  const overspend = club.finances.weeklyWages > getWageLimit()
   const placeDelta = played ? expectedPosition() - (own?.position ?? expectedPosition()) : 0
 
   const board = clamp(70 + placeDelta * 2.5 - (overspend ? 12 : 0))

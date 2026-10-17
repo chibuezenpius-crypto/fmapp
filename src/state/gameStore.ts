@@ -118,6 +118,11 @@ export function notify() {
   listeners.forEach((listener) => listener())
 }
 
+export function reportGameMessage(text: string) {
+  message = text
+  notify()
+}
+
 const subscribe = (listener: () => void) => {
   listeners.add(listener)
   return () => { listeners.delete(listener) }

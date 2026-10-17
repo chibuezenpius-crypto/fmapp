@@ -1,8 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { club, getClubBadge, getSquadHealth, getWageRoom, managerProfiles, refereeProfiles } from './data/mockData'
-import './state/transfers'
-import { advanceDay, advanceToNextMatch, clearMessage, describeDate, playMatch, resetGame, useGame } from './state/gameStore'
+import { advanceDay, clearMessage, describeDate, playMatch, useGame } from './state/gameStore'
 import { computeConfidence } from './state/confidence'
 import { BoardOverview, FanOverview } from './ClubRelations'
 import ClubBadge from './ClubBadge'
@@ -38,13 +37,16 @@ const tabs = [
 ] as const
 
 type TabId = (typeof tabs)[number]['id']
+type RelationsView = 'Board' | 'Fans'
 const money = (amount: number) => `£${(amount / 1000000).toFixed(1)}m`
 
 
 function App() {
+  const game = useGame()
   const [activeTab, setActiveTab] = useState<TabId>('Home')
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
   const [selectedPersonnel, setSelectedPersonnel] = useState<PersonnelProfileData | null>(null)
+  const [relationsView, setRelationsView] = useState<RelationsView | null>(null)
   const [profileSection, setProfileSection] = useState<ProfileSection>('Overview')
   const [selectedClubName, setSelectedClubName] = useState<string | null>(null)
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null)
@@ -54,32 +56,29 @@ function App() {
   const [countryReturnLabel, setCountryReturnLabel] = useState('previous view')
   const [screenSize, setScreenSize] = useState(SCREEN_SIZES[0])
   const [clubSection, setClubSection] = useState<ClubSection>('Overview')
-  const [, setClubVersion] = useState(0)
   const [clubReturnTab, setClubReturnTab] = useState<TabId>('Home')
-  const [savedMatchState] = useState(() => loadSimulatedMatches(matchFixtures))
-  const [simulatedMatches, setSimulatedMatches] = useState<Record<string, MatchInfo>>(savedMatchState.matches)
-  const [matchSimulationError, setMatchSimulationError] = useState(savedMatchState.error)
-  const [gameDate, setGameDate] = useState(loadGameDate)
-  const headerDate = describeDate(gameDate)
-  const displayedMatches = matchFixtures.map((match) => simulatedMatches[match.id] ?? match)
-  const nextFixture = displayedMatches.find((match) => match.status === 'Upcoming') ?? displayedMatches.find((match) => match.id === nextMatch.id) ?? nextMatch
-  const standings = applySimulatedResults(league.standings, Object.values(simulatedMatches))
-  const position = standings.find((standing) => standing.clubId === club.id)
-  const leader = standings[0]
-  const pointsBehindLeader = Math.max(0, (leader?.points ?? 0) - (position?.points ?? 0))
+  const headerDate = describeDate(game.date)
+  const displayedMatches = game.matches
+  const standings = game.standings
+  const nextFixture = game.nextFixture ?? displayedMatches[0]
+  const position = game.ownStanding
+  const pointsBehindLeader = Math.max(0, (standings[0]?.points ?? 0) - (position?.points ?? 0))
   const currentFormSummary = [['W', 'win'], ['D', 'draw'], ['L', 'loss']].map(([code, label]) => {
     const count = position?.form.filter((result) => result === code).length ?? 0
     return `${count} ${count === 1 ? label : label === 'loss' ? 'losses' : `${label}s`}`
   }).join(' · ')
+  const confidence = computeConfidence(game)
   const selectedMatch = displayedMatches.find((match) => match.id === selectedMatchId)
-  const detailOpen = selectedCountryName !== null || selectedPlayer !== null || selectedPersonnel !== null || selectedLeagueId !== null || selectedLeagueClubId !== null || activeTab === 'Club' || selectedMatch !== undefined
+  const detailOpen = selectedCountryName !== null || selectedPlayer !== null || selectedPersonnel !== null || relationsView !== null || selectedLeagueId !== null || selectedLeagueClubId !== null || activeTab === 'Club' || selectedMatch !== undefined
   const backLabel = selectedCountryName ? `Back to ${countryReturnLabel}` : selectedPlayer || selectedPersonnel ? (activeTab === 'Club' ? 'Back to club' : `Back to ${activeTab.toLowerCase()}`)
+    : relationsView ? `Back to ${activeTab.toLowerCase()}`
     : selectedLeagueClubId ? 'Back to league table'
     : selectedLeagueId ? 'Back to leagues'
     : activeTab === 'Club' ? `Back to ${clubReturnTab.toLowerCase()}` : `Back to ${activeTab.toLowerCase()}`
   const selectPlayer = (player: Player) => {
     setSelectedPlayer(player)
     setSelectedPersonnel(null)
+    setRelationsView(null)
     setProfileSection('Overview')
   }
   const selectPersonnel = (idOrName: string) => {
@@ -87,6 +86,18 @@ function App() {
     const referee = refereeProfiles.find((profile) => profile.id === idOrName || profile.name === idOrName)
     setSelectedPersonnel(manager ? { type: 'Manager', profile: manager } : referee ? { type: 'Referee', profile: referee } : null)
     setSelectedPlayer(null)
+    setRelationsView(null)
+  }
+  const openConfidenceView = (view: 'board' | 'fan' | 'manager') => {
+    setSelectedPlayer(null)
+    setSelectedPersonnel(null)
+    if (view === 'board') setRelationsView('Board')
+    else if (view === 'fan') setRelationsView('Fans')
+    else {
+      setRelationsView(null)
+      const manager = managerProfiles.find((profile) => profile.id === 'emeka-nwosu')
+      if (manager) setSelectedPersonnel({ type: 'Manager', profile: manager })
+    }
   }
   const openCountryOverview = (country: string) => {
     if (!selectedCountryName) {
@@ -99,12 +110,17 @@ function App() {
     if (activeTab !== 'Club') setClubReturnTab(activeTab)
     setSelectedPlayer(null)
     setSelectedPersonnel(null)
+    setRelationsView(null)
     setActiveTab('Club')
     setClubSection('Overview')
   }
   const goBack = () => {
     if (selectedCountryName) {
       setSelectedCountryName(null)
+      return
+    }
+    if (relationsView) {
+      setRelationsView(null)
       return
     }
     if (selectedPersonnel) {
@@ -129,52 +145,6 @@ function App() {
     }
     setSelectedMatchId(null)
   }
-  const simulateFixture = (fixture: MatchInfo): MatchInfo => {
-    const tactics = readMatchTactics()
-    const homeSquad = fixture.homeClubId === club.id ? club.squad : getClubSquad(fixture.homeClubId)
-    const awaySquad = fixture.awayClubId === club.id ? club.squad : getClubSquad(fixture.awayClubId)
-    const homeLineup = refreshMatchLineup(fixture.lineups.home, homeSquad, 'home', fixture.homeClubId === club.id ? tactics.lineup : undefined)
-    const awayLineup = refreshMatchLineup(fixture.lineups.away, awaySquad, 'away', fixture.awayClubId === club.id ? tactics.lineup : undefined)
-    return simulateMatch({
-      match: { ...fixture, lineups: { home: homeLineup, away: awayLineup }, formation: { home: homeLineup.formation, away: awayLineup.formation } },
-      homeSquad,
-      awaySquad,
-      seed: matchSeedFromId(fixture.id),
-      homeTactics: fixture.homeClubId === club.id ? tactics : undefined,
-      awayTactics: fixture.awayClubId === club.id ? tactics : undefined,
-    }).match
-  }
-  const commitResults = (results: MatchInfo[], nextDate?: string) => {
-    const updatedMatches = { ...simulatedMatches, ...Object.fromEntries(results.map((result) => [result.id, result])) }
-    setSimulatedMatches(updatedMatches)
-    if (nextDate) setGameDate(nextDate)
-    try {
-      saveSimulatedMatches(updatedMatches)
-      if (nextDate) saveGameDate(nextDate)
-      setMatchSimulationError('')
-    } catch (error) {
-      setMatchSimulationError(error instanceof Error ? `Progress was applied, but it could not be saved: ${error.message}` : 'Progress was applied, but it could not be saved.')
-    }
-  }
-  const playSelectedMatch = () => {
-    if (!selectedMatch || selectedMatch.status !== 'Upcoming') return
-    try {
-      commitResults([simulateFixture(selectedMatch)])
-    } catch (error) {
-      setMatchSimulationError(error instanceof Error ? error.message : 'The match could not be simulated.')
-    }
-  }
-  // Temporary testing helper: moves the calendar forward and plays every fixture that falls due.
-  const advanceDay = () => {
-    const nextDate = addDays(gameDate, 1)
-    try {
-      const due = displayedMatches.filter((match) => match.status === 'Upcoming' && match.date <= nextDate)
-        .sort((first, second) => first.date.localeCompare(second.date) || first.id.localeCompare(second.id))
-      commitResults(due.map(simulateFixture), nextDate)
-    } catch (error) {
-      setMatchSimulationError(error instanceof Error ? `Could not advance the day: ${error.message}` : 'Could not advance the day.')
-    }
-  }
 
   return (
     <div className="app-backdrop">
@@ -192,24 +162,26 @@ function App() {
           </div>
           <div className="header-date"><span>IN-GAME DATE</span><strong>{headerDate.day}</strong><span>{headerDate.weekday}</span></div>
           <div className="budget-strip"><span>TRANSFER BUDGET</span><strong>{money(club.finances.transferBudget)}</strong><button className="advance-day-button" onClick={advanceDay} type="button">Advance Day ▸</button></div>
-          {matchSimulationError && !selectedMatch && <p className="advance-day-error" role="alert">{matchSimulationError}</p>}
+          {game.message && !selectedMatch && <p className="advance-day-error" role="alert">{game.message}<button aria-label="Dismiss message" onClick={clearMessage} type="button">×</button></p>}
         </header>
 
         <main className="main-content" key={selectedCountryName ? `country-${selectedCountryName}` : selectedPlayer ? 'profile' : selectedMatch ? `match-${selectedMatch.id}` : activeTab}>
           {selectedCountryName ? <CountryOverview country={selectedCountryName} onSelectCountry={openCountryOverview} />
             : selectedPlayer ? <PlayerProfile player={selectedPlayer} section={profileSection} selectedClubName={selectedClubName}
-            onSectionChange={setProfileSection} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} onClubChange={() => setClubVersion((version) => version + 1)} />
+            onSectionChange={setProfileSection} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />
             : selectedPersonnel ? <PersonnelProfile personnel={selectedPersonnel} onSelectCountry={openCountryOverview} />
+            : relationsView === 'Board' ? <BoardOverview />
+            : relationsView === 'Fans' ? <FanOverview />
             : activeTab === 'Club' ? <ClubProfile section={clubSection} selectedClubName={selectedClubName} matches={displayedMatches}
               onSectionChange={setClubSection} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} onSelectPersonnel={selectPersonnel} onSelectMatch={setSelectedMatchId} />
               : selectedMatch ? <MatchCenter match={selectedMatch} selectedClubName={selectedClubName}
                 onSelectClub={setSelectedClubName} onOpenClub={openClubProfile} onSelectPlayer={selectPlayer} onSelectPersonnel={selectPersonnel}
-                onSimulateMatch={playSelectedMatch} simulationError={matchSimulationError} /> : <>
-            {activeTab === 'Home' && <HomeView position={position?.position ?? 0} standings={standings} form={position?.form ?? homeMetrics.form} pointsBehindLeader={pointsBehindLeader} dateLabel={headerDate.long} formSummary={currentFormSummary} nextMatch={nextFixture} upcomingFixtures={displayedMatches.filter((match) => match.status === 'Upcoming').slice(0, 3)} selectedClubName={selectedClubName} selectedMatchId={selectedMatchId} onSelectMatch={setSelectedMatchId} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} />}
+                onSimulateMatch={() => playMatch(selectedMatch.id)} simulationError={game.message} /> : <>
+            {activeTab === 'Home' && nextFixture && <HomeView position={position?.position ?? 1} standings={standings} form={position?.form ?? []} pointsBehindLeader={pointsBehindLeader} dateLabel={headerDate.long} formSummary={currentFormSummary} nextMatch={nextFixture} upcomingFixtures={game.upcoming.slice(0, 3)} selectedClubName={selectedClubName} selectedMatchId={selectedMatchId} onSelectMatch={setSelectedMatchId} onSelectClub={setSelectedClubName} confidence={confidence} squadMetrics={getSquadHealth()} wageRoom={getWageRoom()} onOpenConfidence={openConfidenceView} />}
             {activeTab === 'Academy' && <AcademyHub onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />}
             {activeTab === 'Tactics' && <TacticsHub />}
             {activeTab === 'Transfers' && <TransferMarket onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />}
-            {activeTab === 'League' && <LeagueHub matches={displayedMatches} standings={standings} selectedCompetitionId={selectedLeagueId} onSelectCompetition={setSelectedLeagueId} onSelectCountry={openCountryOverview} selectedClubId={selectedLeagueClubId} onSelectClub={setSelectedLeagueClubId} onSelectPlayer={selectPlayer} onSelectMatch={setSelectedMatchId} />}
+            {activeTab === 'League' && <LeagueHub matches={displayedMatches} standings={standings} selectedCompetitionId={selectedLeagueId} onSelectCompetition={setSelectedLeagueId} onSelectCountry={openCountryOverview} selectedClubId={selectedLeagueClubId} onSelectClub={setSelectedLeagueClubId} onSelectPlayer={selectPlayer} onSelectMatch={setSelectedMatchId} playerStats={game.playerStats} teamStats={game.teamStats} />}
             {activeTab === 'Matches' && <MatchesList matches={displayedMatches} onSelectMatch={setSelectedMatchId} />}
           </>}
         </main>
@@ -218,7 +190,7 @@ function App() {
           {tabs.map((tab) => (
             <button aria-current={activeTab === tab.id ? 'page' : undefined} aria-label={tab.label}
               className={activeTab === tab.id ? 'nav-item active' : 'nav-item'} key={tab.id}
-              onClick={() => { if (tab.id === 'Club' && activeTab !== 'Club') setClubReturnTab(activeTab); if (tab.id !== 'Club') setSelectedMatchId(null); if (tab.id !== 'League') { setSelectedLeagueId(null); setSelectedLeagueClubId(null) }; setSelectedCountryName(null); setSelectedPlayer(null); setSelectedPersonnel(null); setActiveTab(tab.id) }} type="button">
+              onClick={() => { if (tab.id === 'Club' && activeTab !== 'Club') setClubReturnTab(activeTab); if (tab.id !== 'Club') setSelectedMatchId(null); if (tab.id !== 'League') { setSelectedLeagueId(null); setSelectedLeagueClubId(null) }; setSelectedCountryName(null); setSelectedPlayer(null); setSelectedPersonnel(null); setRelationsView(null); setActiveTab(tab.id) }} type="button">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d={tab.icon} /></svg>
               <span>{tab.label}</span>
             </button>
@@ -237,7 +209,7 @@ function SectionHeading({ kicker, title, detail }: { kicker: string; title: stri
   return <div className="section-heading"><div><span className="eyebrow">{kicker}</span><h2>{title}</h2></div>{detail && <span className="section-detail">{detail}</span>}</div>
 }
 
-function HomeView({ position, standings, form, pointsBehindLeader, dateLabel, formSummary, nextMatch, upcomingFixtures, selectedClubName, selectedMatchId, onSelectMatch, onSelectClub, onSelectPlayer }: { position: number; standings: LeagueStanding[]; form: LeagueStanding['form']; pointsBehindLeader: number; dateLabel: string; formSummary: string; nextMatch: MatchInfo; upcomingFixtures: MatchInfo[]; selectedClubName: string | null; selectedMatchId: string | null; onSelectMatch: (id: string) => void; onSelectClub: (name: string) => void; onSelectPlayer: (player: Player) => void }) {
+function HomeView({ position, standings, form, pointsBehindLeader, dateLabel, formSummary, nextMatch, upcomingFixtures, selectedClubName, selectedMatchId, onSelectMatch, onSelectClub, confidence, squadMetrics, wageRoom, onOpenConfidence }: { position: number; standings: LeagueStanding[]; form: LeagueStanding['form']; pointsBehindLeader: number; dateLabel: string; formSummary: string; nextMatch: MatchInfo; upcomingFixtures: MatchInfo[]; selectedClubName: string | null; selectedMatchId: string | null; onSelectMatch: (id: string) => void; onSelectClub: (name: string) => void; confidence: ClubConfidenceData; squadMetrics: SquadHealthMetrics; wageRoom: number; onOpenConfidence: (view: 'board' | 'fan' | 'manager') => void }) {
   const fixtureDate = new Date(`${nextMatch.date}T12:00:00`)
   const fixtureDay = fixtureDate.getDate()
   const fixtureMonth = new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(fixtureDate).toUpperCase()
@@ -255,13 +227,13 @@ function HomeView({ position, standings, form, pointsBehindLeader, dateLabel, fo
     </section>
     <section className="metric-row" aria-label="Club overview">
       <div className="metric"><span>LEAGUE POSITION</span><strong><i>{String(position).padStart(2, '0')}</i><small> / {standings.length}</small></strong><span className="metric-note">{pointsBehindLeader === 0 ? 'Top of the table' : `${pointsBehindLeader} pts off top`}</span></div>
-      <div className="metric"><span>TRANSFER BUDGET</span><strong>{money(club.finances.transferBudget)}</strong><span className="metric-note">Wage room £{(homeMetrics.wageRoom / 1000).toFixed(1)}k/wk</span></div>
+      <div className="metric"><span>TRANSFER BUDGET</span><strong>{money(club.finances.transferBudget)}</strong><span className="metric-note">Wage room £{(Math.max(0, wageRoom) / 1000).toFixed(1)}k/wk</span></div>
       <div className="metric"><span>LAST 5</span><div className="form-dots">{form.map((result, index) => <b className={`form-${result.toLowerCase()}`} key={`${result}-${index}`}>{result}</b>)}</div><span className="metric-note">{formSummary}</span></div>
     </section>
-    <TeamStatusCard metrics={squadHealthMetrics} totalPlayers={club.squad.length} />
-    <ClubConfidenceCard data={clubConfidence} />
+    <TeamStatusCard metrics={squadMetrics} totalPlayers={club.squad.length} />
+    <ClubConfidenceCard data={confidence} onOpenConfidence={onOpenConfidence} />
     <UpcomingFixturesPreview fixtures={upcomingFixtures} onSelectMatch={onSelectMatch} selectedMatchId={selectedMatchId} />
-    <section className="content-section" aria-label="League table preview"><SectionHeading kicker="THE RUN-IN" title="League table" detail="NEAR YOU" /><LeagueTable compact standings={standings} onSelectClub={onSelectClub} onSelectPlayer={onSelectPlayer} selectedClubName={selectedClubName} /></section>
+    <section className="content-section" aria-label="League table preview"><SectionHeading kicker="THE RUN-IN" title="League table" detail="NEAR YOU" /><LeagueTable compact standings={standings} onSelectClub={onSelectClub} selectedClubName={selectedClubName} /></section>
   </>
 }
 
@@ -321,19 +293,19 @@ function TeamStatusCard({ metrics, totalPlayers }: { metrics: SquadHealthMetrics
   )
 }
 
-function ClubConfidenceCard({ data }: { data: ClubConfidenceData }) {
+function ClubConfidenceCard({ data, onOpenConfidence }: { data: ClubConfidenceData; onOpenConfidence: (view: 'board' | 'fan' | 'manager') => void }) {
   const items = [
-    { key: 'board', label: 'Board Confidence', item: data.board },
-    { key: 'fan', label: 'Fan Confidence', item: data.fan },
-    { key: 'player', label: 'Player Confidence', item: data.player },
+    { key: 'board', label: 'Board Confidence', item: data.board, target: 'board' },
+    { key: 'fan', label: 'Fan Confidence', item: data.fan, target: 'fan' },
+    { key: 'manager', label: 'Manager Confidence', item: data.manager, target: 'manager' },
   ] as const
 
   return (
     <section className="content-section" aria-label="Club confidence ratings">
-      <SectionHeading kicker="CLUB STANDING" title="Club confidence" detail="OCTOBER 2026" />
+      <SectionHeading kicker="CLUB STANDING" title="Club confidence" detail="CURRENT SEASON" />
       <div className="confidence-card">
-        {items.map(({ key, label, item }) => (
-          <div className="confidence-item" key={key}>
+        {items.map(({ key, label, item, target }) => (
+          <button aria-label={`Open ${label.replace(' Confidence', '')} overview`} className="confidence-item confidence-link" key={key} onClick={() => onOpenConfidence(target)} type="button">
             <div className="confidence-label-row">
               <span className="confidence-title">{label}</span>
               <div className="confidence-badge-group">
@@ -350,7 +322,7 @@ function ClubConfidenceCard({ data }: { data: ClubConfidenceData }) {
               />
             </div>
             <span className="confidence-note">{item.note}</span>
-          </div>
+          </button>
         ))}
       </div>
     </section>
@@ -417,8 +389,8 @@ function UpcomingFixturesPreview({
   )
 }
 
-function LeagueTable({ compact = false, standings = league.standings, selectedClubName, onSelectClub }: { compact?: boolean; standings?: LeagueStanding[]; selectedClubName: string | null; onSelectClub: (name: string) => void; onSelectPlayer: (player: Player) => void }) {
-  const ownPosition = standings.find((standing) => standing.clubId === club.id)?.position ?? homeMetrics.position
+function LeagueTable({ compact = false, standings, selectedClubName, onSelectClub }: { compact?: boolean; standings: LeagueStanding[]; selectedClubName: string | null; onSelectClub: (name: string) => void }) {
+  const ownPosition = standings.find((standing) => standing.clubId === club.id)?.position ?? 1
   const start = Math.max(0, Math.min(ownPosition - 3, standings.length - 5))
   const rows = compact ? standings.slice(start, start + 5) : standings
   return <div className="table-wrap">

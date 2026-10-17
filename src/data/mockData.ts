@@ -252,7 +252,11 @@ export const managerProfiles: ManagerProfile[] = [
 ]
 
 // ---------- Live dashboard metrics (read at render time so every screen stays in sync) ----------
-export const getWageRoom = () => club.finances.wageBudget - club.finances.weeklyWages
+export const getWageBudgetLimit = () => club.finances.wageBudget * ownLeagueRules.financial.wageBudgetTolerance
+export const getFFPWageLimit = () => (club.finances.sponsorshipIncomeAnnual + club.finances.ticketSalesPerHomeMatch * (league.totalMatchdays / 2))
+  * ownLeagueRules.financial.maxWageToIncomeRatio / 52
+export const getWageLimit = () => Math.min(getWageBudgetLimit(), getFFPWageLimit())
+export const getWageRoom = () => getWageLimit() - club.finances.weeklyWages
 
 export function getSquadHealth(): SquadHealthMetrics {
   const players = club.squad
