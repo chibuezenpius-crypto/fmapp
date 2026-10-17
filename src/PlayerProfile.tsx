@@ -3,6 +3,7 @@ import type { Player, PlayerAttributes, PlayerAchievement } from './types/game'
 import { club, getWageRoom, isOwnPlayer } from './data/mockData'
 import { getWageDemand, releasePlayer, renewContract, submitBid, type DealResult } from './state/transfers'
 import { useGame } from './state/gameStore'
+import { moveToReserves, promoteReserve, squadLocation } from './state/matchSquad'
 import { findGeneratedClub, getClubSquad } from './data/clubSquads'
 import Flag from './Flag'
 
@@ -58,6 +59,16 @@ function PlayerActions({ player }: { player: Player }) {
 
   const renew = (years: number, raise: number) => done(renewContract(player, years, raise).message)
 
+  const moveSquad = () => {
+    if (squadLocation(club.squad, player.id) === 'reserve') {
+      const dropped = promoteReserve(club.squad, player.id)
+      done(dropped ? `${player.name} joins the first team; ${dropped} moves to the reserves.` : 'Could not update the squad.')
+    } else {
+      const replacement = moveToReserves(club.squad, player.id)
+      done(replacement === null ? 'Could not move the player to the reserves.' : `${player.name} moves to the reserves.`)
+    }
+  }
+
   const bid = (fee: number) => {
     const result: DealResult = submitBid(player, { fee, wageMultiplier: wageTerm, years: 3 })
     setMessage(result.message)
@@ -84,6 +95,7 @@ function PlayerActions({ player }: { player: Player }) {
       {own ? <>
         <button className="player-action primary" onClick={() => setPanel(panel === 'renew' ? 'none' : 'renew')} type="button">Renew contract</button>
         <button className="player-action danger" onClick={() => setPanel(panel === 'release' ? 'none' : 'release')} type="button">Release</button>
+        <button className="player-action" onClick={moveSquad} type="button">{squadLocation(club.squad, player.id) === 'reserve' ? 'Move to first team' : 'Move to reserves'}</button>
       </> : <>
         <button className="player-action primary" onClick={() => setPanel(panel === 'bid' ? 'none' : 'bid')} type="button">{free ? 'Sign free agent' : 'Place bid'}</button>
         <button className="player-action" onClick={scout} type="button">{scoutedPlayers.has(player.id) ? 'Scouted' : 'Scout'}</button>

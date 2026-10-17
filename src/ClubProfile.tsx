@@ -3,11 +3,13 @@ import { club, getClubBadge } from './data/mockData'
 import ClubBadge from './ClubBadge'
 import { getDate } from './state/gameStore'
 import ClubFacilities from './ClubFacilities'
-import { promoteReserve, splitSquad } from './state/matchSquad'
+import { splitSquad } from './state/matchSquad'
 import { PLACEHOLDER_PORTRAIT } from './portrait'
 import { ClubFinances, ClubSponsorship } from './ClubFinances'
 import { BoardOverview } from './ClubRelations'
 import { getInternationalDutyPlayers } from './simulation/calendarScheduler'
+import { isUnavailable } from './simulation/playerCondition'
+import SquadPlayerRow from './SquadPlayerRow'
 import type { MatchInfo, Player } from './types/game'
 
 export type ClubSection = 'Overview' | 'Squad' | 'Tactics' | 'Staff' | 'Finances' | 'Sponsorship' | 'Board' | 'Fixtures' | 'Facilities'
@@ -94,6 +96,8 @@ export default function ClubProfile({ section, selectedClubName, matches, onSect
   const firstTeam = [...split.starters, ...split.bench]
   const benchIds = new Set(split.bench.map((player) => player.id))
   const startingIds = new Set(split.starters.map((player) => player.id))
+  // A key player is among the club's three best, or rated 80 or higher.
+  const starIds = new Set([...club.squad].sort((first, second) => second.overall - first.overall).filter((player, index) => index < 3 || player.overall >= 80).map((player) => player.id))
   const squad = (squadView === 'First team' ? firstTeam : split.reserves).filter((player) => {
     if (positionFilter === 'ALL') return true
     if (positionFilter === 'GK') return player.position === 'GK'
@@ -180,10 +184,10 @@ export default function ClubProfile({ section, selectedClubName, matches, onSect
       {section === 'Squad' && <>
         <div className="squad-view-tabs" role="tablist" aria-label="Squad groups">{(['First team', 'Reserves'] as const).map((view) => <button aria-selected={squadView === view} className={squadView === view ? 'squad-view-tab active' : 'squad-view-tab'} key={view} onClick={() => { setSquadView(view); setSquadNotice('') }} role="tab" type="button">{view}<small>{view === 'First team' ? firstTeam.length : split.reserves.length}</small></button>)}</div>
         <div className="club-subpage-heading"><div><span className="eyebrow">{squad.length} PLAYERS SHOWN</span><h2>{squadView === 'First team' ? 'First team' : 'Reserves'}</h2></div><label className="club-sort">SORT BY<select aria-label="Sort squad" onChange={(event) => setSortMode(event.target.value as SortMode)} value={sortMode}><option>Value</option><option>Rating</option><option>Age</option></select></label></div>
-        {squadView === 'Reserves' && <p className="swap-guidance">Reserves are outside the matchday squad. Add one to the bench to replace the weakest substitute.</p>}
+        {squadView === 'Reserves' && <p className="swap-guidance">Reserves are outside the matchday squad. Open a player and choose Move to first team to bring him in.</p>}
         {squadNotice && <p className="club-action-notice" role="status">{squadNotice}</p>}
         <div className="position-filters" aria-label="Filter positions">{(['ALL', 'GK', 'DEF', 'MID', 'FWD'] as const).map((filter) => <button aria-pressed={positionFilter === filter} className={positionFilter === filter ? 'position-filter active' : 'position-filter'} key={filter} onClick={() => setPositionFilter(filter)} type="button">{filter}</button>)}</div>
-        <div className="club-roster-list">{squad.map((player) => <div className="club-roster-item" key={player.id}><button aria-label={`Open ${player.name} profile`} className="club-roster-row" onClick={() => onSelectPlayer(player)} type="button"><span className="roster-number">{String(player.shirtNumber).padStart(2, '0')}</span><span className="roster-player"><strong>{player.name}</strong><small>{player.position} · {player.age} yrs{squadView === 'First team' ? (startingIds.has(player.id) ? ' · STARTER' : benchIds.has(player.id) ? ' · SUB' : '') : ''}{onDuty.has(player.id) ? ' · ✈ ON INTERNATIONAL DUTY' : ''}</small></span><span className="roster-stat"><strong>{player.overall}</strong><small>RAT</small></span><span className="roster-stat"><strong>{shortMoney(player.value)}</strong><small>VALUE</small></span></button>{squadView === 'Reserves' && <button aria-label={`Add ${player.name} to the bench`} className="tactics-action" onClick={() => { const dropped = promoteReserve(club.squad, player.id); setSquadNotice(dropped ? `${player.name} joins the bench; ${dropped} moves to the reserves.` : 'Could not update the bench.') }} type="button">Add to bench</button>}</div>)}{squad.length === 0 && <p className="empty-note">No players match this filter.</p>}</div>
+        <div className="club-roster-list">{squad.map((player) => <div className="club-roster-item" key={player.id}><SquadPlayerRow extraNote={onDuty.has(player.id) ? '✈ ON INTERNATIONAL DUTY' : undefined} isInjured={isUnavailable(player, getDate())} isStar={starIds.has(player.id)} onSelect={onSelectPlayer} player={player} status={squadView === 'First team' ? (startingIds.has(player.id) ? 'STARTER' : benchIds.has(player.id) ? 'SUB' : undefined) : undefined} /></div>)}{squad.length === 0 && <p className="empty-note">No players match this filter.</p>}</div>
       </>}
 
       {section === 'Tactics' && <>

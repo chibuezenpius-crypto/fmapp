@@ -44,6 +44,39 @@ export function splitSquad(squad: Player[]) {
   return { starters: byId(lineup), bench: byId(benchIds), reserves: squad.filter((player) => !used.has(player.id)) }
 }
 
+export type SquadLocation = 'starter' | 'bench' | 'reserve'
+
+export function squadLocation(squad: Player[], playerId: string): SquadLocation {
+  const { starters, bench } = splitSquad(squad)
+  return starters.some((player) => player.id === playerId) ? 'starter' : bench.some((player) => player.id === playerId) ? 'bench' : 'reserve'
+}
+
+/** Sends a first-team player to the reserves. A starter is replaced by the best substitute, and the best reserve fills the bench. */
+export function moveToReserves(squad: Player[], playerId: string): string | null {
+  const { starters, bench, reserves } = splitSquad(squad)
+  const incoming = [...reserves].filter((player) => player.id !== playerId).sort((first, second) => second.overall - first.overall)[0]
+  const isStarter = starters.some((player) => player.id === playerId)
+  if (!isStarter && !bench.some((player) => player.id === playerId)) return null
+  let lineup = starters.map((player) => player.id)
+  let nextBench = bench.map((player) => player.id)
+  if (isStarter) {
+    const target = starters.find((player) => player.id === playerId)!
+    const sub = [...bench].sort((first, second) => Number(second.position === target.position) - Number(first.position === target.position) || second.overall - first.overall)[0]
+    if (!sub) return null
+    lineup = lineup.map((id) => id === playerId ? sub.id : id)
+    nextBench = nextBench.filter((id) => id !== sub.id)
+  } else {
+    nextBench = nextBench.filter((id) => id !== playerId)
+  }
+  if (incoming) nextBench.push(incoming.id)
+  try {
+    window.localStorage.setItem(TACTICS_KEY, JSON.stringify({ ...readSaved(), lineup, bench: nextBench }))
+  } catch {
+    return null
+  }
+  return incoming?.name ?? ''
+}
+
 /** Puts a reserve on the bench in place of the weakest substitute and returns the name of the player who dropped out. */
 export function promoteReserve(squad: Player[], reserveId: string): string | null {
   const { bench } = splitSquad(squad)
