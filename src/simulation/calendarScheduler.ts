@@ -7,7 +7,7 @@ import type { Player } from '../types/game'
 export const CALENDAR_START = '2026-07-27'
 export const SEASON_WEEKS = 52
 
-export type SlotKind = 'league' | 'continental' | 'club-world-cup'
+export type SlotKind = 'league' | 'domestic-cup' | 'continental' | 'club-world-cup'
 export type CalendarWeekKind = 'Club Matches' | 'International Window' | 'Summer Window' | 'Off Season'
 
 export interface InternationalWindow {
@@ -114,6 +114,7 @@ export function clubWorldCupMatchDate(round: number, totalRounds: number, season
 
 const allowedDays: Record<SlotKind, readonly number[]> = {
   league: [6, 0],
+  'domestic-cup': [3],
   continental: [2, 3],
   'club-world-cup': [3, 6],
 }
@@ -122,16 +123,24 @@ export interface ScheduledSlot {
   id: string
   date: string
   kind: SlotKind
+  clubIds?: readonly string[]
 }
 
-/** Returns a description of every slot that breaks the calendar rules; empty means the schedule is valid. */
+/** Returns a description of every slot that breaks calendar, international-window, or club-availability rules. */
 export function validateSchedule(slots: readonly ScheduledSlot[]): string[] {
   const problems: string[] = []
+  const clubsByDate = new Map<string, string>()
   for (const slot of slots) {
     const window = getInternationalWindow(slot.date)
     if (window) problems.push(`${slot.id} (${slot.date}) falls inside the ${window.name}.`)
     if (getCalendarWeek(slot.date) === -1) problems.push(`${slot.id} (${slot.date}) is before the calendar starts.`)
     if (!allowedDays[slot.kind].includes(new Date(`${slot.date}T12:00:00Z`).getUTCDay())) problems.push(`${slot.id} (${slot.date}) is on the wrong weekday for a ${slot.kind} match.`)
+    for (const clubId of slot.clubIds ?? []) {
+      const key = `${slot.date}:${clubId}`
+      const previous = clubsByDate.get(key)
+      if (previous) problems.push(`${clubId} is double-booked on ${slot.date} in ${previous} and ${slot.id}.`)
+      else clubsByDate.set(key, slot.id)
+    }
   }
   return problems
 }

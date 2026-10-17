@@ -76,6 +76,7 @@ function App() {
     : relationsView ? `Back to ${activeTab.toLowerCase()}`
     : selectedLeagueClubId ? 'Back to league table'
     : selectedLeagueId ? 'Back to leagues'
+    : selectedMatch ? (activeTab === 'Club' ? 'Back to club' : `Back to ${activeTab.toLowerCase()}`)
     : activeTab === 'Club' ? `Back to ${clubReturnTab.toLowerCase()}` : `Back to ${activeTab.toLowerCase()}`
   const selectPlayer = (player: Player) => {
     setSelectedPlayer(player)
@@ -133,6 +134,10 @@ function App() {
       setSelectedPlayer(null)
       return
     }
+    if (selectedMatch) {
+      setSelectedMatchId(null)
+      return
+    }
     if (selectedLeagueClubId) {
       setSelectedLeagueClubId(null)
       return
@@ -174,12 +179,12 @@ function App() {
             : selectedPersonnel ? <PersonnelProfile personnel={selectedPersonnel} onSelectCountry={openCountryOverview} />
             : relationsView === 'Board' ? <BoardOverview />
             : relationsView === 'Fans' ? <FanOverview />
-            : activeTab === 'Club' ? <ClubProfile section={clubSection} selectedClubName={selectedClubName} matches={displayedMatches}
-              onSectionChange={setClubSection} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} onSelectPersonnel={selectPersonnel} onSelectMatch={setSelectedMatchId} />
-              : selectedMatch ? <MatchCenter match={selectedMatch} selectedClubName={selectedClubName}
+            : selectedMatch ? <MatchCenter match={selectedMatch} selectedClubName={selectedClubName}
                 onSelectClub={setSelectedClubName} onOpenClub={openClubProfile} onSelectPlayer={selectPlayer} onSelectPersonnel={selectPersonnel}
-                onSimulateMatch={() => playMatch(selectedMatch.id)} simulationError={game.message} /> : <>
-            {activeTab === 'Home' && nextFixture && <HomeView position={position?.position ?? 1} standings={standings} form={position?.form ?? []} pointsBehindLeader={pointsBehindLeader} dateLabel={headerDate.long} formSummary={currentFormSummary} nextMatch={nextFixture} upcomingFixtures={game.upcoming.slice(0, 3)} selectedClubName={selectedClubName} selectedMatchId={selectedMatchId} onSelectMatch={setSelectedMatchId} onSelectClub={setSelectedClubName} confidence={confidence} squadMetrics={getSquadHealth()} wageRoom={getWageRoom()} onOpenConfidence={openConfidenceView} />}
+                onSimulateMatch={() => playMatch(selectedMatch.id)} simulationError={game.message} />
+              : activeTab === 'Club' ? <ClubProfile section={clubSection} selectedClubName={selectedClubName} matches={displayedMatches}
+              onSectionChange={setClubSection} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} onSelectPersonnel={selectPersonnel} onSelectMatch={setSelectedMatchId} /> : <>
+            {activeTab === 'Home' && nextFixture && <HomeView position={position?.position ?? 1} standings={standings} form={position?.form ?? []} pointsBehindLeader={pointsBehindLeader} dateLabel={headerDate.long} formSummary={currentFormSummary} nextMatch={nextFixture} upcomingFixtures={game.upcoming.slice(0, 3)} selectedClubName={selectedClubName} selectedMatchId={selectedMatchId} onSelectMatch={setSelectedMatchId} onSelectClub={setSelectedClubName} confidence={confidence} squadMetrics={getSquadHealth(game.date)} wageRoom={getWageRoom()} onOpenConfidence={openConfidenceView} />}
             {activeTab === 'Academy' && <AcademyHub onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />}
             {activeTab === 'Tactics' && <TacticsHub />}
             {activeTab === 'Transfers' && <TransferMarket onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />}

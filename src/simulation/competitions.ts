@@ -65,9 +65,11 @@ const orderedTeams = (country: (typeof countries)[number], rankings?: LeagueRank
 }
 
 /** Top `slotsPerLeague` clubs of every league in the confederation(s), best-ranked clubs seeded first, capped at `maxField`. */
-export function qualifyClubs(spec: ContinentalSpec, rankings?: LeagueRankings): Entrant[] {
+export function qualifyClubs(spec: ContinentalSpec, rankings?: LeagueRankings, season = 0): Entrant[] {
   const eligible = countries.filter((country) => spec.confederations.includes(findWorldCountry(country.countryCode)?.confederation ?? ''))
-  const entrants = eligible.flatMap((country, leagueOrder) => orderedTeams(country, rankings)
+  const offset = eligible.length ? ((season % eligible.length) + eligible.length) % eligible.length : 0
+  const rotated = [...eligible.slice(offset), ...eligible.slice(0, offset)]
+  const entrants = rotated.flatMap((country, leagueOrder) => orderedTeams(country, rankings)
     .slice(0, spec.slotsPerLeague)
     .map((team, index) => ({ clubId: team.id, clubName: team.name, countryName: country.countryName, previousRank: index + 1, leagueOrder })))
   return entrants
@@ -186,23 +188,17 @@ const bracketSlots = (entrants: readonly Entrant[]) => {
   return seedOrder(size).map((seed) => entrants[seed - 1]?.clubId ?? null)
 }
 
-const bracketsBySeason = new Map<number, KnockoutSpec[]>()
-
-/** Every cup and continental bracket of a season, seeded from the previous season's rankings. Cached per season. */
+/** Every cup and continental bracket of a season, seeded from the previous season's rankings. */
 function seasonBrackets(season: number, rankings?: LeagueRankings): KnockoutSpec[] {
-  const cached = bracketsBySeason.get(season)
-  if (cached) return cached
   const cups = DOMESTIC_CUPS.map((spec): KnockoutSpec => ({
     id: spec.id, name: spec.name, season, slots: bracketSlots(qualifyCupClubs(spec, rankings)),
     dateFor: (round, total) => domesticCupMatchDate(round, total, season),
   }))
   const continental = CONTINENTAL_COMPETITIONS.map((spec): KnockoutSpec => ({
-    id: spec.id, name: spec.name, season, slots: bracketSlots(qualifyClubs(spec, rankings)),
+    id: spec.id, name: spec.name, season, slots: bracketSlots(qualifyClubs(spec, rankings, season)),
     dateFor: (round, total) => continentalMatchDate(round, total, spec.day, season),
   }))
-  const all = [...continental, ...cups]
-  bracketsBySeason.set(season, all)
-  return all
+  return [...continental, ...cups]
 }
 
 export interface SeasonTies {

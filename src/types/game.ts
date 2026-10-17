@@ -122,6 +122,7 @@ export interface Player {
   potential: number
   value: number
   fitness: number
+  injuryUntil?: string
   form: number
   morale: 'Very Good' | 'Good' | 'Okay' | 'Poor'
   moodBadges?: string[]

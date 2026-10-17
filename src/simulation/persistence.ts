@@ -1,6 +1,8 @@
 import type { MatchCommentaryEvent, MatchEvent, MatchInfo, MatchLineup, MatchStats } from '../types/game'
+import type { PlayerConditionState } from './playerCondition'
 
 const STORAGE_KEY = 'fmapp-simulated-matches-v5'
+const PLAYER_CONDITION_KEY = 'fmapp-player-condition-v1'
 
 interface SavedMatchResult {
   id: string
@@ -15,7 +17,7 @@ interface SavedMatchResult {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-const isFiniteNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value)
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
 const isScore = (value: unknown): value is SavedMatchResult['score'] =>
   isRecord(value) && Number.isInteger(value.home) && Number.isInteger(value.away) && Number(value.home) >= 0 && Number(value.away) >= 0
 
@@ -143,4 +145,37 @@ export function saveSimulatedMatches(matches: Record<string, MatchInfo>, ownClub
 
 export function clearSimulatedMatches(): void {
   window.localStorage.removeItem(STORAGE_KEY)
+}
+
+export function loadPlayerConditions(): { state: PlayerConditionState; error: string } {
+  try {
+    const stored = window.localStorage.getItem(PLAYER_CONDITION_KEY)
+    if (!stored) return { state: {}, error: '' }
+    const parsed: unknown = JSON.parse(stored)
+    if (!isRecord(parsed)) return { state: {}, error: 'Saved player condition data has an invalid format. Reset the game to replace this save.' }
+    const state: PlayerConditionState = {}
+    for (const [playerId, value] of Object.entries(parsed)) {
+      if (!isRecord(value)) return { state: {}, error: `Saved condition data for player "${playerId}" is invalid. Reset the game to replace this save.` }
+      const fitness = value.fitness
+      const lastUpdated = value.lastUpdated
+      const injuryUntil = value.injuryUntil
+      if (!isFiniteNumber(fitness) || fitness < 0 || fitness > 100
+        || typeof lastUpdated !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(lastUpdated)
+        || (injuryUntil !== undefined && (typeof injuryUntil !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(injuryUntil)))) {
+        return { state: {}, error: `Saved condition data for player "${playerId}" is invalid. Reset the game to replace this save.` }
+      }
+      state[playerId] = { fitness, lastUpdated, ...(typeof injuryUntil === 'string' ? { injuryUntil } : {}) }
+    }
+    return { state, error: '' }
+  } catch (error) {
+    return { state: {}, error: error instanceof Error ? `Could not load player condition data: ${error.message}` : 'Could not load player condition data.' }
+  }
+}
+
+export function savePlayerConditions(state: PlayerConditionState): void {
+  window.localStorage.setItem(PLAYER_CONDITION_KEY, JSON.stringify(state))
+}
+
+export function clearPlayerConditions(): void {
+  window.localStorage.removeItem(PLAYER_CONDITION_KEY)
 }

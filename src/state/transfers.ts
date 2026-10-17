@@ -22,6 +22,11 @@ type LedgerEntry =
   | { type: 'release'; playerId: string; date: string }
   | { type: 'renew'; playerId: string; wage: number; endDate: string; date: string; offer?: Player['contract']['offerHistory'][number] }
   | { type: 'offer'; playerId: string; date: string; offer: Player['contract']['offerHistory'][number] }
+  | { type: 'facility'; facility: FacilityUpgrade; date: string }
+
+export type FacilityUpgrade = 'training' | 'youth' | 'stadium'
+
+export const FACILITY_UPGRADE_COSTS: Record<FacilityUpgrade, number> = { training: 2500000, youth: 1800000, stadium: 3200000 }
 
 const money = (amount: number) => `£${(amount / 1000000).toFixed(1)}m`
 const round = (value: number, step: number) => Math.round(value / step) * step
@@ -77,6 +82,7 @@ function isLedgerEntry(value: unknown): value is LedgerEntry {
   if (entry.type === 'sign') return typeof entry.fromClubId === 'string' && Number.isFinite(entry.fee) && Number.isFinite(entry.wage) && typeof entry.endDate === 'string'
   if (entry.type === 'release') return true
   if (entry.type === 'offer') return isContractOffer(entry.offer)
+  if (entry.type === 'facility') return entry.facility === 'training' || entry.facility === 'youth' || entry.facility === 'stadium'
   return entry.type === 'renew' && Number.isFinite(entry.wage) && typeof entry.endDate === 'string' && (entry.offer === undefined || isContractOffer(entry.offer))
 }
 
@@ -132,7 +138,26 @@ function applyRenew(player: Player, wage: number, endDate: string) {
   player.contract = { ...player.contract, weeklyWage: wage, endDate }
 }
 
+function applyFacility(facility: FacilityUpgrade) {
+  const levelKey = facility === 'training' ? 'trainingLevel' : facility === 'youth' ? 'youthLevel' : 'stadiumLevel'
+  club.facilities[levelKey] += 1
+  club.finances.balance -= FACILITY_UPGRADE_COSTS[facility]
+}
+
 // ---------- Public actions ----------
+export function upgradeFacility(facility: FacilityUpgrade): string {
+  if (!['training', 'youth', 'stadium'].includes(facility)) return 'That facility cannot be upgraded.'
+  const levelKey = facility === 'training' ? 'trainingLevel' : facility === 'youth' ? 'youthLevel' : 'stadiumLevel'
+  const cost = FACILITY_UPGRADE_COSTS[facility]
+  if (club.facilities[levelKey] >= club.facilities.maxLevel) return 'This facility is already at its maximum level.'
+  if (club.finances.balance < cost) return `The club needs £${cost.toLocaleString('en-GB')} to upgrade this facility.`
+  const persistError = record({ type: 'facility', facility, date: getDate() })
+  if (persistError) return `The upgrade was not completed because it could not be saved: ${persistError}`
+  applyFacility(facility)
+  notify()
+  return `${facility[0].toUpperCase()}${facility.slice(1)} facilities upgraded to level ${club.facilities[levelKey]}.`
+}
+
 export function submitBid(player: Player, terms: BidTerms): DealResult {
   const date = getDate()
   const free = !player.contract.clubId
@@ -236,6 +261,8 @@ function restoreTransfers() {
           ?? getTransferMarketPlayers().find((member) => member.id === entry.playerId)
         if (!player) throw new Error(`Cannot restore transfer for player "${entry.playerId}".`)
         applySign(player, entry.fromClubId, entry.fee, entry.wage, entry.endDate, entry.date)
+      } else if (entry.type === 'facility') {
+        applyFacility(entry.facility)
       } else {
         const player = club.squad.find((member) => member.id === entry.playerId)
         if (!player) throw new Error(`Cannot restore contract update for player "${entry.playerId}".`)

@@ -6,14 +6,16 @@ import type { MatchInfo, MatchStats, Player } from '../types/game'
  * Fast, deterministic result generator for fixtures the user's club is not part of.
  * It is a pure function of the fixture ID and the two squads' 1-100 ratings, so results need no saving.
  */
-const strengthCache = new Map<string, number>()
+const strengthCache = new Map<string, { signature: string; strength: number }>()
 
 export function clubStrength(clubId: string, squad: readonly Player[]): number {
+  const signature = squad.map((player) => `${player.id}:${player.overall}:${player.fitness}`).join('|')
   const cached = strengthCache.get(clubId)
-  if (cached !== undefined) return cached
-  const top = [...squad].sort((a, b) => b.overall - a.overall).slice(0, 14)
-  const strength = top.reduce((sum, player) => sum + player.overall, 0) / Math.max(1, top.length)
-  strengthCache.set(clubId, strength)
+  if (cached?.signature === signature) return cached.strength
+  const effectiveOverall = (player: Player) => player.overall * (0.75 + player.fitness / 400)
+  const top = [...squad].sort((a, b) => effectiveOverall(b) - effectiveOverall(a)).slice(0, 14)
+  const strength = top.reduce((sum, player) => sum + effectiveOverall(player), 0) / Math.max(1, top.length)
+  strengthCache.set(clubId, { signature, strength })
   return strength
 }
 

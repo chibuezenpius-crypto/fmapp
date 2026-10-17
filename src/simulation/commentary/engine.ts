@@ -24,6 +24,7 @@ function commentaryKeyFor(event: MatchEvent, zone: string): CommentaryKey | null
     case 'Foul': return 'foul'
     case 'Yellow Card': return 'yellow_card'
     case 'Red Card': return 'red_card'
+    case 'Offside': return 'offside'
     case 'Injury': return 'injury'
     case 'Substitution': return 'substitution'
     case 'Half Time': return 'half_time'

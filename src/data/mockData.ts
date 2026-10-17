@@ -268,6 +268,12 @@ export function getSeasonLeagueFixtures(season: number): MatchInfo[] {
   return fixtures
 }
 
+export function clearOldSeasonFixtureCaches(currentSeason: number) {
+  for (const season of seasonFixtureCache.keys()) {
+    if (season !== currentSeason) seasonFixtureCache.delete(season)
+  }
+}
+
 /** Strictly the fixtures whose `leagueId` equals the given competition ID (never falls back to other competitions). */
 export const getFixturesByLeague = (leagueId: string, source: readonly MatchInfo[] = getSeasonLeagueFixtures(0)): MatchInfo[] =>
   source.filter((match) => match.leagueId === leagueId)
@@ -292,11 +298,12 @@ export const getFFPWageLimit = () => (club.finances.sponsorshipIncomeAnnual + cl
 export const getWageLimit = () => Math.min(getWageBudgetLimit(), getFFPWageLimit())
 export const getWageRoom = () => getWageLimit() - club.finances.weeklyWages
 
-export function getSquadHealth(): SquadHealthMetrics {
+export function getSquadHealth(date = SEASON_START_DATE): SquadHealthMetrics {
   const players = club.squad
+  const injured = players.filter((player) => player.injuryUntil !== undefined && player.injuryUntil > date)
   return {
-    activeInjuries: 0,
-    injuriesNote: 'Full squad available',
+    activeInjuries: injured.length,
+    injuriesNote: injured.length ? `${injured.length} player${injured.length === 1 ? '' : 's'} unavailable` : 'Full squad available',
     suspensions: 0,
     suspensionsNote: 'No disciplinary bans',
     squadMorale: 'Good',

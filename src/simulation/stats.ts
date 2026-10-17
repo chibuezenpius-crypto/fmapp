@@ -46,8 +46,11 @@ export function computePlayerStats(matches: readonly MatchInfo[]): PlayerStats {
     }
     for (const event of match.eventLog) {
       const clubName = event.team === 'home' ? match.homeClubName : match.awayClubName
-      if (event.type === 'Substitution' && !appearances.has(event.playerId)) {
+      if (!appearances.has(event.playerId)) {
         appearances.set(event.playerId, { tally: tallyFor(event.playerId, event.player, clubName), side: event.team, delta: 0 })
+      }
+      if (event.type === 'Substitution' && event.targetId && event.target && !appearances.has(event.targetId)) {
+        appearances.set(event.targetId, { tally: tallyFor(event.targetId, event.target, clubName), side: event.team, delta: 0 })
       }
       const actor = appearances.get(event.playerId)
       if (!actor) continue

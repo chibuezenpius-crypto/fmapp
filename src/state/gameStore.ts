@@ -1,16 +1,18 @@
 import { useSyncExternalStore } from 'react'
 import rawGlobalLeagues from '../data/globalLeaguesAndTeams.json'
-import { club, createTieFixture, getSeasonLeagueFixtures, league, leagueStandings, ownLeagueRules, SEASON_START_DATE } from '../data/mockData'
+import { clearOldSeasonFixtureCaches, club, createTieFixture, getSeasonLeagueFixtures, league, leagueStandings, ownLeagueRules, SEASON_START_DATE } from '../data/mockData'
 import { getCompetitionRules } from '../data/competitionRules'
 import { getClubSquad } from '../data/clubSquads'
 import type { GlobalLeaguesDatabase, LeagueCompetition, LeagueStanding, MatchInfo, Player } from '../types/game'
 import { matchSeedFromId, simulateMatch, type MatchTactics } from '../simulation/matchEngine'
-import { clearSimulatedMatches, loadSimulatedMatches, saveSimulatedMatches } from '../simulation/persistence'
-import { deriveSeasonTies, type LeagueRankings, type ScoreLookup, type SeasonTies, type TieSpec } from '../simulation/competitions'
+import { clearPlayerConditions, clearSimulatedMatches, loadPlayerConditions, loadSimulatedMatches, savePlayerConditions, saveSimulatedMatches } from '../simulation/persistence'
+import { CLUB_WORLD_CUP_ID, CONTINENTAL_IDS, DOMESTIC_CUPS, deriveSeasonTies, type LeagueRankings, type ScoreLookup, type SeasonTies, type TieSpec } from '../simulation/competitions'
 import { clubStrength, quickResult } from '../simulation/quickResult'
 import { applySimulatedResults } from '../simulation/season'
 import { computePlayerStats, computeTeamStats } from '../simulation/stats'
 import { DEFAULT_SLOTS, fitPlayersToSlots } from '../utils/lineup'
+import { applyMatchCondition, isUnavailable, recoverPlayerToDate, type PlayerConditionState } from '../simulation/playerCondition'
+import { validateSchedule } from '../simulation/calendarScheduler'
 
 const DATE_KEY = 'fmapp-game-date-v4'
 export const LEDGER_KEY = 'fmapp-transfer-ledger-v1'
@@ -62,13 +64,15 @@ function readMatchTactics(): MatchTactics {
   return { pressingIntensity: pressingValues[pressing], tempo: tempoValues[tempo], style, ...(Array.isArray(lineup) ? { lineup } : {}) }
 }
 
-function refreshMatchLineup(template: MatchInfo['lineups']['home'], squad: Player[], side: 'home' | 'away', preferredIds?: string[]) {
-  const preferred = preferredIds?.length === 11 && new Set(preferredIds).size === 11 && preferredIds.every((id) => squad.some((player) => player.id === id))
+function refreshMatchLineup(template: MatchInfo['lineups']['home'], squad: Player[], side: 'home' | 'away', preferredIds?: string[], date = getDate()) {
+  const available = squad.filter((player) => !isUnavailable(player, date))
+  if (available.length < 11) throw new Error(`Club has only ${available.length} fit players available for ${date}.`)
+  const preferred = preferredIds?.length === 11 && new Set(preferredIds).size === 11 && preferredIds.every((id) => available.some((player) => player.id === id))
     ? preferredIds
-    : fitPlayersToSlots(DEFAULT_SLOTS, squad)
-  const starters = preferred.map((id) => squad.find((player) => player.id === id)).filter((player): player is Player => player !== undefined)
+    : fitPlayersToSlots(DEFAULT_SLOTS, available)
+  const starters = preferred.map((id) => available.find((player) => player.id === id)).filter((player): player is Player => player !== undefined)
   const startingXI = DEFAULT_SLOTS.map((slot, index) => {
-    const player = squad.find((candidate) => candidate.id === preferred[index]) ?? starters[index]
+    const player = available.find((candidate) => candidate.id === preferred[index]) ?? starters[index]
     if (!player) throw new Error(`Unable to fill the ${slot.label} position in the match lineup.`)
     return {
       id: `${player.id}-match-${index}`,
@@ -81,7 +85,7 @@ function refreshMatchLineup(template: MatchInfo['lineups']['home'], squad: Playe
     }
   })
   const selectedIds = new Set(startingXI.map((player) => player.playerId))
-  const substitutes = [...squad].filter((player) => !selectedIds.has(player.id)).sort((a, b) => b.overall - a.overall).slice(0, 7)
+  const substitutes = available.filter((player) => !selectedIds.has(player.id)).sort((a, b) => b.overall - a.overall).slice(0, 7)
     .map((player, index) => ({ id: `${player.id}-sub-${index}`, playerId: player.id, name: player.name, shirtNumber: player.shirtNumber, position: player.position, x: 0, y: 0 }))
   return { ...template, formation: '4-3-3', startingXI, substitutes }
 }
@@ -90,16 +94,21 @@ export function simulateFixture(fixture: MatchInfo): MatchInfo {
   const tactics = readMatchTactics()
   const homeSquad = fixture.homeClubId === club.id ? club.squad : getClubSquad(fixture.homeClubId)
   const awaySquad = fixture.awayClubId === club.id ? club.squad : getClubSquad(fixture.awayClubId)
-  const homeLineup = refreshMatchLineup(fixture.lineups.home, homeSquad, 'home', fixture.homeClubId === club.id ? tactics.lineup : undefined)
-  const awayLineup = refreshMatchLineup(fixture.lineups.away, awaySquad, 'away', fixture.awayClubId === club.id ? tactics.lineup : undefined)
-  return simulateMatch({
+  for (const player of [...homeSquad, ...awaySquad]) recoverPlayerToDate(player, fixture.date, playerConditions)
+  const homeLineup = refreshMatchLineup(fixture.lineups.home, homeSquad, 'home', fixture.homeClubId === club.id ? tactics.lineup : undefined, fixture.date)
+  const awayLineup = refreshMatchLineup(fixture.lineups.away, awaySquad, 'away', fixture.awayClubId === club.id ? tactics.lineup : undefined, fixture.date)
+  const maxSubstitutions = getCompetitionRules(fixture.leagueId).maxSubstitutions
+  const result = simulateMatch({
     match: { ...fixture, lineups: { home: homeLineup, away: awayLineup }, formation: { home: homeLineup.formation, away: awayLineup.formation } },
     homeSquad,
     awaySquad,
     seed: matchSeedFromId(fixture.id),
-    homeTactics: fixture.homeClubId === club.id ? tactics : undefined,
-    awayTactics: fixture.awayClubId === club.id ? tactics : undefined,
+    homeTactics: { ...(fixture.homeClubId === club.id ? tactics : {}), maxSubstitutions },
+    awayTactics: { ...(fixture.awayClubId === club.id ? tactics : {}), maxSubstitutions },
   }).match
+  applyMatchCondition(result, 'home', homeSquad, homeLineup, playerConditions)
+  applyMatchCondition(result, 'away', awaySquad, awayLineup, playerConditions)
+  return result
 }
 
 // ---------- Store ----------
@@ -120,16 +129,36 @@ const HISTORY_KEY = 'fmapp-season-history-v1'
 const countries = (rawGlobalLeagues as unknown as GlobalLeaguesDatabase).countries
 export const seasonLabel = (season: number) => `${2026 + season}/${String((27 + season) % 100).padStart(2, '0')}`
 
-function loadHistory(): SeasonRecord[] {
+function isSeasonRecord(value: unknown): value is SeasonRecord {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  if (!Number.isSafeInteger(record.season) || typeof record.label !== 'string' || !record.tables || typeof record.tables !== 'object' || Array.isArray(record.tables)
+    || !record.summaries || typeof record.summaries !== 'object' || Array.isArray(record.summaries)) return false
+  const tables = record.tables as Record<string, unknown>
+  const summaries = record.summaries as Record<string, unknown>
+  for (const country of countries) {
+    const table = tables[country.id]
+    const summary = summaries[country.id]
+    if (!Array.isArray(table) || !table.every((clubId: unknown) => typeof clubId === 'string')
+      || !summary || typeof summary !== 'object' || Array.isArray(summary)) return false
+    const summaryRecord = summary as Record<string, unknown>
+    if (typeof summaryRecord.champion !== 'string' || typeof summaryRecord.runnerUp !== 'string' || !Number.isFinite(summaryRecord.points)) return false
+  }
+  return true
+}
+
+function loadHistory(): { history: SeasonRecord[]; error: string } {
   try {
     const parsed: unknown = JSON.parse(window.localStorage.getItem(HISTORY_KEY) ?? '[]')
-    return Array.isArray(parsed) ? parsed.filter((item): item is SeasonRecord => typeof item === 'object' && item !== null && typeof item.season === 'number' && typeof item.tables === 'object') : []
-  } catch {
-    return []
+    if (!Array.isArray(parsed) || !parsed.every(isSeasonRecord)) return { history: [], error: 'Saved season history has an invalid format. Reset the game to replace this save.' }
+    return { history: parsed, error: '' }
+  } catch (error) {
+    return { history: [], error: error instanceof Error ? `Could not load season history: ${error.message}` : 'Could not load season history.' }
   }
 }
 
-let history: SeasonRecord[] = loadHistory()
+const loadedHistory = loadHistory()
+let history: SeasonRecord[] = loadedHistory.history
 const currentSeason = () => history.length
 
 const involvesUser = (match: { homeClubId: string; awayClubId: string }) => match.homeClubId === club.id || match.awayClubId === club.id
@@ -147,6 +176,7 @@ const tieFixture = (tie: TieSpec) => {
 }
 
 const backgroundResults = new Map<string, MatchInfo>()
+const validatedScheduleKeys = new Set<string>()
 /** Quick deterministic result for matches that are not fully simulated; never saved because it is reproducible. */
 function backgroundResult(fixture: MatchInfo): MatchInfo {
   let result = backgroundResults.get(fixture.id)
@@ -168,7 +198,21 @@ const scoreLookup = (done: Record<string, MatchInfo>, asOf: string): ScoreLookup
 function seasonFixtures(done: Record<string, MatchInfo>, asOf: string): { fixtures: MatchInfo[]; ties: SeasonTies } {
   const season = currentSeason()
   const ties = deriveSeasonTies(season, season > 0 ? history[season - 1]?.tables : undefined, scoreLookup(done, asOf))
-  return { fixtures: [...getSeasonLeagueFixtures(season), ...ties.ties.map(tieFixture)], ties }
+  const fixtures = [...getSeasonLeagueFixtures(season), ...ties.ties.map(tieFixture)]
+  const key = `${season}:${ties.ties.map((tie) => `${tie.id}:${tie.date}:${tie.homeId}:${tie.awayId}`).join('|')}`
+  if (!validatedScheduleKeys.has(key)) {
+    const problems = validateSchedule(fixtures.map((match) => ({
+      id: match.id,
+      date: match.date,
+      kind: match.leagueId === CLUB_WORLD_CUP_ID ? 'club-world-cup'
+        : CONTINENTAL_IDS.includes(match.leagueId) ? 'continental'
+          : DOMESTIC_CUPS.some((cup) => cup.id === match.leagueId) ? 'domestic-cup' : 'league',
+      clubIds: [match.homeClubId, match.awayClubId],
+    })))
+    if (problems.length) throw new Error(`Generated season ${seasonLabel(season)} schedule is invalid: ${problems.join(' ')}`)
+    validatedScheduleKeys.add(key)
+  }
+  return { fixtures, ties }
 }
 
 const resolveFixture = (fixture: MatchInfo, done: Record<string, MatchInfo>, asOf: string): MatchInfo =>
@@ -178,7 +222,19 @@ const savedDate = loadDate()
 const loaded = loadSimulatedMatches((done) => seasonFixtures(done, savedDate).fixtures)
 let date = loaded.error ? SEASON_START_DATE : savedDate
 let results: Record<string, MatchInfo> = loaded.matches
-let message = loaded.error
+const loadedPlayerConditions = loadPlayerConditions()
+const playerConditions: PlayerConditionState = loadedPlayerConditions.state
+for (const country of countries) {
+  for (const team of country.teams) {
+    for (const player of getClubSquad(team.id)) {
+      const condition = playerConditions[player.id]
+      if (!condition) continue
+      player.fitness = condition.fitness
+      if (condition.injuryUntil) player.injuryUntil = condition.injuryUntil
+    }
+  }
+}
+let message = [loadedHistory.error, loaded.error, loadedPlayerConditions.error].filter(Boolean).join(' ')
 let revision = 0
 let cached: { revision: number; view: GameView } | null = null
 const listeners = new Set<() => void>()
@@ -282,23 +338,37 @@ function rollOverSeason(): boolean {
   const resolved = fixtures.map((fixture) => resolveFixture(fixture, results, date)).filter((match) => match.status === 'Completed')
   const tables: LeagueRankings = {}
   const summaries: SeasonRecord['summaries'] = {}
+  const clubNames = new Map(countries.flatMap((country) => country.teams.map((team) => [team.id, team.name] as const)))
   for (const country of countries) {
     const rows = applySimulatedResults(leagueStandings(country), resolved.filter((match) => match.leagueId === country.id), getCompetitionRules(country.id))
     tables[country.id] = rows.map((row) => row.clubId)
     summaries[country.id] = { champion: rows[0].clubName, runnerUp: rows[1].clubName, points: rows[0].points }
   }
+  for (const [competitionId, winner] of Object.entries(ties.winners)) {
+    summaries[competitionId] = {
+      champion: clubNames.get(winner.champion) ?? winner.champion,
+      runnerUp: clubNames.get(winner.runnerUp) ?? winner.runnerUp,
+      points: 0,
+    }
+  }
   history = [...history, { season: history.length, label: seasonLabel(history.length), tables, summaries }]
   results = {}
+  clearOldSeasonFixtureCaches(currentSeason())
+  tieFixtures.clear()
+  backgroundResults.clear()
+  validatedScheduleKeys.clear()
   return true
 }
 
 function commit(newResults: MatchInfo[], nextDate?: string) {
   results = { ...results, ...Object.fromEntries(newResults.map((result) => [result.id, result])) }
   if (nextDate) date = nextDate
+  if (nextDate) for (const player of club.squad) recoverPlayerToDate(player, nextDate, playerConditions)
   let startedSeason = ''
   while (rollOverSeason()) startedSeason = seasonLabel(currentSeason())
   try {
     saveSimulatedMatches(results, club.id)
+    savePlayerConditions(playerConditions)
     window.localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
     if (nextDate) window.localStorage.setItem(DATE_KEY, nextDate)
     message = startedSeason ? `The season is over. The ${startedSeason} calendar has been scheduled automatically.` : ''
@@ -344,11 +414,7 @@ export function advanceToNextMatch() {
 export function playMatch(matchId: string) {
   const fixture = getGameView().matches.find((match) => match.id === matchId)
   if (!fixture || fixture.status !== 'Upcoming') return
-  try {
-    commit([simulateFixture(fixture)])
-  } catch (error) {
-    fail('The match could not be simulated', error)
-  }
+  advanceTo(fixture.date > date ? fixture.date : date)
 }
 
 export function clearMessage() {
@@ -360,7 +426,9 @@ export function clearMessage() {
 /** Wipes the save (results, calendar, transfer ledger) and restarts from a fresh season. */
 export function resetGame() {
   clearSimulatedMatches()
+  clearPlayerConditions()
   window.localStorage.removeItem(DATE_KEY)
   window.localStorage.removeItem(LEDGER_KEY)
+  window.localStorage.removeItem(HISTORY_KEY)
   window.location.reload()
 }

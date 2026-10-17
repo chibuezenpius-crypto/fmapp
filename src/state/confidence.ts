@@ -51,7 +51,7 @@ export function computeConfidence(view: GameView): ClubConfidenceData {
   const board = clamp(70 + placeDelta * 2.5 - (overspend ? 12 : 0))
   const fan = clamp(65 + formScore * 5 + (played ? (pointsPerGame - 1.4) * 8 : 0))
   const manager = clamp(62 + (played ? (pointsPerGame - 1.4) * 22 : 0) + formScore * 2)
-  const morale = getSquadHealth().moralePercentage
+  const morale = getSquadHealth(view.date).moralePercentage
 
   return {
     board: item(board, !played ? 'Expectations set for the new season' : placeDelta >= 0 ? 'Pleased with results versus expectations' : 'Results are below the board’s targets'),

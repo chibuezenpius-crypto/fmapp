@@ -5,6 +5,7 @@ export interface MatchTactics {
   pressingIntensity: number
   tempo: number
   style: string
+  maxSubstitutions?: number
   lineup?: string[]
 }
 
@@ -37,6 +38,8 @@ interface RuntimePlayer {
   x: number
   y: number
   fatigue: number
+  yellowCards: number
+  sentOff: boolean
 }
 
 interface RuntimeTeam {
@@ -46,6 +49,7 @@ interface RuntimeTeam {
   squad: RuntimePlayer[]
   bench: RuntimePlayer[]
   substitutionsUsed: number
+  maxSubstitutions: number
   pressing: number
   tempo: number
   style: string
@@ -92,13 +96,15 @@ function buildTeam(
       x: entry.y / 100 * PITCH_LENGTH,
       y: entry.x / 100 * PITCH_WIDTH,
       fatigue: 0,
+      yellowCards: 0,
+      sentOff: false,
     }
   })
   if (starters.length !== 11) throw new Error(`Match lineup for club "${id}" must contain exactly 11 starters.`)
   const bench = lineup.substitutes.flatMap((entry) => {
     const player = squad.find((candidate) => candidate.id === entry.playerId)
       ?? squad.find((candidate) => candidate.name === entry.name)
-    return player ? [{ player, lineup: entry, x: entry.y / 100 * PITCH_LENGTH, y: entry.x / 100 * PITCH_WIDTH, fatigue: 0 }] : []
+    return player ? [{ player, lineup: entry, x: entry.y / 100 * PITCH_LENGTH, y: entry.x / 100 * PITCH_WIDTH, fatigue: 0, yellowCards: 0, sentOff: false }] : []
   })
   const style = tactics.style ?? 'Balanced'
   return {
@@ -108,6 +114,7 @@ function buildTeam(
     squad: starters,
     bench,
     substitutionsUsed: 0,
+    maxSubstitutions: clamp(tactics.maxSubstitutions ?? 5, 0, 5),
     pressing: clamp((tactics.pressingIntensity ?? 55) + (style === 'Gegenpress' ? 8 : style === 'Park the Bus' ? 6 : style === 'Counter-Attack' ? -8 : 0), 0, 100),
     tempo: clamp(tactics.tempo ?? 50, 0, 100),
     style,
@@ -115,11 +122,21 @@ function buildTeam(
 }
 
 function nearest(point: Point, team: RuntimeTeam) {
-  return team.squad.reduce((best, candidate) => distance(point, candidate) < distance(point, best) ? candidate : best)
+  const active = team.squad.filter((candidate) => !candidate.sentOff)
+  if (!active.length) throw new Error(`Club "${team.id}" has no players available on the pitch.`)
+  return active.reduce((best, candidate) => distance(point, candidate) < distance(point, best) ? candidate : best)
 }
 
 function playersForAction(team: RuntimeTeam) {
-  return team.squad.filter((player) => player.player.position !== 'GK')
+  return team.squad.filter((player) => !player.sentOff && player.player.position !== 'GK')
+}
+
+function isOffside(point: Point, defending: RuntimeTeam, direction: number) {
+  const progress = (x: number) => direction === 1 ? x : PITCH_LENGTH - x
+  const defenders = defending.squad.filter((player) => !player.sentOff).map((player) => progress(player.x)).sort((first, second) => second - first)
+  if (defenders.length < 2) return false
+  const attackProgress = progress(point.x)
+  return attackProgress > PITCH_LENGTH / 2 && attackProgress > Math.max(PITCH_LENGTH / 2, defenders[1]) + 0.5
 }
 
 function relationshipBonus(first: Player, second: Player) {
@@ -258,7 +275,16 @@ function simulateHalf(
       const foulChance = 0.025 + pressure * 0.065
       if (random() < foulChance) {
         emit(events, matchId, time, 'Foul', defending, marker, point, 'foul-committed', { target: carrier.player.name, targetId: carrier.player.id })
-        if (random() < 0.16) emit(events, matchId, time, 'Yellow Card', defending, marker, point, 'caution')
+        const cardRoll = random()
+        if (cardRoll < 0.02) {
+          emit(events, matchId, time, 'Red Card', defending, marker, point, 'straight-red')
+          marker.sentOff = true
+        } else if (cardRoll < 0.18) {
+          marker.yellowCards += 1
+          const secondYellow = marker.yellowCards > 1
+          emit(events, matchId, time, secondYellow ? 'Red Card' : 'Yellow Card', defending, marker, point, secondYellow ? 'second-yellow' : 'caution')
+          if (secondYellow) marker.sentOff = true
+        }
         possessionBroken = true
         break
       }
@@ -294,7 +320,13 @@ function simulateHalf(
         const complete = random() < probability
         const progress = randomInt(random, 3, 12) * (attacking.tempo > 70 ? 1.12 : 1)
         const end = clampPoint({ x: point.x + direction * progress, y: point.y + randomInt(random, -8, 8) })
-        emit(events, matchId, time, 'Pass', attacking, carrier, end, complete ? 'complete' : 'intercepted', { target: receiver.player.name, targetId: receiver.player.id, data: { probability: Math.round(probability * 100), distance: Math.round(distance(point, end)) } })
+        const offside = complete && isOffside(end, defending, direction)
+        emit(events, matchId, time, 'Pass', attacking, carrier, end, offside ? 'offside' : complete ? 'complete' : 'intercepted', { target: receiver.player.name, targetId: receiver.player.id, data: { probability: Math.round(probability * 100), distance: Math.round(distance(point, end)) } })
+        if (offside) {
+          emit(events, matchId, time + 1, 'Offside', attacking, receiver, end, 'flagged', { target: carrier.player.name, targetId: carrier.player.id })
+          possessionBroken = true
+          break
+        }
         if (complete) {
           previousPasser = carrier
           receiver.x = end.x
@@ -331,8 +363,8 @@ function simulateHalf(
     }
     clock += duration
     const matchTime = baseTime + clock
-    if (matchTime >= 3900 && attacking.substitutionsUsed < 2 && attacking.bench.length > 0 && random() < 0.11) {
-      const outgoing = [...attacking.squad].filter((player) => player.player.position !== 'GK').sort((first, second) => second.fatigue - first.fatigue)[0]
+    if (matchTime >= 3900 && attacking.substitutionsUsed < attacking.maxSubstitutions && attacking.bench.length > 0 && random() < 0.11) {
+      const outgoing = [...attacking.squad].filter((player) => !player.sentOff && player.player.position !== 'GK').sort((first, second) => second.fatigue - first.fatigue)[0]
       if (outgoing) {
         const benchIndex = attacking.bench.findIndex((player) => player.player.position === outgoing.player.position)
         const replacement = attacking.bench.splice(benchIndex < 0 ? 0 : benchIndex, 1)[0]

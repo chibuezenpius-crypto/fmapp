@@ -76,6 +76,13 @@ export const commentaryTemplates: CommentaryTemplates = {
     '{playerName} sees red, and {teamName} face a real struggle now.',
     'The referee shows a straight red to {playerName}.',
   ],
+  offside: [
+    'The flag is up against {playerName}; {teamName} are caught offside.',
+    '{playerName} strays beyond the defence and the move is halted for offside.',
+    'Offside against {teamName} as {playerName} gets ahead of the last line.',
+    'The assistant referee spots {playerName} in an offside position.',
+    '{teamName} lose the attack after {playerName} is flagged offside.',
+  ],
   injury: [
     '{playerName} is down and the physio comes on to take a look.',
     'Concern for {teamName} as {playerName} goes down injured.',

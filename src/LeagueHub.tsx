@@ -151,17 +151,24 @@ export default function LeagueHub({ seasonLabel, history, matches, standings, pl
   const baseCompetition = selectedGlobalCountry ? adaptGlobalLeague(selectedGlobalCountry) : currentTournament ? adaptTournament(currentTournament) : leagueCompetitions.find((item) => item.id === selectedCompetitionId)
   const leagueMatches = baseCompetition ? getFixturesByLeague(baseCompetition.id, matches) : []
   const ownTable = baseCompetition?.id === league.id
+  const competitionHistory = baseCompetition ? history.slice().reverse().flatMap((record) => {
+    const summary = record.summaries[baseCompetition.id]
+    return summary ? [{ season: record.label, ...summary }] : []
+  }) : []
   const tableStandings = ownTable ? standings : selectedGlobalCountry && baseCompetition
     ? applySimulatedResults(baseCompetition.standings, leagueMatches.filter((match) => match.status === 'Completed'), getCompetitionRules(baseCompetition.id))
     : baseCompetition?.standings ?? []
-  const currentCompetition = baseCompetition && selectedGlobalCountry ? {
+  const completedRounds = new Set(leagueMatches.filter((match) => match.status === 'Completed').map((match) => match.matchday)).size
+  const currentCompetition = baseCompetition ? {
     ...baseCompetition,
     season: seasonLabel,
-    standings: tableStandings,
-    ...(ownTable ? { playerStats, teamStats } : {}),
-    matchday: Math.max(0, ...tableStandings.map((standing) => standing.played)),
-    history: history.map((record) => ({ season: record.label, champion: record.summaries[baseCompetition.id]?.champion ?? '', runnerUp: record.summaries[baseCompetition.id]?.runnerUp ?? '', points: record.summaries[baseCompetition.id]?.points ?? 0 })).reverse(),
-  } : baseCompetition ? { ...baseCompetition, season: seasonLabel } : baseCompetition
+    history: competitionHistory,
+    ...(selectedGlobalCountry ? {
+      standings: tableStandings,
+      ...(ownTable ? { playerStats, teamStats } : {}),
+      matchday: Math.max(0, ...tableStandings.map((standing) => standing.played)),
+    } : currentTournament ? {} : { matchday: completedRounds }),
+  } : baseCompetition
   const isDomesticCup = !selectedGlobalCountry && !currentTournament && currentCompetition?.category === 'Domestic Leagues' && currentCompetition.totalMatchdays <= 8
   const players = currentCompetition?.playerStats[playerStat] ?? []
 

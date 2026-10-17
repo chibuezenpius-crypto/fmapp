@@ -3,7 +3,7 @@ import rawInternationalTournaments from './internationalTournaments.json'
 import { CLUB_WORLD_CUP_ID, CONTINENTAL_IDS } from '../simulation/competitions'
 import type { GlobalLeaguesDatabase, InternationalTournamentsDatabase } from '../types/game'
 
-export type Tiebreaker = 'Goal difference' | 'Goals scored' | 'Wins'
+export type Tiebreaker = 'Head-to-head' | 'Goal difference' | 'Goals scored' | 'Wins'
 
 export interface FinancialRules {
   /** Weekly wage bill may not exceed wageBudget × this multiplier. */
@@ -32,7 +32,7 @@ export interface CompetitionRules {
   financial: FinancialRules
 }
 
-const LEAGUE_TIEBREAKERS: Tiebreaker[] = ['Goal difference', 'Goals scored', 'Wins']
+const LEAGUE_TIEBREAKERS: Tiebreaker[] = ['Head-to-head', 'Goal difference', 'Goals scored', 'Wins']
 const globalLeagues = (rawGlobalLeagues as unknown as GlobalLeaguesDatabase).countries
 const tournaments = (rawInternationalTournaments as unknown as InternationalTournamentsDatabase).tournaments
 

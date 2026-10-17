@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { club, getClubBadge } from './data/mockData'
 import ClubBadge from './ClubBadge'
 import { getDate } from './state/gameStore'
+import { FACILITY_UPGRADE_COSTS, upgradeFacility as upgradeClubFacility } from './state/transfers'
 import { getInternationalDutyPlayers } from './simulation/calendarScheduler'
 import type { MatchInfo, Player } from './types/game'
 
@@ -11,7 +12,6 @@ type PositionFilter = 'ALL' | 'GK' | 'DEF' | 'MID' | 'FWD'
 type SortMode = 'Value' | 'Rating' | 'Age'
 
 const sections: ClubSection[] = ['Overview', 'Squad', 'Tactics', 'Staff', 'Sponsorship', 'Fixtures', 'Facilities']
-const FACILITY_COSTS = { training: 2500000, youth: 1800000, stadium: 3200000 }
 const money = (amount: number) => `£${new Intl.NumberFormat('en-GB').format(amount)}`
 const shortMoney = (amount: number) => `£${(amount / 1000000).toFixed(1)}m`
 const displayDate = (date: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`))
@@ -42,8 +42,8 @@ function PlayerButton({ player, onSelectPlayer, role, x, y }: { player: Player; 
 export default function ClubProfile({ section, selectedClubName, matches, onSectionChange, onSelectClub, onSelectPlayer, onSelectPersonnel, onSelectMatch }: ClubProfileProps) {
   const [positionFilter, setPositionFilter] = useState<PositionFilter>('ALL')
   const [sortMode, setSortMode] = useState<SortMode>('Value')
+  const [facilityNotice, setFacilityNotice] = useState('')
   const onDuty = new Set(getInternationalDutyPlayers(club.squad, getDate()).map((player) => player.id))
-  const [, refresh] = useState(0)
   const { trainingLevel, youthLevel, stadiumLevel } = club.facilities
   const balance = club.finances.balance
   const squad = [...club.squad].filter((player) => {
@@ -59,12 +59,7 @@ export default function ClubProfile({ section, selectedClubName, matches, onSect
   })
 
   const upgradeFacility = (facility: 'training' | 'youth' | 'stadium') => {
-    const levelKey = facility === 'training' ? 'trainingLevel' : facility === 'youth' ? 'youthLevel' : 'stadiumLevel'
-    const cost = FACILITY_COSTS[facility]
-    if (club.facilities[levelKey] >= club.facilities.maxLevel || club.finances.balance < cost) return
-    club.facilities[levelKey] += 1
-    club.finances.balance -= cost
-    refresh((count) => count + 1)
+    setFacilityNotice(upgradeClubFacility(facility))
   }
 
   const formation = [
@@ -147,9 +142,10 @@ export default function ClubProfile({ section, selectedClubName, matches, onSect
         <div className="club-subpage-heading"><div><span className="eyebrow">INVEST IN THE FUTURE</span><h2>Facilities</h2></div></div>
         <section className="club-balance-card"><span className="eyebrow">UPGRADE BUDGET</span><strong>{shortMoney(balance)}</strong><div className="balance-columns"><span>Transfer fund <b>{shortMoney(club.finances.transferBudget)}</b></span><span>Monthly operations <b>{money(club.finances.operationsPerMonth)}</b></span></div></section>
         <section className="club-facilities-panel"><div className="club-panel-heading"><div><span className="eyebrow">INFRASTRUCTURE</span><h2>Club facilities</h2></div></div>
-          <FacilityUpgrade name="Training ground" level={trainingLevel} maxLevel={club.facilities.maxLevel} cost={FACILITY_COSTS.training} canAfford={balance >= FACILITY_COSTS.training} onUpgrade={() => upgradeFacility('training')} />
-          <FacilityUpgrade name="Youth setup" level={youthLevel} maxLevel={club.facilities.maxLevel} cost={FACILITY_COSTS.youth} canAfford={balance >= FACILITY_COSTS.youth} onUpgrade={() => upgradeFacility('youth')} />
-          <FacilityUpgrade name="Stadium" level={stadiumLevel} maxLevel={club.facilities.maxLevel} cost={FACILITY_COSTS.stadium} canAfford={balance >= FACILITY_COSTS.stadium} onUpgrade={() => upgradeFacility('stadium')} />
+          {facilityNotice && <p className="club-action-notice" role="status">{facilityNotice}</p>}
+          <FacilityUpgrade name="Training ground" level={trainingLevel} maxLevel={club.facilities.maxLevel} cost={FACILITY_UPGRADE_COSTS.training} canAfford={balance >= FACILITY_UPGRADE_COSTS.training} onUpgrade={() => upgradeFacility('training')} />
+          <FacilityUpgrade name="Youth setup" level={youthLevel} maxLevel={club.facilities.maxLevel} cost={FACILITY_UPGRADE_COSTS.youth} canAfford={balance >= FACILITY_UPGRADE_COSTS.youth} onUpgrade={() => upgradeFacility('youth')} />
+          <FacilityUpgrade name="Stadium" level={stadiumLevel} maxLevel={club.facilities.maxLevel} cost={FACILITY_UPGRADE_COSTS.stadium} canAfford={balance >= FACILITY_UPGRADE_COSTS.stadium} onUpgrade={() => upgradeFacility('stadium')} />
         </section>
       </>}
     </div>

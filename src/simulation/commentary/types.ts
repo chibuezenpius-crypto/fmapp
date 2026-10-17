@@ -8,6 +8,7 @@ export type CommentaryKey =
   | 'goal'
   | 'yellow_card'
   | 'red_card'
+  | 'offside'
   | 'injury'
   | 'substitution'
   | 'half_time'
