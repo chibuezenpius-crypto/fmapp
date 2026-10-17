@@ -4,6 +4,7 @@ import type { AcademyProspect, Player, PlayerPosition, YouthManager } from './ty
 import { ACADEMY_MAX_SIZE, MAX_ACTIVE_MISSIONS, SCOUT_REGIONS, SENIOR_SQUAD_MAX, advanceDays, generateIntake, generateYouthManager, startMission, useAcademy, type PositionGroup, type ScoutMission } from './utils/academy'
 import { resolveFlagCode } from './countryFlagUtils'
 import { PLACEHOLDER_PORTRAIT } from './portrait'
+import { intakeScoutingBonus } from './state/facilities'
 
 type AcademySection = 'Overview' | 'Scouting' | 'Players' | 'Progress'
 type PositionFilter = 'ALL' | PositionGroup
@@ -97,7 +98,7 @@ export default function AcademyHub({ onSelectPlayer, onSelectCountry }: AcademyH
   }
 
   const runIntake = () => {
-    const intake = generateIntake(club.id, academy.nextIntakeYear, youthLevel, academy.manager)
+    const intake = generateIntake(club.id, academy.nextIntakeYear, youthLevel, academy.manager, intakeScoutingBonus(club.facilities.scoutingLevel))
     const roster = [...prospects, ...intake].sort((first, second) => second.player.potential - first.player.potential).slice(0, ACADEMY_MAX_SIZE)
     setAcademy({ ...academy, prospects: roster, nextIntakeYear: academy.nextIntakeYear + 1, intakeCount: academy.intakeCount + 1 })
     setNotice(`${intake.length} new prospects joined from the ${academy.nextIntakeYear} intake.`)

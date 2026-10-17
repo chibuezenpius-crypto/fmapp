@@ -3,6 +3,7 @@ import { getClubSquad } from '../data/clubSquads'
 import { createRng } from '../utils/proceduralGenerator'
 import type { Player } from '../types/game'
 import { getDate, LEDGER_KEY, notify, reportGameMessage } from './gameStore'
+import { allFacilitiesMaxed, FACILITY_INFO, FACILITY_LEVEL_KEY, FACILITY_UPGRADE_COSTS, isFacilityUpgrade, STADIUM_UPGRADE_GROWTH, type FacilityUpgrade } from './facilities'
 
 export interface BidTerms {
   fee: number
@@ -27,9 +28,8 @@ type LedgerEntry =
 
 export type BoardFundingReason = 'Squad development' | 'Facilities'
 export interface BoardRequest { reason: BoardFundingReason; requested: number; granted: number; date: string }
-export type FacilityUpgrade = 'training' | 'youth' | 'stadium'
-
-export const FACILITY_UPGRADE_COSTS: Record<FacilityUpgrade, number> = { training: 2500000, youth: 1800000, stadium: 3200000 }
+export type { FacilityUpgrade } from './facilities'
+export { FACILITY_UPGRADE_COSTS } from './facilities'
 
 const money = (amount: number) => `£${(amount / 1000000).toFixed(1)}m`
 const round = (value: number, step: number) => Math.round(value / step) * step
@@ -82,7 +82,7 @@ function isLedgerEntry(value: unknown): value is LedgerEntry {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const entry = value as Record<string, unknown>
   if (typeof entry.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date)) return false
-  if (entry.type === 'facility') return entry.facility === 'training' || entry.facility === 'youth' || entry.facility === 'stadium'
+  if (entry.type === 'facility') return isFacilityUpgrade(entry.facility)
   if (entry.type === 'board') return (entry.reason === 'Squad development' || entry.reason === 'Facilities') && Number.isFinite(entry.requested) && Number.isFinite(entry.granted)
   if (typeof entry.playerId !== 'string') return false
   if (entry.type === 'sign') return typeof entry.fromClubId === 'string' && Number.isFinite(entry.fee) && Number.isFinite(entry.wage) && typeof entry.endDate === 'string'
@@ -144,9 +144,12 @@ function applyRenew(player: Player, wage: number, endDate: string) {
 }
 
 function applyFacility(facility: FacilityUpgrade) {
-  const levelKey = facility === 'training' ? 'trainingLevel' : facility === 'youth' ? 'youthLevel' : 'stadiumLevel'
-  club.facilities[levelKey] += 1
+  club.facilities[FACILITY_LEVEL_KEY[facility]] += 1
   club.finances.balance -= FACILITY_UPGRADE_COSTS[facility]
+  if (facility === 'stadium') {
+    club.stadium.capacity = Math.round(club.stadium.capacity * (1 + STADIUM_UPGRADE_GROWTH) / 100) * 100
+    club.finances.ticketSalesPerHomeMatch = Math.round(club.finances.ticketSalesPerHomeMatch * (1 + STADIUM_UPGRADE_GROWTH) / 100) * 100
+  }
 }
 
 function applyBoardFunding(reason: BoardFundingReason, granted: number) {
@@ -188,7 +191,7 @@ export function requestBoardFunds(reason: BoardFundingReason, percent: number, b
   let granted = 0
   let message: string
   if (wageOverLimit) message = 'The board will not release more money while the wage bill is over the limit. Reduce wages first.'
-  else if (reason === 'Facilities' && club.facilities.trainingLevel >= club.facilities.maxLevel && club.facilities.youthLevel >= club.facilities.maxLevel && club.facilities.stadiumLevel >= club.facilities.maxLevel) message = 'Every facility is already at its maximum level, so the board sees no need for funds.'
+  else if (reason === 'Facilities' && allFacilitiesMaxed(club.facilities)) message = 'Every facility is already at its maximum level, so the board sees no need for funds.'
   else {
     const ceilingPercent = Math.max(0, (boardConfidence - 40) / 60) * 100
     granted = Math.min(requested, boardRequestAmount(Math.floor(ceilingPercent / 5) * 5))
@@ -205,8 +208,8 @@ export function requestBoardFunds(reason: BoardFundingReason, percent: number, b
 
 // ---------- Public actions ----------
 export function upgradeFacility(facility: FacilityUpgrade): string {
-  if (!['training', 'youth', 'stadium'].includes(facility)) return 'That facility cannot be upgraded.'
-  const levelKey = facility === 'training' ? 'trainingLevel' : facility === 'youth' ? 'youthLevel' : 'stadiumLevel'
+  if (!isFacilityUpgrade(facility)) return 'That facility cannot be upgraded.'
+  const levelKey = FACILITY_LEVEL_KEY[facility]
   const cost = FACILITY_UPGRADE_COSTS[facility]
   if (club.facilities[levelKey] >= club.facilities.maxLevel) return 'This facility is already at its maximum level.'
   if (club.finances.balance < cost) return `The club needs £${cost.toLocaleString('en-GB')} to upgrade this facility.`
@@ -214,7 +217,7 @@ export function upgradeFacility(facility: FacilityUpgrade): string {
   if (persistError) return `The upgrade was not completed because it could not be saved: ${persistError}`
   applyFacility(facility)
   notify()
-  return `${facility[0].toUpperCase()}${facility.slice(1)} facilities upgraded to level ${club.facilities[levelKey]}.`
+  return `${FACILITY_INFO[facility].name} upgraded to level ${club.facilities[levelKey]}.`
 }
 
 export function submitBid(player: Player, terms: BidTerms): DealResult {

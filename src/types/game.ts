@@ -148,7 +148,7 @@ export interface Club {
   stadium: { name: string; capacity: number; attendance: number }
   finances: { transferBudget: number; wageBudget: number; weeklyWages: number; balance: number; sponsorshipIncomeAnnual: number; ticketSalesPerHomeMatch: number; operationsPerMonth: number }
   sponsors: { name: string; valueAnnual: number; category: string; endDate: string }[]
-  facilities: { trainingLevel: number; youthLevel: number; stadiumLevel: number; maxLevel: number }
+  facilities: { trainingLevel: number; youthLevel: number; stadiumLevel: number; medicalLevel: number; analysisLevel: number; scoutingLevel: number; maxLevel: number }
   staff: { id: string; name: string; role: string; nationality: string; age: number; profileId: string }[]
   history: {
     achievements: { season: string; title: string; detail: string }[]

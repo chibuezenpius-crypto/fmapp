@@ -114,9 +114,9 @@ export function generateProspect(seed: string, clubId: string, youthLevel: numbe
   }
 }
 
-export function generateIntake(clubId: string, year: number, youthLevel: number, manager: YouthManager | null): AcademyProspect[] {
+export function generateIntake(clubId: string, year: number, youthLevel: number, manager: YouthManager | null, scoutingBonus = 0): AcademyProspect[] {
   const scouting = manager?.scoutingNetwork ?? 25
-  const size = 4 + Math.floor(youthLevel / 2) + Math.floor(scouting / 40)
+  const size = Math.max(3, 4 + Math.floor(youthLevel / 2) + Math.floor(scouting / 40) + scoutingBonus)
   return Array.from({ length: size }, (_, index) => generateProspect(`${clubId}:intake:${year}:${index}`, clubId, youthLevel, manager))
 }
 

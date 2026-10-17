@@ -14,6 +14,9 @@ import { DEFAULT_SLOTS, fitPlayersToSlots } from '../utils/lineup'
 import { applyMatchCondition, isUnavailable, recoverPlayerToDate, type PlayerConditionState } from '../simulation/playerCondition'
 import { validateSchedule } from '../simulation/calendarScheduler'
 import { SPONSORS_KEY, syncSponsors } from './sponsors'
+import { injuryDurationScale } from './facilities'
+import { syncTraining, TRAINING_KEY } from './training'
+import { normalizeBench, readSavedBenchIds } from './matchSquad'
 
 const DATE_KEY = 'fmapp-game-date-v4'
 export const LEDGER_KEY = 'fmapp-transfer-ledger-v1'
@@ -65,7 +68,7 @@ function readMatchTactics(): MatchTactics {
   return { pressingIntensity: pressingValues[pressing], tempo: tempoValues[tempo], style, ...(Array.isArray(lineup) ? { lineup } : {}) }
 }
 
-function refreshMatchLineup(template: MatchInfo['lineups']['home'], squad: Player[], side: 'home' | 'away', preferredIds?: string[], date = getDate()) {
+function refreshMatchLineup(template: MatchInfo['lineups']['home'], squad: Player[], side: 'home' | 'away', preferredIds?: string[], date = getDate(), preferredBench?: string[]) {
   const available = squad.filter((player) => !isUnavailable(player, date))
   if (available.length < 11) throw new Error(`Club has only ${available.length} fit players available for ${date}.`)
   const preferred = preferredIds?.length === 11 && new Set(preferredIds).size === 11 && preferredIds.every((id) => available.some((player) => player.id === id))
@@ -86,7 +89,8 @@ function refreshMatchLineup(template: MatchInfo['lineups']['home'], squad: Playe
     }
   })
   const selectedIds = new Set(startingXI.map((player) => player.playerId))
-  const substitutes = available.filter((player) => !selectedIds.has(player.id)).sort((a, b) => b.overall - a.overall).slice(0, 7)
+  const substitutes = normalizeBench(preferredBench, [...selectedIds].filter((id): id is string => typeof id === 'string'), available)
+    .map((id) => available.find((player) => player.id === id)).filter((player): player is Player => player !== undefined)
     .map((player, index) => ({ id: `${player.id}-sub-${index}`, playerId: player.id, name: player.name, shirtNumber: player.shirtNumber, position: player.position, x: 0, y: 0 }))
   return { ...template, formation: '4-3-3', startingXI, substitutes }
 }
@@ -96,8 +100,8 @@ export function simulateFixture(fixture: MatchInfo): MatchInfo {
   const homeSquad = fixture.homeClubId === club.id ? club.squad : getClubSquad(fixture.homeClubId)
   const awaySquad = fixture.awayClubId === club.id ? club.squad : getClubSquad(fixture.awayClubId)
   for (const player of [...homeSquad, ...awaySquad]) recoverPlayerToDate(player, fixture.date, playerConditions)
-  const homeLineup = refreshMatchLineup(fixture.lineups.home, homeSquad, 'home', fixture.homeClubId === club.id ? tactics.lineup : undefined, fixture.date)
-  const awayLineup = refreshMatchLineup(fixture.lineups.away, awaySquad, 'away', fixture.awayClubId === club.id ? tactics.lineup : undefined, fixture.date)
+  const homeLineup = refreshMatchLineup(fixture.lineups.home, homeSquad, 'home', fixture.homeClubId === club.id ? tactics.lineup : undefined, fixture.date, fixture.homeClubId === club.id ? readSavedBenchIds() : undefined)
+  const awayLineup = refreshMatchLineup(fixture.lineups.away, awaySquad, 'away', fixture.awayClubId === club.id ? tactics.lineup : undefined, fixture.date, fixture.awayClubId === club.id ? readSavedBenchIds() : undefined)
   const maxSubstitutions = getCompetitionRules(fixture.leagueId).maxSubstitutions
   const result = simulateMatch({
     match: { ...fixture, lineups: { home: homeLineup, away: awayLineup }, formation: { home: homeLineup.formation, away: awayLineup.formation } },
@@ -107,8 +111,8 @@ export function simulateFixture(fixture: MatchInfo): MatchInfo {
     homeTactics: { ...(fixture.homeClubId === club.id ? tactics : {}), maxSubstitutions },
     awayTactics: { ...(fixture.awayClubId === club.id ? tactics : {}), maxSubstitutions },
   }).match
-  applyMatchCondition(result, 'home', homeSquad, homeLineup, playerConditions)
-  applyMatchCondition(result, 'away', awaySquad, awayLineup, playerConditions)
+  applyMatchCondition(result, 'home', homeSquad, homeLineup, playerConditions, fixture.homeClubId === club.id ? injuryDurationScale(club.facilities.medicalLevel) : 1)
+  applyMatchCondition(result, 'away', awaySquad, awayLineup, playerConditions, fixture.awayClubId === club.id ? injuryDurationScale(club.facilities.medicalLevel) : 1)
   return result
 }
 
@@ -224,6 +228,7 @@ const loaded = loadSimulatedMatches((done) => seasonFixtures(done, savedDate).fi
 let date = loaded.error ? SEASON_START_DATE : savedDate
 let results: Record<string, MatchInfo> = loaded.matches
 syncSponsors(date)
+syncTraining(date)
 const loadedPlayerConditions = loadPlayerConditions()
 const playerConditions: PlayerConditionState = loadedPlayerConditions.state
 for (const country of countries) {
@@ -366,6 +371,7 @@ function commit(newResults: MatchInfo[], nextDate?: string) {
   results = { ...results, ...Object.fromEntries(newResults.map((result) => [result.id, result])) }
   if (nextDate) date = nextDate
   if (nextDate) syncSponsors(nextDate)
+  if (nextDate) syncTraining(nextDate, newResults.filter(involvesUser).length)
   if (nextDate) for (const player of club.squad) recoverPlayerToDate(player, nextDate, playerConditions)
   let startedSeason = ''
   while (rollOverSeason()) startedSeason = seasonLabel(currentSeason())
@@ -433,6 +439,7 @@ export function resetGame() {
   window.localStorage.removeItem(DATE_KEY)
   window.localStorage.removeItem(LEDGER_KEY)
   window.localStorage.removeItem(SPONSORS_KEY)
+  window.localStorage.removeItem(TRAINING_KEY)
   window.localStorage.removeItem(HISTORY_KEY)
   window.location.reload()
 }

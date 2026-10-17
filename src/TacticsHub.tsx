@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react'
+import { Activity, ChevronRight, Gauge, Users } from 'lucide-react'
 import type { Player } from './types/game'
 import { club } from './data/mockData'
 import { fitPlayersToSlots } from './utils/lineup'
+import { PLACEHOLDER_PORTRAIT } from './portrait'
+import { useGame } from './state/gameStore'
+import { BENCH_SIZE, normalizeBench } from './state/matchSquad'
+import { categoryValues, overallFamiliarity, positionFamiliarity } from './state/familiarityModel'
+import { adoptSettings, settingsFromRaw, useTraining } from './state/training'
+import { FamiliarityView, TrainingView } from './TacticsFamiliarity'
 
-const sections = ['Overview', 'Player Roles', 'Set Pieces', 'Captains & Leadership', 'Tactics Styles', 'Tactics Setup'] as const
+const sections = ['Overview', 'Formation', 'Style', 'Tactic', 'Player Roles', 'Set Pieces', 'Captains & Leadership'] as const
 type TacticsSection = (typeof sections)[number]
 type TacticSlot = { label: string; position: string; x: number; y: number; role: string }
 type AssignmentKey = 'leftCorner' | 'rightCorner' | 'shortFreeKick' | 'longFreeKick' | 'penaltyOne' | 'penaltyTwo' | 'penaltyThree'
@@ -181,6 +188,8 @@ interface SavedTacticsState {
   defensiveLine?: string
   pressingIntensity?: string
   creativeFreedom?: string
+  passingStyle?: string
+  bench?: string[]
   setPieceTakers?: Partial<Record<AssignmentKey, string>>
   leadership?: Partial<Record<LeadershipKey, string>>
 }
@@ -204,22 +213,24 @@ function roleGroup(position: string) {
   return 'MID'
 }
 
-function positionFamiliarity(playerPosition: string, slotPosition: string) {
-  if (playerPosition === slotPosition) return 100
-  const playerGroup = roleGroup(playerPosition)
-  const slotGroup = roleGroup(slotPosition)
-  if (playerGroup === 'GK' || slotGroup === 'GK') return 10
-  if (playerGroup === slotGroup && playerGroup === 'DEF') return 82
-  if (playerGroup === slotGroup && playerGroup === 'MID') return 78
-  if (playerGroup === slotGroup && playerGroup === 'FWD') return 76
-  if (playerGroup === 'DEF' && slotGroup === 'FWD') return 40
-  if (playerGroup === 'FWD' && slotGroup === 'DEF') return 35
-  if (playerGroup === 'DEF' || slotGroup === 'DEF') return 58
-  return 62
-}
-
 function familiarityTone(familiarity: number) {
   return familiarity < 50 ? 'poor' : familiarity < 75 ? 'warning' : 'good'
+}
+
+const formationMeta: Record<string, { attack: number; defence: number; possession: number; width: string; difficulty: string }> = {
+  '4-3-3': { attack: 4, defence: 3, possession: 4, width: 'Wide', difficulty: 'Medium' },
+  '4-2-3-1': { attack: 3, defence: 4, possession: 4, width: 'Balanced', difficulty: 'Medium' },
+  '3-5-2': { attack: 4, defence: 3, possession: 4, width: 'Wide', difficulty: 'Hard' },
+  '4-4-2': { attack: 3, defence: 3, possession: 3, width: 'Balanced', difficulty: 'Easy' },
+}
+const styleFormations: Record<string, string[]> = {
+  Gegenpress: ['4-3-3', '4-2-3-1'], 'Tiki-Taka': ['4-3-3', '3-5-2'], 'Counter-Attack': ['4-2-3-1', '4-4-2'], 'Direct Passing': ['4-4-2', '3-5-2'], 'Park the Bus': ['4-4-2', '4-2-3-1'],
+}
+const stars = (count: number) => '★'.repeat(count) + '☆'.repeat(5 - count)
+const shortDate = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+
+function MiniFormation({ slots }: { slots: TacticSlot[] }) {
+  return <svg aria-hidden="true" className="mini-formation" viewBox="0 0 100 100"><rect x="1" y="1" width="98" height="98" rx="4" />{slots.map((slot, index) => <circle cx={slot.x} cy={slot.y} key={index} r="5" />)}</svg>
 }
 
 function PlayerSelect({ label, players, value, onChange }: { label: string; players: Player[]; value: string; onChange: (id: string) => void }) {
@@ -259,11 +270,14 @@ export default function TacticsHub() {
     ...onlySquadIds(savedTactics?.setPieceTakers),
   })
   const [saveMessage, setSaveMessage] = useState('')
+  const [previewStyle, setPreviewStyle] = useState(tacticalDNA)
+  const [passingStyle, setPassingStyle] = useState(['Short', 'Mixed', 'Direct'].includes(savedTactics?.passingStyle ?? '') ? savedTactics!.passingStyle! : 'Mixed')
+  const [benchPref, setBenchPref] = useState<string[] | undefined>(savedTactics?.bench)
   const [leadership, setLeadership] = useState<Record<LeadershipKey, string>>({ ...defaultLeadership, ...onlySquadIds(savedTactics?.leadership) })
   const slots = formations[formation]
   const startingPlayers = lineup.map((id) => club.squad.find((player) => player.id === id) ?? null)
-  const reserves = club.squad.filter((player) => !lineup.includes(player.id))
-  const guidance = styleGuidance[tacticalDNA] ?? styleGuidance.Gegenpress
+  const benchIds = normalizeBench(benchPref, lineup, club.squad)
+  const guidance = styleGuidance[previewStyle] ?? styleGuidance.Gegenpress
   const compatibility = lineup.length ? Math.round(startingPlayers.reduce((total, player) => total + (player ? guidance.score(player) : 0), 0) / lineup.length) : 0
   const formationRatings = Object.keys(formations).map((formationName) => {
     const pickedIds = fitPlayersToSlots(formations[formationName], club.squad)
@@ -282,17 +296,33 @@ export default function TacticsHub() {
   const excellingPlayers = suitability.slice(0, 3).map((player) => ({ player, reason: guidance.excelReason(player) }))
   const strugglingPlayers = suitability.slice(-2).reverse().map((player) => ({ player, reason: guidance.struggleReason(player) }))
 
+  const training = useTraining()
+  const { nextFixture } = useGame()
+  const settings = settingsFromRaw({ formation, roles, tacticalDNA, matchTempo, defensiveLine, pressingIntensity, setPieceTakers })!
+  const familiarity = overallFamiliarity(categoryValues(training, settings))
+  const filledStarters = startingPlayers.filter((player): player is Player => player !== null)
+  const slotFits = startingPlayers.map((player, index) => player ? positionFamiliarity(player.position, slots[index].position) : 0)
+  const average = (values: number[]) => values.length ? values.reduce((total, value) => total + value, 0) / values.length : 0
+  const chemistry = Math.round(average(filledStarters.map((player) => player.attributes.teamwork)) * 0.5 + average(slotFits.filter(Boolean)) * 0.3 + familiarity * 0.2)
+  const condition = Math.round(average(filledStarters.map((player) => player.fitness)))
+  const benchPlayers = benchIds.map((id) => club.squad.find((player) => player.id === id)).filter((player): player is Player => player !== undefined)
+  const assistant = club.staff.find((member) => member.role === 'Assistant Manager')
+  const [view, setView] = useState<'hub' | 'familiarity' | 'training'>('hub')
+  const savedJson = JSON.stringify({ formation, lineup, bench: benchIds, roles, tacticalDNA, matchTempo, passingStyle, aggressionLevel, pitchWidth, attackFocus, defensiveLine, pressingIntensity, creativeFreedom, setPieceTakers, leadership })
+
+  useEffect(() => { adoptSettings(settings) }, [settings])
+
   useEffect(() => {
     try {
-      window.localStorage.setItem('fmapp-tactics', JSON.stringify({ formation, lineup, roles, tacticalDNA, matchTempo, aggressionLevel, pitchWidth, attackFocus, defensiveLine, pressingIntensity, creativeFreedom, setPieceTakers, leadership }))
+      window.localStorage.setItem('fmapp-tactics', savedJson)
     } catch {
       return
     }
-  }, [formation, lineup, roles, tacticalDNA, matchTempo, aggressionLevel, pitchWidth, attackFocus, defensiveLine, pressingIntensity, creativeFreedom, setPieceTakers, leadership])
+  }, [savedJson])
 
   const saveTactic = () => {
     try {
-      window.localStorage.setItem('fmapp-tactics', JSON.stringify({ formation, lineup, roles, tacticalDNA, matchTempo, aggressionLevel, pitchWidth, attackFocus, defensiveLine, pressingIntensity, creativeFreedom, setPieceTakers, leadership }))
+      window.localStorage.setItem('fmapp-tactics', savedJson)
       setSaveMessage('Tactic saved. It will be used for your next match.')
     } catch {
       setSaveMessage('Could not save the tactic on this device.')
@@ -308,7 +338,7 @@ export default function TacticsHub() {
   const clearPitch = () => {
     setLineup([])
     setSelectedSlot(null)
-    setSwapMessage('Pitch cleared. Auto Pick or add players from the reserves list.')
+    setSwapMessage('Pitch cleared. Use Auto Pick to select the best XI.')
   }
 
   const changeFormation = (nextFormation: string) => {
@@ -329,8 +359,9 @@ export default function TacticsHub() {
     const outgoingPlayer = club.squad.find((player) => player.id === nextLineup[selectedSlot])
     nextLineup[selectedSlot] = reserve.id
     setLineup(nextLineup)
+    setBenchPref(outgoingPlayer ? benchIds.map((id) => id === reserve.id ? outgoingPlayer.id : id) : benchIds.filter((id) => id !== reserve.id))
     setSelectedSlot(null)
-    setSwapMessage(`${reserve.name} replaces ${outgoingPlayer?.name ?? 'the selected player'}.`)
+    setSwapMessage(`${reserve.name} replaces ${outgoingPlayer?.name ?? 'the selected player'}; ${outgoingPlayer?.name ?? 'he'} takes a place on the bench.`)
   }
 
   const selectStartingSlot = (targetSlot: number) => {
@@ -361,14 +392,25 @@ export default function TacticsHub() {
   const setTaker = (key: AssignmentKey, playerId: string) => setSetPieceTakers((current) => ({ ...current, [key]: playerId }))
   const setLeader = (key: LeadershipKey, playerId: string) => setLeadership((current) => ({ ...current, [key]: playerId }))
 
+  const starters = startingPlayers.map((player, index) => ({ player, slotPosition: slots[index].position, slotLabel: slots[index].label }))
+  if (view === 'familiarity') return <FamiliarityView settings={settings} starters={starters} onBack={() => setView('hub')} onOpen={setView} />
+  if (view === 'training') return <TrainingView settings={settings} onBack={() => setView('familiarity')} />
+
   return <div className="tactics-hub">
     <div className="page-intro"><span className="eyebrow">FIRST TEAM · MATCH PREPARATION</span><h1>Tactics hub</h1><p>{formation} · {lineup.length} of {slots.length} starters selected</p></div>
     <nav className="tactics-tabs" aria-label="Tactics sections">{sections.map((item) => <button aria-current={section === item ? 'page' : undefined} className={section === item ? 'tactics-tab active' : 'tactics-tab'} key={item} onClick={() => setSection(item)} type="button">{item}</button>)}</nav>
 
     {section === 'Overview' && <div className="tactics-section-content">
-      <div className="tactics-toolbar"><div><span className="eyebrow">STARTING XI</span><strong>{formation}</strong></div><div className="tactics-actions"><button className="tactics-action primary" onClick={autoPick} type="button">Auto Pick</button><button className="tactics-action" onClick={clearPitch} type="button">Clear Pitch</button></div></div>
+      <div className="tactics-toolbar"><div><span className="eyebrow">MATCH SQUAD</span><strong>{formation}</strong></div><div className="tactics-actions"><button aria-label={`Tactical familiarity ${familiarity}%`} className="tactics-action fam-pill" onClick={() => setView('familiarity')} type="button">Familiarity {familiarity}% <ChevronRight size={11} /></button><button className="tactics-action primary" onClick={autoPick} type="button">Auto Pick</button><button className="tactics-action" onClick={clearPitch} type="button">Clear Pitch</button></div></div>
       <TacticalPitch formation={formation} slots={slots} players={startingPlayers} selectedSlot={selectedSlot} onSelectSlot={selectStartingSlot} />
-      <div className="bench-panel"><div className="bench-heading"><div><span className="eyebrow">SQUAD ROTATION</span><h2>Bench & Reserves</h2></div><span>{reserves.length} AVAILABLE</span></div><p className="swap-guidance">{swapMessage}</p><div className="tactics-reserves">{reserves.map((player) => <button aria-label={`Swap in ${player.name}`} aria-pressed={false} className="reserve-player-card" key={player.id} onClick={() => swapReserve(player)} type="button"><span>{String(player.shirtNumber).padStart(2, '0')}</span><div><strong>{player.name}</strong><small>{player.position} · FIT {player.fitness}%</small></div><b>{player.overall}</b></button>)}</div></div>
+      <div className="squad-stat-cards">
+        <article><Gauge size={13} /><span>Next match</span><strong>{nextFixture ? (nextFixture.homeClubId === club.id ? nextFixture.awayClubName : nextFixture.homeClubName) : 'None scheduled'}</strong><small>{nextFixture ? `${shortDate(nextFixture.date)} · ${nextFixture.kickOff}` : ''}</small></article>
+        <article><Users size={13} /><span>Chemistry</span><strong>{chemistry}%</strong><small>Teamwork, fit, familiarity</small></article>
+        <article><Activity size={13} /><span>Condition</span><strong>{condition}%</strong><small>Average starter fitness</small></article>
+      </div>
+      <div className="bench-panel"><div className="bench-heading"><div><span className="eyebrow">MATCHDAY SQUAD</span><h2>Substitutes</h2></div><span>{benchPlayers.length} / {BENCH_SIZE}</span></div><p className="swap-guidance">{swapMessage} Reserves are managed in Club → Squad.</p>
+        <table className="fin-table bench-table"><thead><tr><th>Pos</th><th>Player</th><th>Con</th><th>Form</th><th>Morale</th><th>OVR</th></tr></thead><tbody>{benchPlayers.map((player) => <tr aria-label={`Swap in ${player.name}`} key={player.id} onClick={() => swapReserve(player)} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') swapReserve(player) }}><td>{player.position.split(' ')[0]}</td><td><img alt="" src={PLACEHOLDER_PORTRAIT} />{player.name}</td><td>{player.fitness}%</td><td>{player.form.toFixed(1)}</td><td>{player.morale}</td><td><b>{player.overall}</b></td></tr>)}</tbody></table>
+      </div>
     </div>}
 
     {section === 'Player Roles' && <div className="tactics-section-content"><div className="tactics-subhead"><span className="eyebrow">TACTICAL RESPONSIBILITIES</span><h2>Player roles</h2><p>Assign a role to each slot in your {formation}.</p></div><div className="role-assignment-list">{slots.map((slot, index) => {
@@ -383,9 +425,25 @@ export default function TacticsHub() {
 
     {section === 'Captains & Leadership' && <div className="tactics-section-content"><div className="tactics-subhead"><span className="eyebrow">DRESSING ROOM</span><h2>Leadership group</h2><p>Set the matchday captain and three deputies.</p></div><section className="tactics-assignments-panel">{leadershipLabels.map(({ key, label }) => <PlayerSelect key={key} label={label} players={club.squad} value={leadership[key]} onChange={(value) => setLeader(key, value)} />)}</section><section className="leadership-influence-panel"><div className="bench-heading"><div><span className="eyebrow">SQUAD LEADERS</span><h2>Leadership influence</h2></div></div>{club.squad.filter((player) => player.attributes.leadership >= 70).sort((first, second) => second.attributes.leadership - first.attributes.leadership).map((player) => <article className="leadership-player-row" key={player.id}><div><strong>{player.name}</strong><small>Leadership {player.attributes.leadership} · {player.shirtNumber === 4 ? 'Organizes the back line' : player.shirtNumber === 8 ? 'Sets training standards' : 'Supports squad morale'}</small></div><span className={`influence-badge ${influenceFor(player).toLowerCase().replace(' ', '-')}`}>{influenceFor(player)}</span></article>)}</section></div>}
 
-    {section === 'Tactics Styles' && <div className="tactics-section-content"><div className="tactics-subhead"><span className="eyebrow">PRESET TACTICAL DNA</span><h2>Tactics styles</h2><p>Choose a preset to see how it fits your squad.</p></div><div className="preset-style-grid">{Object.keys(styleGuidance).map((style) => <button aria-pressed={tacticalDNA === style} className={tacticalDNA === style ? 'preset-style-option active' : 'preset-style-option'} key={style} onClick={() => setTacticalDNA(style)} type="button"><span>{style}</span>{style === recommendedStyle && <b aria-label="Assistant Manager recommended" title="Assistant Manager recommended">★</b>}</button>)}</div><TacticalPitch formation={formation} slots={slots} players={startingPlayers} selectedSlot={null} onSelectSlot={() => undefined} preview tacticalDNA={tacticalDNA} /><AssistantAdvice compatibility={compatibility} recommendedFormation={recommendedFormation} recommendedStyle={recommendedStyle} tacticalDNA={tacticalDNA} advantages={guidance.advantages} disadvantages={guidance.disadvantages} excellingPlayers={excellingPlayers} strugglingPlayers={strugglingPlayers} /></div>}
+    {section === 'Formation' && <div className="tactics-section-content">
+      <section className="assistant-reco"><img alt="" src={PLACEHOLDER_PORTRAIT} /><div><span className="eyebrow">ASSISTANT MANAGER · {assistant?.name ?? 'Assistant'}</span><strong>Recommends {recommendedFormation.name}</strong><p>It fits your squad best ({recommendedFormation.rating}% position fit){recommendedFormation.name === formation ? ' and is already your active formation.' : `, compared with ${formationRatings.find((rating) => rating.name === formation)?.rating ?? 0}% for ${formation}.`} {tacticalDNA} usually works in {styleFormations[tacticalDNA].join(' or ')}.</p></div></section>
+      <div className="formation-list">{Object.keys(formations).map((item) => {
+        const meta = formationMeta[item]
+        const fit = formationRatings.find((rating) => rating.name === item)?.rating ?? 0
+        const known = Math.round(training.known[`formation:${item}`] ?? 40)
+        return <article className={formation === item ? 'formation-row active' : 'formation-row'} key={item}><MiniFormation slots={formations[item]} /><div><strong>{item}{item === recommendedFormation.name && <em>★ Recommended</em>}</strong><small>Attack {stars(meta.attack)} · Defence {stars(meta.defence)}</small><small>Possession {stars(meta.possession)} · {meta.width} · {meta.difficulty}</small><small>Squad fit <b>{fit}%</b> · Familiarity <b>{known}%</b></small></div><button aria-pressed={formation === item} className={formation === item ? 'tactics-action' : 'tactics-action primary'} disabled={formation === item} onClick={() => changeFormation(item)} type="button">{formation === item ? 'Active' : 'Use'}</button></article>
+      })}</div>
+      <TacticalPitch formation={formation} slots={slots} players={startingPlayers} selectedSlot={null} onSelectSlot={() => undefined} preview tacticalDNA={tacticalDNA} />
+    </div>}
 
-    {section === 'Tactics Setup' && <div className="tactics-section-content"><div className="tactics-subhead"><span className="eyebrow">MANUAL CONTROLS</span><h2>Tactics setup</h2><p>Fine-tune your match approach without applying a preset.</p></div><section className="formation-library"><span className="eyebrow">FORMATION</span><div className="formation-options">{Object.keys(formations).map((item) => <button aria-pressed={formation === item} className={formation === item ? 'formation-option active' : 'formation-option'} key={item} onClick={() => changeFormation(item)} type="button">{item}</button>)}</div></section><ManualChoice title="Match Tempo" options={['Slow', 'Balanced', 'Fast']} value={matchTempo} onChange={setMatchTempo} /><ManualChoice title="Aggression Level" options={['Cautious', 'Normal', 'Hard']} value={aggressionLevel} onChange={setAggressionLevel} /><ManualChoice title="Pitch Width" options={['Narrow', 'Balanced', 'Wide']} value={pitchWidth} onChange={setPitchWidth} /><ManualChoice title="Attack Focus" options={['Left Wing', 'Right Wing', 'Both Wings', 'Center']} value={attackFocus} onChange={setAttackFocus} /><ManualChoice title="Defensive Line" options={['Deep Block', 'Mid Block', 'High Line']} value={defensiveLine} onChange={setDefensiveLine} /><ManualChoice title="Pressing Intensity" options={['Low', 'Standard', 'High']} value={pressingIntensity} onChange={setPressingIntensity} /><ManualChoice title="Creative Freedom" options={['Disciplined', 'Expressive']} value={creativeFreedom} onChange={setCreativeFreedom} /><button className="save-tactic-button" onClick={saveTactic} type="button">Save tactic</button>{saveMessage && <p className="save-tactic-message" role="status">{saveMessage}</p>}</div>}
+    {section === 'Style' && <div className="tactics-section-content">
+      <section className="assistant-reco"><img alt="" src={PLACEHOLDER_PORTRAIT} /><div><span className="eyebrow">ASSISTANT MANAGER · {assistant?.name ?? 'Assistant'}</span><strong>Recommends {recommendedStyle}</strong><p>Your players' attributes suit it best. Tap a style to hear the pros and cons.</p></div></section>
+      <div className="preset-style-grid">{Object.keys(styleGuidance).map((style) => <button aria-pressed={previewStyle === style} className={previewStyle === style ? 'preset-style-option active' : 'preset-style-option'} key={style} onClick={() => setPreviewStyle(style)} type="button"><span>{style}</span>{style === recommendedStyle && <b aria-label="Assistant Manager recommended" title="Assistant Manager recommended">★</b>}{style === tacticalDNA && <i>ACTIVE</i>}</button>)}</div>
+      <TacticalPitch formation={formation} slots={slots} players={startingPlayers} selectedSlot={null} onSelectSlot={() => undefined} preview tacticalDNA={previewStyle} />
+      <AssistantAdvice style={previewStyle} compatibility={compatibility} advantages={guidance.advantages} disadvantages={guidance.disadvantages} excellingPlayers={excellingPlayers} strugglingPlayers={strugglingPlayers} bestFormations={styleFormations[previewStyle]} />
+      <button className="save-tactic-button" disabled={previewStyle === tacticalDNA} onClick={() => { setTacticalDNA(previewStyle); setSaveMessage(`${previewStyle} is now your active style.`) }} type="button">{previewStyle === tacticalDNA ? `${previewStyle} is your active style` : `Use ${previewStyle}`}</button>{saveMessage && <p className="save-tactic-message" role="status">{saveMessage}</p>}
+    </div>}
+    {section === 'Tactic' && <div className="tactics-section-content"><div className="tactics-subhead"><span className="eyebrow">MANUAL SETUP</span><h2>Build your own tactic</h2><p>Choose each instruction yourself instead of using a ready-made style, then save.</p></div><ManualChoice title="Match Tempo" options={['Slow', 'Balanced', 'Fast']} value={matchTempo} onChange={setMatchTempo} /><ManualChoice title="Passing Style" options={['Short', 'Mixed', 'Direct']} value={passingStyle} onChange={setPassingStyle} /><ManualChoice title="Aggression Level" options={['Cautious', 'Normal', 'Hard']} value={aggressionLevel} onChange={setAggressionLevel} /><ManualChoice title="Pitch Width" options={['Narrow', 'Balanced', 'Wide']} value={pitchWidth} onChange={setPitchWidth} /><ManualChoice title="Attack Focus" options={['Left Wing', 'Right Wing', 'Both Wings', 'Center']} value={attackFocus} onChange={setAttackFocus} /><ManualChoice title="Defensive Line" options={['Deep Block', 'Mid Block', 'High Line']} value={defensiveLine} onChange={setDefensiveLine} /><ManualChoice title="Pressing Intensity" options={['Low', 'Standard', 'High']} value={pressingIntensity} onChange={setPressingIntensity} /><ManualChoice title="Creative Freedom" options={['Disciplined', 'Expressive']} value={creativeFreedom} onChange={setCreativeFreedom} /><button className="save-tactic-button" onClick={saveTactic} type="button">Save tactic</button>{saveMessage && <p className="save-tactic-message" role="status">{saveMessage}</p>}</div>}
   </div>
 }
 
@@ -393,6 +451,6 @@ function ManualChoice({ title, options, value, onChange }: { title: string; opti
   return <section className="mentality-panel manual-tactics-choice"><span className="eyebrow">{title.toUpperCase()}</span><div className="style-options">{options.map((item) => <button aria-pressed={value === item} className={value === item ? 'style-option active' : 'style-option'} key={item} onClick={() => onChange(item)} type="button">{item}</button>)}</div></section>
 }
 
-function AssistantAdvice({ compatibility, recommendedFormation, recommendedStyle, tacticalDNA, advantages, disadvantages, excellingPlayers, strugglingPlayers }: { compatibility: number; recommendedFormation: { name: string; rating: number }; recommendedStyle: string; tacticalDNA: string; advantages: string[]; disadvantages: string[]; excellingPlayers: { player: Player; reason: string }[]; strugglingPlayers: { player: Player; reason: string }[] }) {
-  return <section className="assistant-advice-card"><div className="assistant-advice-header"><div><span className="eyebrow">ASSISTANT MANAGER</span><h2>Tactical advice</h2></div><span className="advice-compatibility">{compatibility}% FIT</span></div><p className="advice-recommendation"><strong>{recommendedFormation.name} suits your squad best</strong><span>{recommendedFormation.rating}% compatibility</span></p><div className="advice-style-label">CURRENT STYLE · {tacticalDNA.toUpperCase()}</div><div className="advice-pros-cons"><div><strong>Advantages</strong>{advantages.map((advantage) => <span key={advantage}>{advantage}</span>)}</div><div><strong>Disadvantages</strong>{disadvantages.map((disadvantage) => <span key={disadvantage}>{disadvantage}</span>)}</div></div><div className="advice-suitability"><section><strong>Players who will excel</strong>{excellingPlayers.map(({ player, reason }) => <span className="advice-player" key={player.id}><b>{player.name}</b><i>{reason}</i></span>)}</section><section><strong>Players who might struggle</strong>{strugglingPlayers.map(({ player, reason }) => <span className="advice-player" key={player.id}><b>{player.name}</b><i>{reason}</i></span>)}</section></div><div className="assistant-recommended-style"><span>RECOMMENDED PRESET</span><strong>★ {recommendedStyle}</strong></div></section>
+function AssistantAdvice({ style, compatibility, bestFormations, advantages, disadvantages, excellingPlayers, strugglingPlayers }: { style: string; compatibility: number; bestFormations: string[]; advantages: string[]; disadvantages: string[]; excellingPlayers: { player: Player; reason: string }[]; strugglingPlayers: { player: Player; reason: string }[] }) {
+  return <section className="assistant-advice-card"><div className="assistant-advice-header"><div><span className="eyebrow">ASSISTANT MANAGER EXPLAINS</span><h2>{style}</h2></div><span className="advice-compatibility">{compatibility}% FIT</span></div><p className="advice-recommendation"><strong>Works best in {bestFormations.join(' or ')}</strong></p><div className="advice-pros-cons"><div><strong>Advantages</strong>{advantages.map((advantage) => <span key={advantage}>{advantage}</span>)}</div><div><strong>Disadvantages</strong>{disadvantages.map((disadvantage) => <span key={disadvantage}>{disadvantage}</span>)}</div></div><div className="advice-suitability"><section><strong>Players who will excel</strong>{excellingPlayers.map(({ player, reason }) => <span className="advice-player" key={player.id}><b>{player.name}</b><i>{reason}</i></span>)}</section><section><strong>Players who might struggle</strong>{strugglingPlayers.map(({ player, reason }) => <span className="advice-player" key={player.id}><b>{player.name}</b><i>{reason}</i></span>)}</section></div></section>
 }

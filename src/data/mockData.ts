@@ -71,7 +71,7 @@ export const club: Club = {
     { name: 'Bridgehead Bank', valueAnnual: 700000, category: 'Official partner', endDate: '2027-06-30' },
     { name: 'Kestrel Sports', valueAnnual: 400000, category: 'Kit supplier', endDate: '2029-06-30' },
   ],
-  facilities: { trainingLevel: 3, youthLevel: 3, stadiumLevel: 3, maxLevel: 5 },
+  facilities: { trainingLevel: 3, youthLevel: 3, stadiumLevel: 3, medicalLevel: 3, analysisLevel: 2, scoutingLevel: 3, maxLevel: 5 },
   staff: [
     { id: 'staff-manager', name: 'Emeka Nwosu', role: 'Manager', nationality: 'Nigerian', age: 46, profileId: 'emeka-nwosu' },
     { id: 'staff-assistant', name: 'Ngozi Okafor', role: 'Assistant Manager', nationality: 'Nigerian', age: 41, profileId: 'ngozi-okafor' },

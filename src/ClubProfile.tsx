@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { club, getClubBadge } from './data/mockData'
 import ClubBadge from './ClubBadge'
 import { getDate } from './state/gameStore'
-import { FACILITY_UPGRADE_COSTS, upgradeFacility as upgradeClubFacility } from './state/transfers'
+import ClubFacilities from './ClubFacilities'
+import { promoteReserve, splitSquad } from './state/matchSquad'
 import { PLACEHOLDER_PORTRAIT } from './portrait'
 import { ClubFinances, ClubSponsorship } from './ClubFinances'
 import { BoardOverview } from './ClubRelations'
@@ -85,12 +86,15 @@ function PlayerButton({ player, onSelectPlayer, role, x, y }: { player: Player; 
 export default function ClubProfile({ section, selectedClubName, matches, onSectionChange, onSelectClub, onSelectPlayer, onSelectPersonnel, onSelectMatch }: ClubProfileProps) {
   const [positionFilter, setPositionFilter] = useState<PositionFilter>('ALL')
   const [sortMode, setSortMode] = useState<SortMode>('Value')
-  const [facilityNotice, setFacilityNotice] = useState('')
   const [kitEditor, setKitEditor] = useState(readKitDesign)
+  const [squadView, setSquadView] = useState<'First team' | 'Reserves'>('First team')
+  const [squadNotice, setSquadNotice] = useState('')
   const onDuty = new Set(getInternationalDutyPlayers(club.squad, getDate()).map((player) => player.id))
-  const { trainingLevel, youthLevel, stadiumLevel } = club.facilities
-  const balance = club.finances.balance
-  const squad = [...club.squad].filter((player) => {
+  const split = splitSquad(club.squad)
+  const firstTeam = [...split.starters, ...split.bench]
+  const benchIds = new Set(split.bench.map((player) => player.id))
+  const startingIds = new Set(split.starters.map((player) => player.id))
+  const squad = (squadView === 'First team' ? firstTeam : split.reserves).filter((player) => {
     if (positionFilter === 'ALL') return true
     if (positionFilter === 'GK') return player.position === 'GK'
     if (positionFilter === 'DEF') return player.position.startsWith('D')
@@ -101,10 +105,6 @@ export default function ClubProfile({ section, selectedClubName, matches, onSect
     if (sortMode === 'Rating') return second.overall - first.overall
     return first.age - second.age
   })
-
-  const upgradeFacility = (facility: 'training' | 'youth' | 'stadium') => {
-    setFacilityNotice(upgradeClubFacility(facility))
-  }
 
   const updateKit = <K extends keyof KitPart>(kit: keyof KitDesign, key: K, value: KitPart[K]) => {
     const design: KitDesign = kit === 'home'
@@ -178,9 +178,12 @@ export default function ClubProfile({ section, selectedClubName, matches, onSect
       </>}
 
       {section === 'Squad' && <>
-        <div className="club-subpage-heading"><div><span className="eyebrow">{squad.length} PLAYERS SHOWN</span><h2>First team</h2></div><label className="club-sort">SORT BY<select aria-label="Sort squad" onChange={(event) => setSortMode(event.target.value as SortMode)} value={sortMode}><option>Value</option><option>Rating</option><option>Age</option></select></label></div>
+        <div className="squad-view-tabs" role="tablist" aria-label="Squad groups">{(['First team', 'Reserves'] as const).map((view) => <button aria-selected={squadView === view} className={squadView === view ? 'squad-view-tab active' : 'squad-view-tab'} key={view} onClick={() => { setSquadView(view); setSquadNotice('') }} role="tab" type="button">{view}<small>{view === 'First team' ? firstTeam.length : split.reserves.length}</small></button>)}</div>
+        <div className="club-subpage-heading"><div><span className="eyebrow">{squad.length} PLAYERS SHOWN</span><h2>{squadView === 'First team' ? 'First team' : 'Reserves'}</h2></div><label className="club-sort">SORT BY<select aria-label="Sort squad" onChange={(event) => setSortMode(event.target.value as SortMode)} value={sortMode}><option>Value</option><option>Rating</option><option>Age</option></select></label></div>
+        {squadView === 'Reserves' && <p className="swap-guidance">Reserves are outside the matchday squad. Add one to the bench to replace the weakest substitute.</p>}
+        {squadNotice && <p className="club-action-notice" role="status">{squadNotice}</p>}
         <div className="position-filters" aria-label="Filter positions">{(['ALL', 'GK', 'DEF', 'MID', 'FWD'] as const).map((filter) => <button aria-pressed={positionFilter === filter} className={positionFilter === filter ? 'position-filter active' : 'position-filter'} key={filter} onClick={() => setPositionFilter(filter)} type="button">{filter}</button>)}</div>
-        <div className="club-roster-list">{squad.map((player) => <button aria-label={`Open ${player.name} profile`} className="club-roster-row" key={player.id} onClick={() => onSelectPlayer(player)} type="button"><span className="roster-number">{String(player.shirtNumber).padStart(2, '0')}</span><span className="roster-player"><strong>{player.name}</strong><small>{player.position} · {player.age} yrs{onDuty.has(player.id) ? ' · ✈ ON INTERNATIONAL DUTY' : ''}</small></span><span className="roster-stat"><strong>{player.overall}</strong><small>RAT</small></span><span className="roster-stat"><strong>{shortMoney(player.value)}</strong><small>VALUE</small></span></button>)}</div>
+        <div className="club-roster-list">{squad.map((player) => <div className="club-roster-item" key={player.id}><button aria-label={`Open ${player.name} profile`} className="club-roster-row" onClick={() => onSelectPlayer(player)} type="button"><span className="roster-number">{String(player.shirtNumber).padStart(2, '0')}</span><span className="roster-player"><strong>{player.name}</strong><small>{player.position} · {player.age} yrs{squadView === 'First team' ? (startingIds.has(player.id) ? ' · STARTER' : benchIds.has(player.id) ? ' · SUB' : '') : ''}{onDuty.has(player.id) ? ' · ✈ ON INTERNATIONAL DUTY' : ''}</small></span><span className="roster-stat"><strong>{player.overall}</strong><small>RAT</small></span><span className="roster-stat"><strong>{shortMoney(player.value)}</strong><small>VALUE</small></span></button>{squadView === 'Reserves' && <button aria-label={`Add ${player.name} to the bench`} className="tactics-action" onClick={() => { const dropped = promoteReserve(club.squad, player.id); setSquadNotice(dropped ? `${player.name} joins the bench; ${dropped} moves to the reserves.` : 'Could not update the bench.') }} type="button">Add to bench</button>}</div>)}{squad.length === 0 && <p className="empty-note">No players match this filter.</p>}</div>
       </>}
 
       {section === 'Tactics' && <>
@@ -203,22 +206,9 @@ export default function ClubProfile({ section, selectedClubName, matches, onSect
 
       {section === 'Fixtures' && <ClubFixturesSection fixtures={matches.filter((match) => match.homeClubId === club.id || match.awayClubId === club.id)} onSelectMatch={onSelectMatch} />}
 
-      {section === 'Facilities' && <>
-        <div className="club-subpage-heading"><div><span className="eyebrow">INVEST IN THE FUTURE</span><h2>Facilities</h2></div></div>
-        <section className="club-balance-card"><span className="eyebrow">UPGRADE BUDGET</span><strong>{shortMoney(balance)}</strong><div className="balance-columns"><span>Transfer fund <b>{shortMoney(club.finances.transferBudget)}</b></span><span>Monthly operations <b>{money(club.finances.operationsPerMonth)}</b></span></div></section>
-        <section className="club-facilities-panel"><div className="club-panel-heading"><div><span className="eyebrow">INFRASTRUCTURE</span><h2>Club facilities</h2></div></div>
-          {facilityNotice && <p className="club-action-notice" role="status">{facilityNotice}</p>}
-          <FacilityUpgrade name="Training ground" level={trainingLevel} maxLevel={club.facilities.maxLevel} cost={FACILITY_UPGRADE_COSTS.training} canAfford={balance >= FACILITY_UPGRADE_COSTS.training} onUpgrade={() => upgradeFacility('training')} />
-          <FacilityUpgrade name="Youth setup" level={youthLevel} maxLevel={club.facilities.maxLevel} cost={FACILITY_UPGRADE_COSTS.youth} canAfford={balance >= FACILITY_UPGRADE_COSTS.youth} onUpgrade={() => upgradeFacility('youth')} />
-          <FacilityUpgrade name="Stadium" level={stadiumLevel} maxLevel={club.facilities.maxLevel} cost={FACILITY_UPGRADE_COSTS.stadium} canAfford={balance >= FACILITY_UPGRADE_COSTS.stadium} onUpgrade={() => upgradeFacility('stadium')} />
-        </section>
-      </>}
+      {section === 'Facilities' && <ClubFacilities />}
     </div>
   </div>
-}
-
-function FacilityUpgrade({ name, level, maxLevel, cost, canAfford, onUpgrade }: { name: string; level: number; maxLevel: number; cost: number; canAfford: boolean; onUpgrade: () => void }) {
-  return <article className="facility-row"><div className="facility-level-mark">{level}</div><div className="facility-info"><strong>{name}</strong><span>Level {level} of {maxLevel}</span><div className="facility-levels">{Array.from({ length: maxLevel }, (_, index) => <i className={index < level ? 'filled' : ''} key={index} />)}</div></div><button aria-label={`Upgrade ${name} for ${shortMoney(cost)}`} className="facility-upgrade" disabled={level >= maxLevel || !canAfford} onClick={onUpgrade} type="button">{level >= maxLevel ? 'MAX' : `+ ${shortMoney(cost)}`}</button></article>
 }
 
 const dayMonth = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' })

@@ -30,6 +30,7 @@ export function applyMatchCondition(
   squad: readonly Player[],
   initialLineup: MatchLineup,
   state: PlayerConditionState,
+  injuryScale = 1,
 ) {
   const fullTime = match.eventLog?.find((event) => event.type === 'Full Time')?.elapsedSeconds ?? 5400
   const minutesPlayed = new Map<string, number>()
@@ -57,7 +58,7 @@ export function applyMatchCondition(
     const player = players.get(event.playerId)
     if (!player) continue
     const weeks = typeof event.data?.expectedWeeks === 'number' ? Math.max(1, event.data.expectedWeeks) : 1
-    const injuryUntil = shiftDate(match.date, weeks * 7)
+    const injuryUntil = shiftDate(match.date, Math.max(1, Math.round(weeks * 7 * injuryScale)))
     player.injuryUntil = injuryUntil
     const previous = state[player.id] ?? { fitness: player.fitness, lastUpdated: match.date }
     state[player.id] = { ...previous, injuryUntil }
