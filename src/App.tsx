@@ -1,8 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
-import { club, getClubBadge, getSquadHealth, getWageRoom, managerProfiles, refereeProfiles } from './data/mockData'
-import { addDays, advanceDay, clearMessage, describeDate, playMatch, useGame } from './state/gameStore'
-import { computeConfidence } from './state/confidence'
+import { club, getClubBadge, managerProfiles, refereeProfiles } from './data/mockData'
+import { addDays, advanceDay, clearMessage, playMatch, useGame } from './state/gameStore'
 import { BoardOverview, FanOverview } from './ClubRelations'
 import ClubBadge from './ClubBadge'
 import PlayerProfile, { type ProfileSection } from './PlayerProfile'
@@ -15,7 +14,10 @@ import CountryOverview from './CountryOverview'
 import TacticsHub from './TacticsHub'
 import AcademyHub from './AcademyHub'
 import MatchesList from './MatchesList'
-import type { ClubConfidenceData, LeagueStanding, MatchInfo, PersonnelProfile as PersonnelProfileData, Player, SquadHealthMetrics } from './types/game'
+import AppHeader from './components/AppHeader'
+import Dashboard from './components/Dashboard'
+import type { NavActions, NavTab } from './components/navTypes'
+import type { LeagueStanding, PersonnelProfile as PersonnelProfileData, Player } from './types/game'
 import './App.css'
 
 const SCREEN_SIZES = [
@@ -36,10 +38,8 @@ const tabs = [
   { id: 'Matches', label: 'Matches', icon: 'M7 3v4m10-4v4M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1ZM8 13h3v3H8z' },
 ] as const
 
-type TabId = (typeof tabs)[number]['id']
+type TabId = NavTab
 type RelationsView = 'Board' | 'Fans'
-const money = (amount: number) => `£${(amount / 1000000).toFixed(1)}m`
-
 
 function App() {
   const game = useGame()
@@ -57,19 +57,10 @@ function App() {
   const [screenSize, setScreenSize] = useState(SCREEN_SIZES[0])
   const [clubSection, setClubSection] = useState<ClubSection>('Overview')
   const [clubReturnTab, setClubReturnTab] = useState<TabId>('Home')
-  const headerDate = describeDate(game.date)
   const displayedMatches = game.matches
   // The Matches tab lists the user's own matches plus everything around today, not every match of every league.
   const matchesTabMatches = displayedMatches.filter((match) => match.homeClubId === club.id || match.awayClubId === club.id || (match.date >= addDays(game.date, -2) && match.date <= addDays(game.date, 3)))
   const standings = game.standings
-  const nextFixture = game.nextFixture ?? displayedMatches[0]
-  const position = game.ownStanding
-  const pointsBehindLeader = Math.max(0, (standings[0]?.points ?? 0) - (position?.points ?? 0))
-  const currentFormSummary = [['W', 'win'], ['D', 'draw'], ['L', 'loss']].map(([code, label]) => {
-    const count = position?.form.filter((result) => result === code).length ?? 0
-    return `${count} ${count === 1 ? label : label === 'loss' ? 'losses' : `${label}s`}`
-  }).join(' · ')
-  const confidence = computeConfidence(game)
   const selectedMatch = displayedMatches.find((match) => match.id === selectedMatchId)
   const detailOpen = selectedCountryName !== null || selectedPlayer !== null || selectedPersonnel !== null || relationsView !== null || selectedLeagueId !== null || selectedLeagueClubId !== null || activeTab === 'Club' || selectedMatch !== undefined
   const backLabel = selectedCountryName ? `Back to ${countryReturnLabel}` : selectedPlayer || selectedPersonnel ? (activeTab === 'Club' ? 'Back to club' : `Back to ${activeTab.toLowerCase()}`)
@@ -117,6 +108,28 @@ function App() {
     setActiveTab('Club')
     setClubSection('Overview')
   }
+  const openClubSection = (section: ClubSection) => {
+    openClubProfile()
+    setClubSection(section)
+  }
+  const selectTab = (tab: TabId) => {
+    if (tab === 'Club' && activeTab !== 'Club') setClubReturnTab(activeTab)
+    if (tab !== 'Club') setSelectedMatchId(null)
+    if (tab !== 'League') { setSelectedLeagueId(null); setSelectedLeagueClubId(null) }
+    setSelectedCountryName(null)
+    setSelectedPlayer(null)
+    setSelectedPersonnel(null)
+    setRelationsView(null)
+    setActiveTab(tab)
+  }
+  const nav: NavActions = {
+    onNavigate: selectTab,
+    onOpenClubSection: openClubSection,
+    onOpenConfidence: openConfidenceView,
+    onSelectMatch: setSelectedMatchId,
+    onSelectPlayer: selectPlayer,
+    onSelectCountry: openCountryOverview,
+  }
   const goBack = () => {
     if (selectedCountryName) {
       setSelectedCountryName(null)
@@ -159,18 +172,10 @@ function App() {
         {SCREEN_SIZES.map((size) => <button aria-pressed={screenSize.label === size.label} key={size.label} onClick={() => setScreenSize(size)} type="button">{size.label}<small>{size.width ? `${size.width}px` : 'Full'}</small></button>)}
       </div>
       <div className="app-shell" style={screenSize.width ? { width: `min(100%, ${screenSize.width}px)` } : { width: '100%' }}>
-        <header className="topbar">
-          {detailOpen ? <button aria-label={backLabel} className="header-back-button" onClick={goBack} type="button"><ArrowLeft aria-hidden="true" size={19} strokeWidth={2.2} /></button>
-            : <ClubReference name={club.name} selectedClubName={selectedClubName} onSelect={setSelectedClubName} onOpen={openClubProfile} className="club-mark" ariaLabel={`${club.name} crest`}><ClubBadge badge={getClubBadge(club.id)} name={club.name} /></ClubReference>}
-          <div className="identity">
-            <span className="eyebrow">MANAGER CAREER · {game.seasonLabel}</span>
-            <strong>{club.manager.name}</strong>
-            <ClubReference name={club.name} selectedClubName={selectedClubName} onSelect={setSelectedClubName} onOpen={openClubProfile} className="club-name" />
-          </div>
-          <div className="header-date"><span>IN-GAME DATE</span><strong>{headerDate.day}</strong><span>{headerDate.weekday}</span></div>
-          <div className="budget-strip"><span>TRANSFER BUDGET</span><strong>{money(club.finances.transferBudget)}</strong><button className="advance-day-button" onClick={advanceDay} type="button">Advance Day ▸</button></div>
-          {game.message && !selectedMatch && <p className="advance-day-error" role="alert">{game.message}<button aria-label="Dismiss message" onClick={clearMessage} type="button">×</button></p>}
-        </header>
+        <AppHeader expanded={!detailOpen} game={game} message={selectedMatch ? '' : game.message} nav={nav} onAdvanceDay={advanceDay} onClearMessage={clearMessage} onOpenClub={openClubProfile}
+          leading={detailOpen
+            ? <button aria-label={backLabel} className="header-back-button" onClick={goBack} type="button"><ArrowLeft aria-hidden="true" size={19} strokeWidth={2.2} /></button>
+            : <button aria-label={`${club.name} crest`} className="grid size-10 shrink-0 cursor-pointer place-items-center border-0 bg-transparent p-0 [&_.club-badge]:size-full" onClick={openClubProfile} type="button"><ClubBadge badge={getClubBadge(club.id)} name={club.name} /></button>} />
 
         <main className="main-content" key={selectedCountryName ? `country-${selectedCountryName}` : selectedPlayer ? 'profile' : selectedMatch ? `match-${selectedMatch.id}` : activeTab}>
           {selectedCountryName ? <CountryOverview country={selectedCountryName} onSelectCountry={openCountryOverview} />
@@ -184,7 +189,7 @@ function App() {
                 onSimulateMatch={() => playMatch(selectedMatch.id)} simulationError={game.message} />
               : activeTab === 'Club' ? <ClubProfile section={clubSection} selectedClubName={selectedClubName} matches={displayedMatches}
               onSectionChange={setClubSection} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} onSelectPersonnel={selectPersonnel} onSelectMatch={setSelectedMatchId} /> : <>
-            {activeTab === 'Home' && nextFixture && <HomeView position={position?.position ?? 1} standings={standings} form={position?.form ?? []} pointsBehindLeader={pointsBehindLeader} dateLabel={headerDate.long} formSummary={currentFormSummary} nextMatch={nextFixture} upcomingFixtures={game.upcoming.slice(0, 3)} selectedClubName={selectedClubName} selectedMatchId={selectedMatchId} onSelectMatch={setSelectedMatchId} onSelectClub={setSelectedClubName} confidence={confidence} squadMetrics={getSquadHealth(game.date)} wageRoom={getWageRoom()} onOpenConfidence={openConfidenceView} />}
+            {activeTab === 'Home' && <Dashboard game={game} nav={nav} leagueSlot={<section className="content-section !mt-0" aria-label="League table preview"><SectionHeading kicker="THE RUN-IN" title="League table" detail="NEAR YOU" /><LeagueTable compact standings={standings} onSelectClub={setSelectedClubName} selectedClubName={selectedClubName} /></section>} />}
             {activeTab === 'Academy' && <AcademyHub onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />}
             {activeTab === 'Tactics' && <TacticsHub />}
             {activeTab === 'Transfers' && <TransferMarket onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />}
@@ -197,7 +202,7 @@ function App() {
           {tabs.map((tab) => (
             <button aria-current={activeTab === tab.id ? 'page' : undefined} aria-label={tab.label}
               className={activeTab === tab.id ? 'nav-item active' : 'nav-item'} key={tab.id}
-              onClick={() => { if (tab.id === 'Club' && activeTab !== 'Club') setClubReturnTab(activeTab); if (tab.id !== 'Club') setSelectedMatchId(null); if (tab.id !== 'League') { setSelectedLeagueId(null); setSelectedLeagueClubId(null) }; setSelectedCountryName(null); setSelectedPlayer(null); setSelectedPersonnel(null); setRelationsView(null); setActiveTab(tab.id) }} type="button">
+              onClick={() => selectTab(tab.id)} type="button">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d={tab.icon} /></svg>
               <span>{tab.label}</span>
             </button>
@@ -214,186 +219,6 @@ function ClubReference({ name, selectedClubName, onSelect, onOpen, className = '
 
 function SectionHeading({ kicker, title, detail }: { kicker: string; title: string; detail?: string }) {
   return <div className="section-heading"><div><span className="eyebrow">{kicker}</span><h2>{title}</h2></div>{detail && <span className="section-detail">{detail}</span>}</div>
-}
-
-function HomeView({ position, standings, form, pointsBehindLeader, dateLabel, formSummary, nextMatch, upcomingFixtures, selectedClubName, selectedMatchId, onSelectMatch, onSelectClub, confidence, squadMetrics, wageRoom, onOpenConfidence }: { position: number; standings: LeagueStanding[]; form: LeagueStanding['form']; pointsBehindLeader: number; dateLabel: string; formSummary: string; nextMatch: MatchInfo; upcomingFixtures: MatchInfo[]; selectedClubName: string | null; selectedMatchId: string | null; onSelectMatch: (id: string) => void; onSelectClub: (name: string) => void; confidence: ClubConfidenceData; squadMetrics: SquadHealthMetrics; wageRoom: number; onOpenConfidence: (view: 'board' | 'fan' | 'manager') => void }) {
-  const fixtureDate = new Date(`${nextMatch.date}T12:00:00`)
-  const fixtureDay = fixtureDate.getDate()
-  const fixtureMonth = new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(fixtureDate).toUpperCase()
-  const fixtureStatus = nextMatch.score ? 'FULL TIME' : nextMatch.kickOff
-  return <>
-    <div className="welcome-row"><div><span className="eyebrow">{dateLabel}</span><h1>Match week, <em>boss.</em></h1></div><span className="round-tag">MD {nextMatch.matchday}</span></div>
-    <section className={`fixture-panel ${selectedMatchId === nextMatch.id ? 'selected-match' : ''}`} aria-label="Next fixture">
-      <div className="fixture-topline"><span>NEXT FIXTURE</span><span>{nextMatch.competition.toUpperCase()} · MD {nextMatch.matchday}</span></div>
-      <div className="fixture-teams">
-        <ClubReference name={nextMatch.homeClubName} selectedClubName={selectedClubName} onSelect={onSelectClub} className="fixture-club team-link"><span className="large-crest home-crest"><ClubBadge badge={getClubBadge(nextMatch.homeClubId)} name={nextMatch.homeClubName} /></span><strong>{nextMatch.homeClubName.toUpperCase()}</strong></ClubReference>
-        <button aria-label={`Select ${nextMatch.homeClubName} versus ${nextMatch.awayClubName} fixture`} aria-pressed={selectedMatchId === nextMatch.id} className="fixture-versus fixture-select" onClick={() => onSelectMatch(nextMatch.id)} type="button"><span>{nextMatch.score ? 'FT' : 'VS'}</span><b>{nextMatch.score ? `${nextMatch.score.home}–${nextMatch.score.away}` : fixtureDay}</b><small>{fixtureMonth} · {fixtureStatus}</small></button>
-        <ClubReference name={nextMatch.awayClubName} selectedClubName={selectedClubName} onSelect={onSelectClub} className="fixture-club away team-link"><span className="large-crest away-crest"><ClubBadge badge={getClubBadge(nextMatch.awayClubId)} name={nextMatch.awayClubName} /></span><strong>{nextMatch.awayClubName.toUpperCase()}</strong></ClubReference>
-      </div>
-      <div className="fixture-bottom"><span>{nextMatch.venue}</span><span>{nextMatch.weather}</span><span>{nextMatch.status}</span></div>
-    </section>
-    <section className="metric-row" aria-label="Club overview">
-      <div className="metric"><span>LEAGUE POSITION</span><strong><i>{String(position).padStart(2, '0')}</i><small> / {standings.length}</small></strong><span className="metric-note">{pointsBehindLeader === 0 ? 'Top of the table' : `${pointsBehindLeader} pts off top`}</span></div>
-      <div className="metric"><span>TRANSFER BUDGET</span><strong>{money(club.finances.transferBudget)}</strong><span className="metric-note">Wage room £{(Math.max(0, wageRoom) / 1000).toFixed(1)}k/wk</span></div>
-      <div className="metric"><span>LAST 5</span><div className="form-dots">{form.map((result, index) => <b className={`form-${result.toLowerCase()}`} key={`${result}-${index}`}>{result}</b>)}</div><span className="metric-note">{formSummary}</span></div>
-    </section>
-    <TeamStatusCard metrics={squadMetrics} totalPlayers={club.squad.length} />
-    <ClubConfidenceCard data={confidence} onOpenConfidence={onOpenConfidence} />
-    <UpcomingFixturesPreview fixtures={upcomingFixtures} onSelectMatch={onSelectMatch} selectedMatchId={selectedMatchId} />
-    <section className="content-section" aria-label="League table preview"><SectionHeading kicker="THE RUN-IN" title="League table" detail="NEAR YOU" /><LeagueTable compact standings={standings} onSelectClub={onSelectClub} selectedClubName={selectedClubName} /></section>
-  </>
-}
-
-function TeamStatusCard({ metrics, totalPlayers }: { metrics: SquadHealthMetrics; totalPlayers: number }) {
-  return (
-    <section className="content-section" aria-label="Squad health and team status">
-      <SectionHeading kicker="FIRST TEAM" title="Team status" detail={`${totalPlayers} PLAYERS`} />
-      <div className="team-status-card">
-        <div className="team-metrics-grid">
-          <div className="team-metric-box">
-            <span className="team-metric-label">ACTIVE INJURIES</span>
-            <div className="team-metric-val-row">
-              <strong className="team-metric-val zero">{metrics.activeInjuries}</strong>
-              <span className="metric-status-tag clean">None</span>
-            </div>
-            <span className="team-metric-hint">{metrics.injuriesNote}</span>
-          </div>
-
-          <div className="team-metric-box">
-            <span className="team-metric-label">SUSPENSIONS</span>
-            <div className="team-metric-val-row">
-              <strong className="team-metric-val zero">{metrics.suspensions}</strong>
-              <span className="metric-status-tag clean">Eligible</span>
-            </div>
-            <span className="team-metric-hint">{metrics.suspensionsNote}</span>
-          </div>
-
-          <div className="team-metric-box">
-            <span className="team-metric-label">SQUAD MORALE</span>
-            <div className="team-metric-val-row">
-              <strong className="team-metric-val">{metrics.moralePercentage}%</strong>
-              <span className="metric-status-tag morale">{metrics.squadMorale}</span>
-            </div>
-            <span className="team-metric-hint">High camp harmony</span>
-          </div>
-
-          <div className="team-metric-box">
-            <span className="team-metric-label">TEAM CHEMISTRY</span>
-            <div className="team-metric-val-row">
-              <strong className="team-metric-val">{metrics.teamChemistry}%</strong>
-              <span className="metric-status-tag chemistry">Strong</span>
-            </div>
-            <span className="team-metric-hint">{metrics.chemistryNote}</span>
-          </div>
-        </div>
-
-        <div className="team-status-footer">
-          <span className="status-indicator" />
-          <div className="team-status-footer-info">
-            <strong>Everyone ready</strong>
-            <span>Full squad available for Saturday</span>
-          </div>
-          <strong className="fitness-score">{metrics.averageFitness}% <small>AVG</small></strong>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function ClubConfidenceCard({ data, onOpenConfidence }: { data: ClubConfidenceData; onOpenConfidence: (view: 'board' | 'fan' | 'manager') => void }) {
-  const items = [
-    { key: 'board', label: 'Board Confidence', item: data.board, target: 'board' },
-    { key: 'fan', label: 'Fan Confidence', item: data.fan, target: 'fan' },
-    { key: 'manager', label: 'Manager Confidence', item: data.manager, target: 'manager' },
-  ] as const
-
-  return (
-    <section className="content-section" aria-label="Club confidence ratings">
-      <SectionHeading kicker="CLUB STANDING" title="Club confidence" detail="CURRENT SEASON" />
-      <div className="confidence-card">
-        {items.map(({ key, label, item, target }) => (
-          <button aria-label={`Open ${label.replace(' Confidence', '')} overview`} className="confidence-item confidence-link" key={key} onClick={() => onOpenConfidence(target)} type="button">
-            <div className="confidence-label-row">
-              <span className="confidence-title">{label}</span>
-              <div className="confidence-badge-group">
-                <span className={`confidence-badge ${item.status.toLowerCase().replace(' ', '-')}`}>
-                  {item.status}
-                </span>
-                <strong className="confidence-pct">{item.percentage}%</strong>
-              </div>
-            </div>
-            <div className="confidence-track" role="progressbar" aria-valuenow={item.percentage} aria-valuemin={0} aria-valuemax={100} aria-label={`${label}: ${item.percentage}%`}>
-              <div
-                className={`confidence-fill ${item.percentage >= 85 ? 'high' : 'medium'}`}
-                style={{ width: `${item.percentage}%` }}
-              />
-            </div>
-            <span className="confidence-note">{item.note}</span>
-          </button>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function UpcomingFixturesPreview({
-  fixtures,
-  selectedMatchId,
-  onSelectMatch,
-}: {
-  fixtures: MatchInfo[]
-  selectedMatchId: string | null
-  onSelectMatch: (id: string) => void
-}) {
-  return (
-    <section className="content-section" aria-label="Upcoming fixtures preview">
-      <SectionHeading kicker="SCHEDULE" title="Upcoming fixtures" detail="NEXT 3 MATCHES" />
-      <div className="upcoming-fixtures-card">
-        {fixtures.slice(0, 3).map((match) => {
-          const isHome = match.homeClubId === club.id
-          const opponentName = isHome ? match.awayClubName : match.homeClubName
-          const opponentId = isHome ? match.awayClubId : match.homeClubId
-          const dateObj = new Date(`${match.date}T12:00:00`)
-          const dayNum = dateObj.getDate()
-          const monthStr = new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(dateObj).toUpperCase()
-          const isSelected = selectedMatchId === match.id
-
-          return (
-            <button
-              key={match.id}
-              type="button"
-              className={`upcoming-fixture-row ${isSelected ? 'selected' : ''}`}
-              onClick={() => onSelectMatch(match.id)}
-              aria-label={`View match details: ${club.name} vs ${opponentName} on ${dayNum} ${monthStr}`}
-              aria-pressed={isSelected}
-            >
-              <div className="upcoming-date-box">
-                <strong>{String(dayNum).padStart(2, '0')}</strong>
-                <small>{monthStr}</small>
-              </div>
-
-              <div className="upcoming-crest-slot">
-                <span className="mini-crest"><ClubBadge badge={getClubBadge(opponentId)} name={opponentName} /></span>
-              </div>
-
-              <div className="upcoming-match-info">
-                <div className="upcoming-meta-row">
-                  <span className={`venue-tag ${isHome ? 'home' : 'away'}`}>{isHome ? 'HOME' : 'AWAY'}</span>
-                  <span className="upcoming-comp-text">{match.competition} · MD {match.matchday}</span>
-                </div>
-                <strong className="upcoming-opponent-title">{opponentName}</strong>
-              </div>
-
-              <div className="upcoming-right-slot">
-                <span className="upcoming-time-text">{match.kickOff}</span>
-                <span className="upcoming-venue-text">{match.venue}</span>
-              </div>
-            </button>
-          )
-        })}
-      </div>
-    </section>
-  )
 }
 
 function LeagueTable({ compact = false, standings, selectedClubName, onSelectClub }: { compact?: boolean; standings: LeagueStanding[]; selectedClubName: string | null; onSelectClub: (name: string) => void }) {

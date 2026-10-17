@@ -12,26 +12,31 @@ export interface CommentaryGeneratorOptions {
 
 const PITCH_LENGTH = 105
 const FIRST_HALF_SECONDS = 2700
+const LONG_RANGE_METRES = 22
 const PLACEHOLDER_PATTERN = /\{(playerName|teamName|opponentName|targetName|zone|minute)\}/g
 
 /** Maps a simulation event onto a template pool; null means the event is not worth a line. */
 function commentaryKeyFor(event: MatchEvent, zone: string): CommentaryKey | null {
+  const dangerZone = zone === 'the final third' || zone === 'the penalty area'
   switch (event.type) {
-    case 'Goal': return 'goal'
+    case 'Kick Off': return 'kick_off'
+    case 'Goal': return Number(event.data?.distance ?? 0) >= LONG_RANGE_METRES ? 'goal_long_range' : 'goal'
     case 'Save': return 'save'
     case 'Miss': return 'shot_off_target'
     case 'Shot': return event.outcome === 'on-target' ? 'shot_on_target' : null
     case 'Foul': return 'foul'
     case 'Yellow Card': return 'yellow_card'
-    case 'Red Card': return 'red_card'
+    case 'Red Card': return event.outcome === 'second-yellow' ? 'second_yellow' : 'red_card'
     case 'Offside': return 'offside'
-    case 'Injury': return 'injury'
+    case 'Injury': return event.outcome === 'serious' ? 'injury_serious' : event.outcome === 'muscle' ? 'injury_muscle' : 'injury_knock'
     case 'Substitution': return 'substitution'
     case 'Half Time': return 'half_time'
     case 'Full Time': return 'full_time'
     // Routine defensive actions deep in a team's own half would flood the feed.
-    case 'Interception': return zone === 'midfield' || zone === 'the final third' || zone === 'the penalty area' ? 'interception' : null
-    case 'Tackle': return zone === 'midfield' || zone === 'the final third' || zone === 'the penalty area' ? 'tackle' : null
+    case 'Interception': return zone === 'midfield' || dangerZone ? 'interception' : null
+    case 'Tackle': return zone === 'midfield' || dangerZone ? 'tackle' : null
+    // Only successful runs near goal are worth narrating.
+    case 'Carry': return event.outcome === 'advanced' && dangerZone ? 'dribble' : null
     default: return null
   }
 }

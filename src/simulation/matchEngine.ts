@@ -286,6 +286,11 @@ function simulateHalf(
           if (secondYellow) marker.sentOff = true
         }
         possessionBroken = true
+        if (random() < 0.045) {
+          const severity = random()
+          const [outcome, expectedWeeks] = severity < 0.6 ? ['knock', 1] as const : severity < 0.9 ? ['muscle', 3] as const : ['serious', 8] as const
+          emit(events, matchId, time + 2, 'Injury', attacking, carrier, point, outcome, { data: { expectedWeeks } })
+        }
         break
       }
 
