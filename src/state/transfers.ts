@@ -23,7 +23,10 @@ type LedgerEntry =
   | { type: 'renew'; playerId: string; wage: number; endDate: string; date: string; offer?: Player['contract']['offerHistory'][number] }
   | { type: 'offer'; playerId: string; date: string; offer: Player['contract']['offerHistory'][number] }
   | { type: 'facility'; facility: FacilityUpgrade; date: string }
+  | { type: 'board'; reason: BoardFundingReason; requested: number; granted: number; date: string }
 
+export type BoardFundingReason = 'Squad development' | 'Facilities'
+export interface BoardRequest { reason: BoardFundingReason; requested: number; granted: number; date: string }
 export type FacilityUpgrade = 'training' | 'youth' | 'stadium'
 
 export const FACILITY_UPGRADE_COSTS: Record<FacilityUpgrade, number> = { training: 2500000, youth: 1800000, stadium: 3200000 }
@@ -78,11 +81,13 @@ function readLedger(): LedgerEntry[] {
 function isLedgerEntry(value: unknown): value is LedgerEntry {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const entry = value as Record<string, unknown>
-  if (typeof entry.playerId !== 'string' || typeof entry.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date)) return false
+  if (typeof entry.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date)) return false
+  if (entry.type === 'facility') return entry.facility === 'training' || entry.facility === 'youth' || entry.facility === 'stadium'
+  if (entry.type === 'board') return (entry.reason === 'Squad development' || entry.reason === 'Facilities') && Number.isFinite(entry.requested) && Number.isFinite(entry.granted)
+  if (typeof entry.playerId !== 'string') return false
   if (entry.type === 'sign') return typeof entry.fromClubId === 'string' && Number.isFinite(entry.fee) && Number.isFinite(entry.wage) && typeof entry.endDate === 'string'
   if (entry.type === 'release') return true
   if (entry.type === 'offer') return isContractOffer(entry.offer)
-  if (entry.type === 'facility') return entry.facility === 'training' || entry.facility === 'youth' || entry.facility === 'stadium'
   return entry.type === 'renew' && Number.isFinite(entry.wage) && typeof entry.endDate === 'string' && (entry.offer === undefined || isContractOffer(entry.offer))
 }
 
@@ -142,6 +147,60 @@ function applyFacility(facility: FacilityUpgrade) {
   const levelKey = facility === 'training' ? 'trainingLevel' : facility === 'youth' ? 'youthLevel' : 'stadiumLevel'
   club.facilities[levelKey] += 1
   club.finances.balance -= FACILITY_UPGRADE_COSTS[facility]
+}
+
+function applyBoardFunding(reason: BoardFundingReason, granted: number) {
+  if (granted <= 0) return
+  club.finances.balance += granted
+  if (reason === 'Squad development') club.finances.transferBudget += granted
+}
+
+// ---------- Board meetings ----------
+const ORIGINAL_TRANSFER_BUDGET = club.finances.transferBudget
+/** Requests are a share of the budget the club started with, not of whatever is left. */
+export const BOARD_REQUEST_PERCENTS = [10, 25, 50, 75]
+export const BOARD_REQUEST_COOLDOWN_DAYS = 30
+export const boardRequestAmount = (percent: number) => round(ORIGINAL_TRANSFER_BUDGET * percent / 100, 5000)
+
+export function getBoardRequests(): BoardRequest[] {
+  try {
+    return readLedger().flatMap((entry) => entry.type === 'board' ? [{ reason: entry.reason, requested: entry.requested, granted: entry.granted, date: entry.date }] : [])
+  } catch {
+    return []
+  }
+}
+
+export function boardCooldownDaysLeft(): number {
+  const last = getBoardRequests().at(-1)
+  if (!last) return 0
+  const elapsed = Math.round((Date.parse(`${getDate()}T12:00:00Z`) - Date.parse(`${last.date}T12:00:00Z`)) / 86_400_000)
+  return Math.max(0, BOARD_REQUEST_COOLDOWN_DAYS - elapsed)
+}
+
+/** The board funds up to a ceiling that grows with its confidence; it never funds a club that is over its wage limit. */
+export function requestBoardFunds(reason: BoardFundingReason, percent: number, boardConfidence: number, wageOverLimit: boolean): DealResult {
+  if (reason !== 'Squad development' && reason !== 'Facilities') return { status: 'failed', message: 'Choose a reason for the request.' }
+  if (!BOARD_REQUEST_PERCENTS.includes(percent)) return { status: 'failed', message: 'Choose one of the listed amounts.' }
+  const requested = boardRequestAmount(percent)
+  const wait = boardCooldownDaysLeft()
+  if (wait > 0) return { status: 'failed', message: `The board has already met you recently. Ask again in ${wait} day${wait === 1 ? '' : 's'}.` }
+  const date = getDate()
+  let granted = 0
+  let message: string
+  if (wageOverLimit) message = 'The board will not release more money while the wage bill is over the limit. Reduce wages first.'
+  else if (reason === 'Facilities' && club.facilities.trainingLevel >= club.facilities.maxLevel && club.facilities.youthLevel >= club.facilities.maxLevel && club.facilities.stadiumLevel >= club.facilities.maxLevel) message = 'Every facility is already at its maximum level, so the board sees no need for funds.'
+  else {
+    const ceilingPercent = Math.max(0, (boardConfidence - 40) / 60) * 100
+    granted = Math.min(requested, boardRequestAmount(Math.floor(ceilingPercent / 5) * 5))
+    message = granted >= requested ? `The board approves the full £${requested.toLocaleString('en-GB')} for ${reason.toLowerCase()}.`
+      : granted > 0 ? `The board will only commit £${granted.toLocaleString('en-GB')} of the £${requested.toLocaleString('en-GB')} you asked for. Deliver results to earn more trust.`
+        : 'The board declines. It does not have enough confidence in you yet.'
+  }
+  const persistError = record({ type: 'board', reason, requested, granted, date })
+  if (persistError) return { status: 'failed', message: `The decision was not recorded because it could not be saved: ${persistError}` }
+  applyBoardFunding(reason, granted)
+  notify()
+  return { status: granted >= requested ? 'accepted' : granted > 0 ? 'counter' : 'rejected', message, counterFee: granted }
 }
 
 // ---------- Public actions ----------
@@ -263,6 +322,8 @@ function restoreTransfers() {
         applySign(player, entry.fromClubId, entry.fee, entry.wage, entry.endDate, entry.date)
       } else if (entry.type === 'facility') {
         applyFacility(entry.facility)
+      } else if (entry.type === 'board') {
+        applyBoardFunding(entry.reason, entry.granted)
       } else {
         const player = club.squad.find((member) => member.id === entry.playerId)
         if (!player) throw new Error(`Cannot restore contract update for player "${entry.playerId}".`)

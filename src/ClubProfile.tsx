@@ -3,10 +3,13 @@ import { club, getClubBadge } from './data/mockData'
 import ClubBadge from './ClubBadge'
 import { getDate } from './state/gameStore'
 import { FACILITY_UPGRADE_COSTS, upgradeFacility as upgradeClubFacility } from './state/transfers'
+import { PLACEHOLDER_PORTRAIT } from './portrait'
+import { ClubFinances, ClubSponsorship } from './ClubFinances'
+import { BoardOverview } from './ClubRelations'
 import { getInternationalDutyPlayers } from './simulation/calendarScheduler'
 import type { MatchInfo, Player } from './types/game'
 
-export type ClubSection = 'Overview' | 'Squad' | 'Tactics' | 'Staff' | 'Sponsorship' | 'Fixtures' | 'Facilities'
+export type ClubSection = 'Overview' | 'Squad' | 'Tactics' | 'Staff' | 'Finances' | 'Sponsorship' | 'Board' | 'Fixtures' | 'Facilities'
 
 type PositionFilter = 'ALL' | 'GK' | 'DEF' | 'MID' | 'FWD'
 type SortMode = 'Value' | 'Rating' | 'Age'
@@ -17,10 +20,9 @@ type KitDesign = { home: KitPart; away: KitPart }
 const kitPatterns: KitPattern[] = ['Solid', 'Vertical stripes', 'Hoops', 'Sash', 'Pinstripes']
 const kitStorageKey = `fmapp-kits-${club.id}-v1`
 
-const sections: ClubSection[] = ['Overview', 'Squad', 'Tactics', 'Staff', 'Sponsorship', 'Fixtures', 'Facilities']
+const sections: ClubSection[] = ['Overview', 'Squad', 'Tactics', 'Staff', 'Finances', 'Sponsorship', 'Board', 'Fixtures', 'Facilities']
 const money = (amount: number) => `£${new Intl.NumberFormat('en-GB').format(amount)}`
 const shortMoney = (amount: number) => `£${(amount / 1000000).toFixed(1)}m`
-const displayDate = (date: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`))
 const defaultKitDesign = (): KitDesign => ({
   home: { primary: club.colors.primary, secondary: club.colors.secondary, pattern: 'Vertical stripes' },
   away: { primary: '#bf6d53', secondary: '#ffffff', pattern: 'Solid' },
@@ -145,7 +147,7 @@ export default function ClubProfile({ section, selectedClubName, matches, onSect
 
     <div className="club-profile-content" key={section}>
       {section === 'Overview' && <>
-        <section className="club-manager-card"><div className="club-manager-avatar">{club.manager.name.split(' ').map((part) => part[0]).join('')}</div><div className="club-manager-info"><span className="eyebrow">FIRST TEAM MANAGER</span><strong>{club.manager.name}</strong><span>{club.manager.nationality} · Age {club.manager.age}</span></div><div className="manager-reputation"><StarRating rating={club.manager.reputation} /><small>REPUTATION</small></div></section>
+        <section className="club-manager-card"><img alt={`Portrait of ${club.manager.name}`} className="club-manager-avatar" src={PLACEHOLDER_PORTRAIT} /><div className="club-manager-info"><span className="eyebrow">FIRST TEAM MANAGER</span><strong>{club.manager.name}</strong><span>{club.manager.nationality} · Age {club.manager.age}</span></div><div className="manager-reputation"><StarRating rating={club.manager.reputation} /><small>REPUTATION</small></div></section>
         <section className="club-stadium-card"><div><span className="eyebrow">HOME GROUND</span><h2>{club.stadium.name}</h2><span>Founded {club.founded} · {club.nickname}</span></div><div className="stadium-capacity"><strong>{new Intl.NumberFormat('en-GB').format(club.stadium.capacity)}</strong><span>CAPACITY</span></div><div className="stadium-attendance"><span>AVG ATTENDANCE</span><strong>{new Intl.NumberFormat('en-GB').format(club.stadium.attendance)}</strong><div><i style={{ width: `${club.stadium.attendance / club.stadium.capacity * 100}%` }} /></div></div></section>
         <div className="club-overview-metrics"><article><span>TRANSFER BUDGET</span><strong>{shortMoney(club.finances.transferBudget)}</strong><small>Available now</small></article><article><span>WAGE BUDGET</span><strong>{money(club.finances.wageBudget)}<small> / wk</small></strong><small>{money(club.finances.wageBudget - club.finances.weeklyWages)} remaining</small></article><article><span>TEAM PRESTIGE</span><strong>{club.prestige}<small> / 100</small></strong><small>National reputation</small></article></div>
         <section className="club-kits-panel">
@@ -190,26 +192,14 @@ export default function ClubProfile({ section, selectedClubName, matches, onSect
 
       {section === 'Staff' && <>
         <div className="club-subpage-heading"><div><span className="eyebrow">COACHING & BACKROOM</span><h2>Club staff</h2></div><span className="club-tactic-tag">{club.staff.length} PROFILES</span></div>
-        <div className="club-staff-list">{club.staff.map((staff) => <button className="club-staff-row" key={staff.id} onClick={() => onSelectPersonnel(staff.profileId)} type="button"><span className="club-staff-avatar">{staff.name.split(' ').map((part) => part[0]).join('')}</span><span className="club-staff-person"><strong>{staff.name}</strong><small>{staff.role}</small></span><span className="club-staff-nationality">{staff.nationality}</span><span className="club-staff-chevron">→</span></button>)}</div>
+        <div className="club-staff-list">{club.staff.map((staff) => <button className="club-staff-row" key={staff.id} onClick={() => onSelectPersonnel(staff.profileId)} type="button"><img alt={`Portrait of ${staff.name}`} className="club-staff-avatar" src={PLACEHOLDER_PORTRAIT} /><span className="club-staff-person"><strong>{staff.name}</strong><small>{staff.role}</small></span><span className="club-staff-nationality">{staff.nationality}</span><span className="club-staff-chevron">→</span></button>)}</div>
       </>}
 
-      {section === 'Sponsorship' && <>
-        <div className="club-subpage-heading"><div><span className="eyebrow">2026/27 SEASON</span><h2>Sponsorship</h2></div><span className="club-tactic-tag">{shortMoney(club.finances.sponsorshipIncomeAnnual)} / YR</span></div>
-        {(() => {
-          const mainSponsor = [...club.sponsors].sort((first, second) => second.valueAnnual - first.valueAnnual)[0]
-          const shirtSponsor = club.sponsors.find((sponsor) => sponsor.category === 'Front of shirt')
-          const stadiumRights = Math.round(club.stadium.capacity * 85 / 10000) * 10000
-          return <>
-            <section className="club-sponsors-panel"><div className="club-panel-heading"><div><span className="eyebrow">PARTNERS</span><h2>Main & shirt sponsors</h2></div></div>
-              {mainSponsor && <article className="club-sponsor-row"><div><span className="eyebrow">{mainSponsor === shirtSponsor ? 'MAIN & SHIRT SPONSOR' : 'MAIN SPONSOR'}</span><strong>{mainSponsor.name}</strong><span>{mainSponsor.category} · ends {displayDate(mainSponsor.endDate)}</span></div><strong>{shortMoney(mainSponsor.valueAnnual)}<small> / yr</small></strong></article>}
-              {shirtSponsor && shirtSponsor !== mainSponsor && <article className="club-sponsor-row"><div><span className="eyebrow">SHIRT SPONSOR</span><strong>{shirtSponsor.name}</strong><span>Front of shirt · ends {displayDate(shirtSponsor.endDate)}</span></div><strong>{shortMoney(shirtSponsor.valueAnnual)}<small> / yr</small></strong></article>}
-              {club.sponsors.filter((sponsor) => sponsor !== mainSponsor && sponsor !== shirtSponsor).map((sponsor) => <article className="club-sponsor-row" key={sponsor.name}><div><span className="eyebrow">{sponsor.category.toUpperCase()}</span><strong>{sponsor.name}</strong><span>ends {displayDate(sponsor.endDate)}</span></div><strong>{shortMoney(sponsor.valueAnnual)}<small> / yr</small></strong></article>)}
-            </section>
-            <section className="club-sponsors-panel"><div className="club-panel-heading"><div><span className="eyebrow">NAMING RIGHTS</span><h2>Stadium rights</h2></div></div><article className="club-sponsor-row"><div><span className="eyebrow">{club.stadium.name.toUpperCase()}</span><strong>Naming rights unsold</strong><span>Estimated offer for {club.stadium.capacity.toLocaleString()} seats</span></div><strong>{shortMoney(stadiumRights)}<small> / yr</small></strong></article></section>
-          </>
-        })()}
-        <section className="club-finance-panel"><div className="club-panel-heading"><div><span className="eyebrow">REVENUE & SPEND</span><h2>Income streams</h2></div></div><div className="finance-line"><span>Sponsorship income <small>per season</small></span><strong>{shortMoney(club.finances.sponsorshipIncomeAnnual)}</strong></div><div className="finance-line"><span>Ticket sales <small>per home match</small></span><strong>{money(club.finances.ticketSalesPerHomeMatch)}</strong></div><div className="finance-line"><span>Weekly wages <small>of {money(club.finances.wageBudget)} budget</small></span><strong>{money(club.finances.weeklyWages)}</strong></div><div className="finance-line"><span>Monthly operations</span><strong>{money(club.finances.operationsPerMonth)}</strong></div></section>
-      </>}
+      {section === 'Sponsorship' && <ClubSponsorship />}
+
+      {section === 'Finances' && <ClubFinances />}
+
+      {section === 'Board' && <BoardOverview embedded />}
 
       {section === 'Fixtures' && <ClubFixturesSection fixtures={matches.filter((match) => match.homeClubId === club.id || match.awayClubId === club.id)} onSelectMatch={onSelectMatch} />}
 

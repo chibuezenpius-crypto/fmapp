@@ -3,6 +3,7 @@ import { club } from './data/mockData'
 import type { AcademyProspect, Player, PlayerPosition, YouthManager } from './types/game'
 import { ACADEMY_MAX_SIZE, MAX_ACTIVE_MISSIONS, SCOUT_REGIONS, SENIOR_SQUAD_MAX, advanceDays, generateIntake, generateYouthManager, startMission, useAcademy, type PositionGroup, type ScoutMission } from './utils/academy'
 import { resolveFlagCode } from './countryFlagUtils'
+import { PLACEHOLDER_PORTRAIT } from './portrait'
 
 type AcademySection = 'Overview' | 'Scouting' | 'Players' | 'Progress'
 type PositionFilter = 'ALL' | PositionGroup
@@ -178,7 +179,12 @@ export default function AcademyHub({ onSelectPlayer, onSelectCountry }: AcademyH
       <section className="ah-panel">
         <div className="ah-panel-head"><h3>Academy Director</h3><span className="ah-muted">Youth Lvl {youthLevel} · Next intake 1 Jul {academy.nextIntakeYear}</span></div>
         {academy.manager ? <>
-          <div className="ah-director"><Avatar name={academy.manager.name} size={44} /><div><strong>{academy.manager.name}</strong><small><Flag code={academy.manager.nationalityCode} /> {academy.manager.nationality} · Age {academy.manager.age} · {academy.manager.philosophy}</small></div></div>
+          <div className="club-manager-card ah-director-card">
+            <img alt={`Portrait of ${academy.manager.name}`} className="club-manager-avatar" src={PLACEHOLDER_PORTRAIT} />
+            <div className="club-manager-info"><span className="eyebrow">ACADEMY DIRECTOR</span><strong>{academy.manager.name}</strong><span><Flag code={academy.manager.nationalityCode} /> {academy.manager.nationality} · Age {academy.manager.age}</span></div>
+            <div className="manager-reputation"><strong className="ah-director-rating">{academy.manager.coachingRating}</strong><small>COACHING</small></div>
+          </div>
+          <p className="ah-director-philosophy">Philosophy · {academy.manager.philosophy}</p>
           <dl className="ah-metrics">
             <div><dt>Coaching</dt><dd>{academy.manager.coachingRating}</dd></div>
             <div><dt>Scouting network</dt><dd>{academy.manager.scoutingNetwork}%</dd></div>
@@ -188,7 +194,7 @@ export default function AcademyHub({ onSelectPlayer, onSelectCountry }: AcademyH
         <details className="ah-candidates">
           <summary>{academy.manager ? 'Replace director' : 'Hire a director'}</summary>
           {academy.candidates.map((candidate) => <article key={candidate.id}>
-            <Avatar name={candidate.name} size={36} />
+            <img alt={`Portrait of ${candidate.name}`} className="ah-candidate-portrait" src={PLACEHOLDER_PORTRAIT} />
             <div><strong>{candidate.name}</strong><small>{candidate.philosophy} · Coaching {candidate.coachingRating} · Scouting {candidate.scoutingNetwork}%</small></div>
             <button className="academy-action" onClick={() => hireManager(candidate)} type="button">{academy.manager ? 'Replace' : 'Hire'}</button>
           </article>)}

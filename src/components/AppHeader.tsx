@@ -3,6 +3,8 @@ import { Bell, Coins, Crown, Landmark, Mail, Settings, Star, Trophy, Wallet, X }
 import { club, getClubBadge, getSquadHealth } from '../data/mockData'
 import { advanceToNextMatch, describeDate, type GameView } from '../state/gameStore'
 import { computeConfidence } from '../state/confidence'
+import { markSponsorMailRead, useSponsors } from '../state/sponsors'
+import type { SponsorMail } from '../state/sponsorDeals'
 import { financialHealth, formatMoney, managerProgress, reputationLabel, teamOverall } from '../state/dashboard'
 import ClubBadge from '../ClubBadge'
 import Flag from '../Flag'
@@ -32,11 +34,12 @@ export default function AppHeader({ game, leading, expanded, nav, onOpenClub, on
   const date = describeDate(game.date)
   const health = getSquadHealth(game.date)
   const alerts = buildAlerts(game, nav)
-  const messages = buildInbox(game, nav)
+  const sponsors = useSponsors()
+  const messages = buildInbox(game, nav, sponsors.mail)
   const toggle = (kind: PanelKind) => setPanel((current) => (current === kind ? null : kind))
   const go = (action: () => void) => () => { setPanel(null); action() }
   const icons = <div className="flex shrink-0 items-center gap-1.5">
-    <HeaderIconButton active={panel === 'inbox'} label="Inbox" onClick={() => toggle('inbox')}><Mail size={16} /></HeaderIconButton>
+    <HeaderIconButton active={panel === 'inbox'} badge={sponsors.mail.filter((item) => !item.read).length} label="Inbox" onClick={() => toggle('inbox')}><Mail size={16} /></HeaderIconButton>
     <HeaderIconButton active={panel === 'notifications'} badge={alerts.length} label="Notifications" onClick={() => toggle('notifications')}><Bell size={16} /></HeaderIconButton>
     <HeaderIconButton active={panel === 'settings'} label="Settings" onClick={() => toggle('settings')}><Settings size={16} /></HeaderIconButton>
   </div>
@@ -132,7 +135,7 @@ function MetricBar({ nav }: { nav: NavActions }) {
   const wageBudget = club.finances.wageBudget
   const items = [
     { key: 'transfer', icon: <Wallet size={14} />, label: 'Transfer budget', value: formatMoney(club.finances.transferBudget), go: () => nav.onNavigate('Transfers') },
-    { key: 'wage', icon: <Coins size={14} />, label: 'Wage budget', value: `${formatMoney(wageBudget)} / wk`, go: () => nav.onOpenClubSection('Sponsorship') },
+    { key: 'wage', icon: <Coins size={14} />, label: 'Wage budget', value: `${formatMoney(wageBudget)} / wk`, go: () => nav.onOpenClubSection('Finances') },
     { key: 'rank', icon: <Trophy size={14} />, label: 'VFA ranking', value: `${club.prestige}/100`, go: () => nav.onNavigate('League') },
     { key: 'rep', icon: <Star size={14} />, label: 'Club reputation', value: reputationLabel(club.prestige),     go: () => nav.onOpenClubSection('Overview') },
   ]
@@ -141,7 +144,7 @@ function MetricBar({ nav }: { nav: NavActions }) {
       <span className="grid size-6 shrink-0 place-items-center rounded-lg bg-[#5b9bff]/15 text-[#8fb4ff]">{item.icon}</span>
       <span className="flex min-w-0 flex-col leading-tight"><strong className="truncate text-[11px]">{item.value}</strong><span className="truncate text-[8px] text-[#a7b3d0]">{item.label}</span></span>
     </button>)}
-    <button className="flex min-w-0 cursor-pointer flex-col items-center justify-center gap-0.5 border-0 bg-transparent px-1 text-center text-white hover:bg-white/5" onClick={() => nav.onOpenClubSection('Sponsorship')} type="button">
+    <button className="flex min-w-0 cursor-pointer flex-col items-center justify-center gap-0.5 border-0 bg-transparent px-1 text-center text-white hover:bg-white/5" onClick={() => nav.onOpenClubSection('Finances')} type="button">
       <span className="grid size-6 shrink-0 place-items-center rounded-lg bg-[#5b9bff]/15 text-[#8fb4ff]"><Landmark size={13} /></span>
       <span className="flex min-w-0 flex-col leading-tight"><strong className={`truncate text-[10px] ${toneClasses[health.tone]}`}>{health.label}</strong><span className="truncate text-[8px] text-[#a7b3d0]">Financial health</span></span>
     </button>
@@ -152,15 +155,17 @@ function buildAlerts(game: GameView, nav: NavActions): HeaderMessage[] {
   const health = getSquadHealth(game.date)
   const items: HeaderMessage[] = []
   if (health.activeInjuries > 0) items.push({ id: 'injuries', title: `${health.activeInjuries} injured`, detail: health.injuriesNote, go: () => nav.onOpenClubSection('Squad') })
-  if (financialHealth().tone === 'bad') items.push({ id: 'wages', title: 'Wage bill over the limit', detail: 'Reduce wages or release players.', go: () => nav.onOpenClubSection('Sponsorship') })
+  if (financialHealth().tone === 'bad') items.push({ id: 'wages', title: 'Wage bill over the limit', detail: 'Reduce wages or release players.', go: () => nav.onOpenClubSection('Finances') })
   const next = game.nextFixture
   if (next && next.date === game.date) items.push({ id: 'matchday', title: 'Matchday', detail: `${next.homeClubName} vs ${next.awayClubName}`, go: () => nav.onSelectMatch(next.id) })
   return items
 }
 
-function buildInbox(game: GameView, nav: NavActions): HeaderMessage[] {
+function buildInbox(game: GameView, nav: NavActions, mail: SponsorMail[]): HeaderMessage[] {
   const confidence = computeConfidence(game)
+  const sponsorMail = mail.map((item) => ({ id: item.id, title: `${item.read ? '' : '● '}${item.subject}`, detail: item.body, go: () => { markSponsorMailRead(item.id); nav.onOpenClubSection('Sponsorship') } }))
   return [
+    ...sponsorMail,
     { id: 'board', title: `Board · ${confidence.board.status}`, detail: confidence.board.note, go: () => nav.onOpenConfidence('board') },
     { id: 'fans', title: `Fans · ${confidence.fan.status}`, detail: confidence.fan.note, go: () => nav.onOpenConfidence('fan') },
     { id: 'manager', title: `Manager · ${confidence.manager.status}`, detail: confidence.manager.note, go: () => nav.onOpenConfidence('manager') },

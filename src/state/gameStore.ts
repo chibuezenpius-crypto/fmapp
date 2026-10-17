@@ -13,6 +13,7 @@ import { computePlayerStats, computeTeamStats } from '../simulation/stats'
 import { DEFAULT_SLOTS, fitPlayersToSlots } from '../utils/lineup'
 import { applyMatchCondition, isUnavailable, recoverPlayerToDate, type PlayerConditionState } from '../simulation/playerCondition'
 import { validateSchedule } from '../simulation/calendarScheduler'
+import { SPONSORS_KEY, syncSponsors } from './sponsors'
 
 const DATE_KEY = 'fmapp-game-date-v4'
 export const LEDGER_KEY = 'fmapp-transfer-ledger-v1'
@@ -222,6 +223,7 @@ const savedDate = loadDate()
 const loaded = loadSimulatedMatches((done) => seasonFixtures(done, savedDate).fixtures)
 let date = loaded.error ? SEASON_START_DATE : savedDate
 let results: Record<string, MatchInfo> = loaded.matches
+syncSponsors(date)
 const loadedPlayerConditions = loadPlayerConditions()
 const playerConditions: PlayerConditionState = loadedPlayerConditions.state
 for (const country of countries) {
@@ -363,6 +365,7 @@ function rollOverSeason(): boolean {
 function commit(newResults: MatchInfo[], nextDate?: string) {
   results = { ...results, ...Object.fromEntries(newResults.map((result) => [result.id, result])) }
   if (nextDate) date = nextDate
+  if (nextDate) syncSponsors(nextDate)
   if (nextDate) for (const player of club.squad) recoverPlayerToDate(player, nextDate, playerConditions)
   let startedSeason = ''
   while (rollOverSeason()) startedSeason = seasonLabel(currentSeason())
@@ -429,6 +432,7 @@ export function resetGame() {
   clearPlayerConditions()
   window.localStorage.removeItem(DATE_KEY)
   window.localStorage.removeItem(LEDGER_KEY)
+  window.localStorage.removeItem(SPONSORS_KEY)
   window.localStorage.removeItem(HISTORY_KEY)
   window.location.reload()
 }

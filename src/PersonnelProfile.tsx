@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ManagerProfile, PersonnelProfile, RefereeProfile } from './types/game'
 import Flag from './Flag'
+import { PLACEHOLDER_PORTRAIT } from './portrait'
 import { displayCountryName } from './countryFlagUtils'
 
 type ManagerSection = 'Overview & Attributes' | 'Tactics & Style' | 'Achievements & History'
@@ -14,7 +15,7 @@ function ManagerView({ manager, onSelectCountry }: { manager: ManagerProfile; on
   ] as const
 
   return <div className="manager-profile">
-    <section className="personnel-hero"><span className="personnel-avatar">{manager.name.split(' ').map((part) => part[0]).join('')}</span><div><span className="eyebrow">MANAGER PROFILE</span><h1>{manager.name}</h1><span className="personnel-country"><Flag code={manager.nationality} countryName={displayCountryName(manager.nationality)} onSelectCountry={onSelectCountry} />{manager.nationality} · Age {manager.age}</span></div><span className="personnel-role">COACH</span></section>
+    <section className="personnel-hero"><img alt={`Portrait of ${manager.name}`} className="personnel-avatar" src={PLACEHOLDER_PORTRAIT} /><div><span className="eyebrow">MANAGER PROFILE</span><h1>{manager.name}</h1><span className="personnel-country"><Flag code={manager.nationality} countryName={displayCountryName(manager.nationality)} onSelectCountry={onSelectCountry} />{manager.nationality} · Age {manager.age}</span></div><span className="personnel-role">COACH</span></section>
     <nav className="personnel-tabs" aria-label="Manager profile sections">{managerSections.map((item) => <button aria-current={section === item ? 'page' : undefined} className={section === item ? 'personnel-tab active' : 'personnel-tab'} key={item} onClick={() => setSection(item)} type="button">{item}</button>)}</nav>
     {section === 'Overview & Attributes' && <div className="personnel-content">
       <section className="personnel-panel"><div className="personnel-panel-heading"><span className="eyebrow">MANAGER ATTRIBUTES</span><strong>KEY SKILLS</strong></div>{attributes.map(([label, value]) => <div className="manager-attribute" key={label}><span>{label}</span><div><i style={{ width: `${value * 5}%` }} /></div><strong>{value}</strong></div>)}</section>
@@ -28,7 +29,7 @@ function ManagerView({ manager, onSelectCountry }: { manager: ManagerProfile; on
 function RefereeView({ referee, onSelectCountry }: { referee: RefereeProfile; onSelectCountry: (country: string) => void }) {
   const strictness = referee.strictness.toLowerCase()
   return <div className="referee-profile">
-    <section className="personnel-hero"><span className="personnel-avatar referee-avatar">{referee.name.split(' ').map((part) => part[0]).join('')}</span><div><span className="eyebrow">MATCH OFFICIAL</span><h1>{referee.name}</h1><span className="personnel-country"><Flag code={referee.countryCode} countryName={displayCountryName(referee.nationality)} onSelectCountry={onSelectCountry} />{referee.nationality} · Age {referee.age}</span></div><span className={`strictness-badge ${strictness}`}>{referee.strictness}</span></section>
+    <section className="personnel-hero"><img alt={`Portrait of ${referee.name}`} className="personnel-avatar referee-avatar" src={PLACEHOLDER_PORTRAIT} /><div><span className="eyebrow">MATCH OFFICIAL</span><h1>{referee.name}</h1><span className="personnel-country"><Flag code={referee.countryCode} countryName={displayCountryName(referee.nationality)} onSelectCountry={onSelectCountry} />{referee.nationality} · Age {referee.age}</span></div><span className={`strictness-badge ${strictness}`}>{referee.strictness}</span></section>
     <section className="personnel-panel referee-languages"><span className="eyebrow">LANGUAGES</span><div className="language-tags">{referee.languages.map((language) => <span key={language.name}>{language.name} · {language.proficiency}</span>)}</div></section>
     <section className="personnel-panel"><span className="eyebrow">DISCIPLINARY TENDENCY</span><div className="referee-stats"><article><strong>{referee.yellowCardsPerMatch.toFixed(1)}</strong><span>YELLOW CARDS / MATCH</span></article><article><strong>{referee.redCardsPerMatch.toFixed(2)}</strong><span>RED CARDS / MATCH</span></article><article><strong>{referee.foulThreshold}</strong><span>FOULS BEFORE CARD</span></article></div><div className="referee-meter"><i style={{ width: `${referee.strictness === 'Lenient' ? 30 : referee.strictness === 'Balanced' ? 60 : 90}%` }} /></div></section>
   </div>

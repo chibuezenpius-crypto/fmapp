@@ -14,6 +14,7 @@ export interface BoardObjective {
   title: string
   target: string
   current: string
+  importance: 'High' | 'Medium' | 'Low'
   status: 'On track' | 'Behind' | 'Not started' | 'Met'
 }
 
@@ -26,11 +27,11 @@ export function getBoardObjectives(view: GameView): BoardObjective[] {
   const youngsters = club.squad.filter((player) => player.age <= 21).length
   const position = own?.position ?? 99
   return [
-    { title: 'League finish', target: `Top ${target}`, current: played ? `${position}${ordinal(position)} after ${played} games` : 'Season not started', status: !played ? 'Not started' : position <= target ? 'On track' : 'Behind' },
-    { title: 'Qualify for continental football', target: `Top ${ownLeagueRules.continentalSlots}`, current: played ? `Position ${position}` : 'Season not started', status: !played ? 'Not started' : position <= ownLeagueRules.continentalSlots ? 'On track' : 'Behind' },
-    { title: 'Stay within the wage budget', target: `£${Math.round(wageLimit).toLocaleString('en-GB')}/wk`, current: `£${Math.round(wageBill).toLocaleString('en-GB')}/wk`, status: wageBill <= wageLimit ? 'Met' : 'Behind' },
-    { title: 'Keep a balanced squad', target: `${SQUAD_MIN}–${SQUAD_MAX} players`, current: `${club.squad.length} players`, status: club.squad.length >= SQUAD_MIN && club.squad.length <= SQUAD_MAX ? 'Met' : 'Behind' },
-    { title: 'Develop young talent', target: '4 players aged 21 or under', current: `${youngsters} in the squad`, status: youngsters >= 4 ? 'Met' : 'Behind' },
+    { title: 'League finish', importance: 'High', target: `Top ${target}`, current: played ? `${position}${ordinal(position)} after ${played} games` : 'Season not started', status: !played ? 'Not started' : position <= target ? 'On track' : 'Behind' },
+    { title: 'Qualify for continental football', importance: 'Medium', target: `Top ${ownLeagueRules.continentalSlots}`, current: played ? `Position ${position}` : 'Season not started', status: !played ? 'Not started' : position <= ownLeagueRules.continentalSlots ? 'On track' : 'Behind' },
+    { title: 'Stay within the wage budget', importance: 'High', target: `£${Math.round(wageLimit).toLocaleString('en-GB')}/wk`, current: `£${Math.round(wageBill).toLocaleString('en-GB')}/wk`, status: wageBill <= wageLimit ? 'Met' : 'Behind' },
+    { title: 'Keep a balanced squad', importance: 'Low', target: `${SQUAD_MIN}–${SQUAD_MAX} players`, current: `${club.squad.length} players`, status: club.squad.length >= SQUAD_MIN && club.squad.length <= SQUAD_MAX ? 'Met' : 'Behind' },
+    { title: 'Develop young talent', importance: 'Medium', target: '4 players aged 21 or under', current: `${youngsters} in the squad`, status: youngsters >= 4 ? 'Met' : 'Behind' },
   ]
 }
 
