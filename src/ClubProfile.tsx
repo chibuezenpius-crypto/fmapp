@@ -1,16 +1,14 @@
 import { useState } from 'react'
-import { club, getClubBadge, matchFixtures } from './data/mockData'
+import { club, getClubBadge } from './data/mockData'
 import ClubBadge from './ClubBadge'
-import type { AcademyProspect, MatchInfo, Player, YouthManager } from './types/game'
-import { ACADEMY_MAX_SIZE, SENIOR_SQUAD_MAX, generateIntake, generateYouthManager, useAcademy } from './utils/academy'
-import { resolveFlagCode } from './countryFlagUtils'
+import type { MatchInfo, Player } from './types/game'
 
-export type ClubSection = 'Overview' | 'Squad' | 'Tactics' | 'Staff' | 'Sponsorship' | 'Fixtures' | 'Facilities' | 'Academy'
+export type ClubSection = 'Overview' | 'Squad' | 'Tactics' | 'Staff' | 'Sponsorship' | 'Fixtures' | 'Facilities'
 
 type PositionFilter = 'ALL' | 'GK' | 'DEF' | 'MID' | 'FWD'
 type SortMode = 'Value' | 'Rating' | 'Age'
 
-const sections: ClubSection[] = ['Overview', 'Squad', 'Tactics', 'Staff', 'Sponsorship', 'Fixtures', 'Facilities', 'Academy']
+const sections: ClubSection[] = ['Overview', 'Squad', 'Tactics', 'Staff', 'Sponsorship', 'Fixtures', 'Facilities']
 const FACILITY_COSTS = { training: 2500000, youth: 1800000, stadium: 3200000 }
 const money = (amount: number) => `£${new Intl.NumberFormat('en-GB').format(amount)}`
 const shortMoney = (amount: number) => `£${(amount / 1000000).toFixed(1)}m`
@@ -19,15 +17,12 @@ const displayDate = (date: string) => new Intl.DateTimeFormat('en-GB', { day: 'n
 interface ClubProfileProps {
   section: ClubSection
   selectedClubName: string | null
+  matches: MatchInfo[]
   onSectionChange: (section: ClubSection) => void
   onSelectClub: (name: string) => void
   onSelectPlayer: (player: Player) => void
   onSelectPersonnel: (idOrName: string) => void
   onSelectMatch: (id: string) => void
-}
-
-function Flag({ code }: { code: string }) {
-  return <span aria-hidden="true" className={`fi fi-${resolveFlagCode(code)}`} />
 }
 
 function StarRating({ rating }: { rating: number }) {
@@ -42,14 +37,12 @@ function PlayerButton({ player, onSelectPlayer, role, x, y }: { player: Player; 
   return <button aria-label={`Open ${player.name} profile`} className="club-pitch-player" onClick={() => onSelectPlayer(player)} style={{ left: x, top: y }} type="button"><span>{String(player.shirtNumber).padStart(2, '0')}</span><strong>{player.name}</strong>{role && <small>{role}</small>}</button>
 }
 
-export default function ClubProfile({ section, selectedClubName, onSectionChange, onSelectClub, onSelectPlayer, onSelectPersonnel, onSelectMatch }: ClubProfileProps) {
+export default function ClubProfile({ section, selectedClubName, matches, onSectionChange, onSelectClub, onSelectPlayer, onSelectPersonnel, onSelectMatch }: ClubProfileProps) {
   const [positionFilter, setPositionFilter] = useState<PositionFilter>('ALL')
   const [sortMode, setSortMode] = useState<SortMode>('Value')
   const [, refresh] = useState(0)
   const { trainingLevel, youthLevel, stadiumLevel } = club.facilities
   const balance = club.finances.balance
-  const [academy, setAcademy] = useAcademy(club.id, youthLevel)
-  const [academyNotice, setAcademyNotice] = useState('')
   const squad = [...club.squad].filter((player) => {
     if (positionFilter === 'ALL') return true
     if (positionFilter === 'GK') return player.position === 'GK'
@@ -69,37 +62,6 @@ export default function ClubProfile({ section, selectedClubName, onSectionChange
     club.facilities[levelKey] += 1
     club.finances.balance -= cost
     refresh((count) => count + 1)
-  }
-
-  const promoteProspect = (prospect: AcademyProspect) => {
-    if (club.squad.length >= SENIOR_SQUAD_MAX) { setAcademyNotice('Senior squad is full (' + SENIOR_SQUAD_MAX + ').'); return }
-    const shirtNumber = Math.max(...club.squad.map((player) => player.shirtNumber)) + 1
-    club.squad.push({ ...prospect.player, shirtNumber })
-    setAcademy({ ...academy, prospects: academy.prospects.filter((item) => item.player.id !== prospect.player.id) })
-    setAcademyNotice(prospect.player.name + ' promoted to the senior squad.')
-  }
-
-  const releaseProspect = (prospect: AcademyProspect) => {
-    setAcademy({ ...academy, prospects: academy.prospects.filter((item) => item.player.id !== prospect.player.id) })
-    setAcademyNotice(prospect.player.name + ' released.')
-  }
-
-  const fireManager = () => {
-    setAcademy({ ...academy, manager: null })
-    setAcademyNotice('Youth manager dismissed. Intakes will be weaker until you hire a replacement.')
-  }
-
-  const hireManager = (candidate: YouthManager) => {
-    const replacement = generateYouthManager(club.id + ':candidate:' + academy.candidates.length + ':' + candidate.id)
-    setAcademy({ ...academy, manager: candidate, candidates: academy.candidates.filter((item) => item.id !== candidate.id).concat(academy.manager ? [academy.manager] : [replacement]) })
-    setAcademyNotice(candidate.name + ' appointed as Academy Director.')
-  }
-
-  const runIntake = () => {
-    const intake = generateIntake(club.id, academy.nextIntakeYear, youthLevel, academy.manager)
-    const roster = [...academy.prospects, ...intake].sort((first, second) => second.player.potential - first.player.potential).slice(0, ACADEMY_MAX_SIZE)
-    setAcademy({ ...academy, prospects: roster, nextIntakeYear: academy.nextIntakeYear + 1, intakeCount: academy.intakeCount + 1 })
-    setAcademyNotice(intake.length + ' new prospects joined from the ' + academy.nextIntakeYear + ' intake.')
   }
 
   const formation = [
@@ -176,7 +138,7 @@ export default function ClubProfile({ section, selectedClubName, onSectionChange
         <section className="club-finance-panel"><div className="club-panel-heading"><div><span className="eyebrow">REVENUE & SPEND</span><h2>Income streams</h2></div></div><div className="finance-line"><span>Sponsorship income <small>per season</small></span><strong>{shortMoney(club.finances.sponsorshipIncomeAnnual)}</strong></div><div className="finance-line"><span>Ticket sales <small>per home match</small></span><strong>{money(club.finances.ticketSalesPerHomeMatch)}</strong></div><div className="finance-line"><span>Weekly wages <small>of {money(club.finances.wageBudget)} budget</small></span><strong>{money(club.finances.weeklyWages)}</strong></div><div className="finance-line"><span>Monthly operations</span><strong>{money(club.finances.operationsPerMonth)}</strong></div></section>
       </>}
 
-      {section === 'Fixtures' && <ClubFixturesSection fixtures={matchFixtures} onSelectMatch={onSelectMatch} />}
+      {section === 'Fixtures' && <ClubFixturesSection fixtures={matches} onSelectMatch={onSelectMatch} />}
 
       {section === 'Facilities' && <>
         <div className="club-subpage-heading"><div><span className="eyebrow">INVEST IN THE FUTURE</span><h2>Facilities</h2></div></div>
@@ -185,27 +147,6 @@ export default function ClubProfile({ section, selectedClubName, onSectionChange
           <FacilityUpgrade name="Training ground" level={trainingLevel} maxLevel={club.facilities.maxLevel} cost={FACILITY_COSTS.training} canAfford={balance >= FACILITY_COSTS.training} onUpgrade={() => upgradeFacility('training')} />
           <FacilityUpgrade name="Youth setup" level={youthLevel} maxLevel={club.facilities.maxLevel} cost={FACILITY_COSTS.youth} canAfford={balance >= FACILITY_COSTS.youth} onUpgrade={() => upgradeFacility('youth')} />
           <FacilityUpgrade name="Stadium" level={stadiumLevel} maxLevel={club.facilities.maxLevel} cost={FACILITY_COSTS.stadium} canAfford={balance >= FACILITY_COSTS.stadium} onUpgrade={() => upgradeFacility('stadium')} />
-        </section>
-      </>}
-
-      {section === 'Academy' && <>
-        <div className="club-subpage-heading"><div><span className="eyebrow">YOUTH ACADEMY & INTAKE</span><h2>Academy</h2></div><span className="club-tactic-tag">LEVEL {youthLevel}</span></div>
-        {academyNotice && <p className="academy-notice" role="status">{academyNotice}</p>}
-        <section className="academy-manager-card"><div className="club-panel-heading"><div><span className="eyebrow">ACADEMY DIRECTOR</span><h2>Youth manager</h2></div></div>
-          {academy.manager ? <>
-            <div className="academy-manager-head"><span className="club-manager-avatar">{academy.manager.name.split(' ').map((part) => part[0]).join('')}</span><div><strong>{academy.manager.name}</strong><span><Flag code={academy.manager.nationalityCode} /> {academy.manager.nationality} · Age {academy.manager.age}</span></div></div>
-            <dl className="academy-manager-stats"><div><dt>Philosophy</dt><dd>{academy.manager.philosophy}</dd></div><div><dt>Coaching</dt><dd>{academy.manager.coachingRating}<small> / 100</small></dd></div><div><dt>Scouting network</dt><dd>{academy.manager.scoutingNetwork}%</dd></div><div><dt>Wage</dt><dd>{money(academy.manager.weeklyWage)}<small> / wk</small></dd></div></dl>
-            <button className="academy-action danger" onClick={fireManager} type="button">Dismiss manager</button>
-          </> : <p className="academy-empty">Vacant. Intake quality and scouting reach are reduced.</p>}
-          <div className="academy-candidates"><span className="eyebrow">{academy.manager ? 'REPLACE WITH' : 'CANDIDATES'}</span>{academy.candidates.map((candidate) => <article className="academy-candidate" key={candidate.id}><div><strong>{candidate.name}</strong><small><Flag code={candidate.nationalityCode} /> {candidate.nationality} · {candidate.philosophy}</small><small>Coaching {candidate.coachingRating} · Scouting {candidate.scoutingNetwork}% · {money(candidate.weeklyWage)}/wk</small></div><button className="academy-action" onClick={() => hireManager(candidate)} type="button">{academy.manager ? 'Replace' : 'Hire'}</button></article>)}</div>
-        </section>
-        <section className="academy-intake-card"><div><span className="eyebrow">ANNUAL YOUTH INTAKE</span><strong>1 Jul {academy.nextIntakeYear}</strong><small>{academy.intakeCount} intake{academy.intakeCount === 1 ? '' : 's'} completed · quality driven by Youth level {youthLevel} and your scouting network</small></div><button className="academy-action" onClick={runIntake} type="button">Run intake now</button></section>
-        <section className="academy-roster"><div className="club-panel-heading"><div><span className="eyebrow">AGED 15–18</span><h2>Prospects</h2></div><span>{academy.prospects.length} / {ACADEMY_MAX_SIZE}</span></div>
-          {academy.prospects.length === 0 && <p className="academy-empty">No prospects. Run an intake to find new talent.</p>}
-          {academy.prospects.map((prospect) => <article className="academy-prospect" key={prospect.player.id}>
-            <button aria-label={`Open ${prospect.player.name} profile`} className="academy-prospect-main" onClick={() => onSelectPlayer(prospect.player)} type="button"><span className="academy-pot"><strong>{prospect.potentialLow} - {prospect.potentialHigh}</strong><small>POT</small></span><span className="roster-player"><strong>{prospect.player.name}</strong><small>{prospect.player.position} · {prospect.player.age} yrs · OVR {prospect.player.overall}</small><small><Flag code={prospect.countryCode} /> {prospect.country} · {prospect.pace} development</small></span></button>
-            <div className="academy-prospect-actions"><button className="academy-action" onClick={() => promoteProspect(prospect)} type="button">Promote to Senior Squad</button><button className="academy-action danger" onClick={() => releaseProspect(prospect)} type="button">Release</button></div>
-          </article>)}
         </section>
       </>}
     </div>

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { Player, PlayerAttributes, PlayerAchievement } from './types/game'
-import { club, isOwnPlayer, releasePlayer, renewContract, signPlayer } from './data/mockData'
-import { createRng } from './utils/proceduralGenerator'
+import { club, getWageRoom, isOwnPlayer } from './data/mockData'
+import { getWageDemand, releasePlayer, renewContract, submitBid, type DealResult } from './state/transfers'
+import { useGame } from './state/gameStore'
 import { findGeneratedClub, getClubSquad } from './data/clubSquads'
 import Flag from './Flag'
 
@@ -22,12 +23,11 @@ interface PlayerProfileProps {
   onSelectClub: (name: string) => void
   onSelectPlayer: (player: Player) => void
   onSelectCountry: (country: string) => void
-  onClubChange?: () => void
 }
 
 const money = (amount: number) => `£${new Intl.NumberFormat('en-GB').format(amount)}`
 const displayDate = (date: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`))
-const ratingTone = (rating: number) => rating >= 15 ? 'positive' : rating < 9 ? 'negative' : 'neutral'
+const ratingTone = (rating: number) => rating >= 75 ? 'positive' : rating < 45 ? 'negative' : 'neutral'
 
 const playerClubName = (player: Player) => findGeneratedClub(player.contract.clubId)?.clubName ?? 'Free Agent'
 
@@ -46,29 +46,22 @@ const readShortlist = (): string[] => {
 const shortMoney = (amount: number) => `£${(amount / 1000000).toFixed(1)}m`
 const scoutedPlayers = new Set<string>()
 
-function PlayerActions({ player, onClubChange }: { player: Player; onClubChange?: () => void }) {
-  const [, refresh] = useState(0)
+function PlayerActions({ player }: { player: Player }) {
   const [panel, setPanel] = useState<'none' | 'renew' | 'bid' | 'release'>('none')
   const [message, setMessage] = useState('')
+  const [counter, setCounter] = useState<number | null>(null)
+  const [wageTerm, setWageTerm] = useState(1)
   const [shortlisted, setShortlisted] = useState(() => readShortlist().includes(player.id))
   const own = isOwnPlayer(player)
-  const done = (text: string) => { setMessage(text); setPanel('none'); refresh((count) => count + 1); onClubChange?.() }
+  const free = !player.contract.clubId
+  const done = (text: string) => { setMessage(text); setPanel('none'); setCounter(null) }
 
-  const renew = (years: number, raise: number) => {
-    const wage = Math.round(player.contract.weeklyWage * (1 + raise / 100) / 50) * 50
-    const needed = { 'Very Good': 0, Good: 5, Okay: 10, Poor: 20 }[player.morale]
-    const accepted = raise >= needed
-    const reason = accepted ? 'Happy with the project and terms' : `Wants a wage rise of at least ${needed}%`
-    renewContract(player, years, wage, accepted ? 'Accepted' : 'Declined', reason)
-    done(accepted ? `${player.name} signed a ${years}-year deal on ${money(wage)}/wk.` : `${player.name} rejected the offer: ${reason}.`)
-  }
+  const renew = (years: number, raise: number) => done(renewContract(player, years, raise).message)
 
-  const bid = (premium: number) => {
-    const offer = Math.round(player.value * (1 + premium / 100) / 50000) * 50000
-    const demanded = Math.round(player.value * (1 + createRng(`bid:${player.id}`)() * 0.3))
-    const accepted = offer >= demanded || (player.contract.releaseClause !== undefined && offer >= player.contract.releaseClause)
-    if (!accepted) return done(`${playerClubName(player)} rejected the ${shortMoney(offer)} bid. They want more.`)
-    done(signPlayer(player, offer))
+  const bid = (fee: number) => {
+    const result: DealResult = submitBid(player, { fee, wageMultiplier: wageTerm, years: 3 })
+    setMessage(result.message)
+    if (result.status === 'accepted') { setPanel('none'); setCounter(null) } else setCounter(result.status === 'counter' ? result.counterFee ?? null : null)
   }
 
   const scout = () => {
@@ -84,6 +77,7 @@ function PlayerActions({ player, onClubChange }: { player: Player; onClubChange?
   }
 
   if (!own && player.contract.clubId === club.id) return null
+  const demand = getWageDemand(player)
 
   return <section className="player-actions" aria-label="Player actions">
     <div className="player-action-buttons">
@@ -91,20 +85,26 @@ function PlayerActions({ player, onClubChange }: { player: Player; onClubChange?
         <button className="player-action primary" onClick={() => setPanel(panel === 'renew' ? 'none' : 'renew')} type="button">Renew contract</button>
         <button className="player-action danger" onClick={() => setPanel(panel === 'release' ? 'none' : 'release')} type="button">Release</button>
       </> : <>
-        <button className="player-action primary" onClick={() => setPanel(panel === 'bid' ? 'none' : 'bid')} type="button">Place bid</button>
+        <button className="player-action primary" onClick={() => setPanel(panel === 'bid' ? 'none' : 'bid')} type="button">{free ? 'Sign free agent' : 'Place bid'}</button>
         <button className="player-action" onClick={scout} type="button">{scoutedPlayers.has(player.id) ? 'Scouted' : 'Scout'}</button>
         <button aria-pressed={shortlisted} className="player-action" onClick={toggleShortlist} type="button">{shortlisted ? '★ Shortlisted' : '☆ Shortlist'}</button>
       </>}
     </div>
     {panel === 'renew' && <div className="player-action-panel"><span className="eyebrow">OFFER · CURRENT {money(player.contract.weeklyWage)}/WK</span>{[2, 3, 4].map((years) => <div className="player-offer-row" key={years}><strong>{years} years</strong>{[0, 10, 20].map((raise) => <button key={raise} onClick={() => renew(years, raise)} type="button">{raise === 0 ? 'Same wage' : `+${raise}%`}</button>)}</div>)}</div>}
-    {panel === 'bid' && <div className="player-action-panel"><span className="eyebrow">BID · VALUE {shortMoney(player.value)} · BUDGET {shortMoney(club.finances.transferBudget)}</span><div className="player-offer-row">{[0, 15, 30].map((premium) => <button disabled={player.value * (1 + premium / 100) > club.finances.transferBudget} key={premium} onClick={() => bid(premium)} type="button">{shortMoney(Math.round(player.value * (1 + premium / 100) / 50000) * 50000)}</button>)}</div></div>}
+    {panel === 'bid' && <div className="player-action-panel">
+      <span className="eyebrow">{free ? 'FREE TRANSFER' : `BID · VALUE ${shortMoney(player.value)}`} · BUDGET {shortMoney(club.finances.transferBudget)} · WAGE ROOM {money(Math.max(0, getWageRoom()))}/WK</span>
+      <div className="player-offer-row"><strong>Wage</strong>{[1, 1.1, 1.25].map((multiplier) => <button aria-pressed={wageTerm === multiplier} key={multiplier} onClick={() => setWageTerm(multiplier)} type="button">{money(Math.round(demand * multiplier / 50) * 50)}/wk</button>)}</div>
+      {free ? <div className="player-offer-row"><button onClick={() => bid(0)} type="button">Offer contract</button></div>
+        : <div className="player-offer-row"><strong>Fee</strong>{[0, 15, 30].map((premium) => <button disabled={player.value * (1 + premium / 100) > club.finances.transferBudget} key={premium} onClick={() => bid(Math.round(player.value * (1 + premium / 100) / 50000) * 50000)} type="button">{shortMoney(Math.round(player.value * (1 + premium / 100) / 50000) * 50000)}</button>)}</div>}
+      {counter !== null && <div className="player-offer-row"><button className="primary" onClick={() => bid(counter)} type="button">Accept counter {shortMoney(counter)}</button></div>}
+    </div>}
     {panel === 'release' && <div className="player-action-panel"><span className="eyebrow">RELEASE {player.name.toUpperCase()}?</span><div className="player-offer-row"><button className="danger" onClick={() => done(releasePlayer(player))} type="button">Confirm release</button><button onClick={() => setPanel('none')} type="button">Cancel</button></div></div>}
     {message && <p className="player-action-message" role="status">{message}</p>}
   </section>
 }
 
 function RatingBar({ label, value }: { label: string; value: number }) {
-  return <div className="attribute-row"><span>{label}</span><div className="attribute-track"><i className={ratingTone(value)} style={{ width: `${value * 5}%` }} /></div><strong className={ratingTone(value)}>{value}</strong></div>
+  return <div className="attribute-row"><span>{label}</span><div className="attribute-track"><i className={ratingTone(value)} style={{ width: `${value}%` }} /></div><strong className={ratingTone(value)}>{value}</strong></div>
 }
 
 function AchievementList({ title, achievements, emptyText }: { title: string; achievements: PlayerAchievement[]; emptyText: string }) {
@@ -115,7 +115,8 @@ function AchievementList({ title, achievements, emptyText }: { title: string; ac
   </section>
 }
 
-export default function PlayerProfile({ player, section, selectedClubName, onSectionChange, onSelectClub, onSelectPlayer, onSelectCountry, onClubChange }: PlayerProfileProps) {
+export default function PlayerProfile({ player, section, selectedClubName, onSectionChange, onSelectClub, onSelectPlayer, onSelectCountry }: PlayerProfileProps) {
+  useGame()
   const squad = getClubSquad(player.contract.clubId)
   const profile = player.personalInfo
   const contract = player.contract
@@ -136,7 +137,7 @@ export default function PlayerProfile({ player, section, selectedClubName, onSec
       <div><span>MOOD</span><strong className={`mood-badge mood-${player.morale.toLowerCase().replace(' ', '-')}`}>{player.morale}</strong></div>
     </div>
 
-    <PlayerActions key={player.id} player={player} onClubChange={onClubChange} />
+    <PlayerActions key={player.id} player={player} />
 
     <div className="profile-tabs" role="tablist" aria-label="Player profile sections">
       {sections.map((item) => <button aria-selected={section === item} className={section === item ? 'profile-tab active' : 'profile-tab'} key={item} onClick={() => onSectionChange(item)} role="tab" type="button">{item}</button>)}

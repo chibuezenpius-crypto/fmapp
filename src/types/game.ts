@@ -318,6 +318,28 @@ export type PersonnelProfile =
   | { type: 'Manager'; profile: ManagerProfile }
   | { type: 'Referee'; profile: RefereeProfile }
 
+export type MatchEventType =
+  | 'Kick Off' | 'Possession' | 'Pass' | 'Carry' | 'Interception'
+  | 'Shot' | 'Goal' | 'Save' | 'Miss' | 'Foul' | 'Tackle' | 'Yellow Card'
+  | 'Red Card' | 'Offside' | 'Injury' | 'Substitution' | 'Half Time' | 'Full Time'
+
+export interface MatchEvent {
+  id: string
+  matchId: string
+  sequence: number
+  elapsedSeconds: number
+  type: MatchEventType
+  team: 'home' | 'away'
+  playerId: string
+  player: string
+  targetId?: string
+  target?: string
+  x: number
+  y: number
+  outcome: string
+  data?: Record<string, number | string | boolean>
+}
+
 export interface MatchInfo {
   id: string
   competition: string
@@ -346,6 +368,8 @@ export interface MatchInfo {
   lineups: { home: MatchLineup; away: MatchLineup }
   commentary: MatchCommentaryEvent[]
   stats?: MatchStats
+  simulationSeed?: number
+  eventLog?: MatchEvent[]
 }
 
 export interface MatchLineupPlayer {
@@ -367,10 +391,14 @@ export interface MatchLineup {
 
 export interface MatchCommentaryEvent {
   minute: number
+  second?: number
+  eventId?: string
   team: 'home' | 'away'
-  type: 'Goal' | 'Yellow Card' | 'Red Card' | 'Save' | 'Foul' | 'Substitution'
+  type: MatchEventType
   player: string
   detail: string
+  x?: number
+  y?: number
 }
 
 export interface MatchStats {
@@ -390,6 +418,7 @@ export interface ClubConfidenceItem {
 export interface ClubConfidenceData {
   board: ClubConfidenceItem
   fan: ClubConfidenceItem
+  manager: ClubConfidenceItem
   player: ClubConfidenceItem
 }
 

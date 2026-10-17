@@ -17,6 +17,8 @@ interface MatchCenterProps {
   onOpenClub: () => void
   onSelectPlayer: (player: Player) => void
   onSelectPersonnel: (idOrName: string) => void
+  onSimulateMatch: () => void
+  simulationError: string
 }
 
 function ClubReference({ name, selectedClubName, onSelectClub, onOpenClub }: { name: string; selectedClubName: string | null; onSelectClub: (name: string) => void; onOpenClub: () => void }) {
@@ -51,7 +53,7 @@ function StatBar({ label, home, away, suffix = '' }: { label: string; home: numb
   </div>
 }
 
-export default function MatchCenter({ match, selectedClubName, onSelectClub, onOpenClub, onSelectPlayer, onSelectPersonnel }: MatchCenterProps) {
+export default function MatchCenter({ match, selectedClubName, onSelectClub, onOpenClub, onSelectPlayer, onSelectPersonnel, onSimulateMatch, simulationError }: MatchCenterProps) {
   const [section, setSection] = useState<MatchSection>('Overview')
   const isPlayed = match.status === 'Completed'
 
@@ -75,10 +77,16 @@ export default function MatchCenter({ match, selectedClubName, onSelectClub, onO
     </nav>
 
     <div className="match-center-content" key={section}>
+      {simulationError && <p className="match-storage-error" role="alert">{simulationError}</p>}
+      {!isPlayed && section === 'Overview' && <section className="match-simulation-action">
+        <div><strong>Ready for kick-off?</strong><span>Your starting XI, tactical style, pressing and tempo shape this seeded simulation.</span></div>
+        <button onClick={onSimulateMatch} type="button">Simulate Match</button>
+      </section>}
+      {isPlayed && match.simulationSeed !== undefined && <p className="match-seed-note">SIMULATED RESULT · SEED {match.simulationSeed} · {match.eventLog?.length ?? match.commentary.length} EVENTS</p>}
       {section === 'Overview' && <>
         <section className="match-overview-venue"><div className="match-venue-icon">⌂</div><div><span className="eyebrow">VENUE</span><strong>{match.venue}</strong><span>{match.weather}</span></div><div className="venue-capacity"><span>CAPACITY</span><strong>{club.stadium.capacity.toLocaleString('en-GB')}</strong></div></section>
         <section className="match-overview-facts"><div><span>REFEREE</span><strong><button className="entity-link" onClick={() => onSelectPersonnel(match.referee)} type="button">{match.referee}</button></strong></div><div><span>KICK-OFF</span><strong>{match.kickOff}</strong></div><div><span>HOME COACH</span><strong><button className="entity-link" onClick={() => onSelectPersonnel(match.coaches.home)} type="button">{match.coaches.home}</button></strong></div><div><span>AWAY COACH</span><strong><button className="entity-link" onClick={() => onSelectPersonnel(match.coaches.away)} type="button">{match.coaches.away}</button></strong></div></section>
-        <section className="match-watch-section"><div className="match-section-heading"><div><span className="eyebrow">ONES TO WATCH</span><h2>Key players</h2></div><span>PRE-MATCH</span></div><div className="match-watch-grid">
+        <section className="match-watch-section"><div className="match-section-heading"><div><span className="eyebrow">ONES TO WATCH</span><h2>Key players</h2></div><span>{isPlayed ? 'FULL TIME' : 'PRE-MATCH'}</span></div><div className="match-watch-grid">
           <article className="match-watch-card home"><span className="watch-side">HOME</span><span className="watch-player-mark">{match.keyPlayers.home.split(' ').map((part) => part[0]).join('')}</span><div><span className="eyebrow">{match.homeClubName.toUpperCase()}</span><PlayerReference name={match.keyPlayers.home} clubIds={[match.homeClubId, match.awayClubId]} onSelectPlayer={onSelectPlayer} /></div></article>
           <article className="match-watch-card away"><span className="watch-side">AWAY</span><span className="watch-player-mark">{match.keyPlayers.away.split(' ').map((part) => part[0]).join('')}</span><div><span className="eyebrow">{match.awayClubName.toUpperCase()}</span><strong>{match.keyPlayers.away}</strong></div></article>
         </div></section>
@@ -101,7 +109,7 @@ export default function MatchCenter({ match, selectedClubName, onSelectClub, onO
       </>}
 
       {section === 'Commentary' && <>
-        {isPlayed ? <section className="commentary-list"><div className="match-section-heading"><div><span className="eyebrow">FULL-TIME REPORT</span><h2>Match events</h2></div><span>{match.commentary.length} EVENTS</span></div>{match.commentary.map((event, index) => <article className={`commentary-event ${event.team}`} key={`${event.minute}-${event.player}-${index}`}><span className="commentary-minute">{event.minute}'</span><span className={`commentary-type ${event.type.toLowerCase().replace(' ', '-')}`}>{event.type === 'Goal' ? '⚽' : event.type === 'Yellow Card' ? '▰' : event.type === 'Red Card' ? '▰' : event.type === 'Save' ? '✦' : event.type === 'Substitution' ? '↔' : '·'}</span><div><strong>{event.player}</strong><span>{event.detail}</span></div><i className="event-side">{event.team === 'home' ? 'NBR' : 'OPP'}</i></article>)}</section> : <div className="match-unavailable"><span className="unavailable-icon">◷</span><strong>Commentary starts at kick-off</strong><span>This fixture has not been played yet.</span></div>}
+        {isPlayed ? <section className="commentary-list"><div className="match-section-heading"><div><span className="eyebrow">{match.simulationSeed === undefined ? 'FULL-TIME REPORT' : 'EVENT-DRIVEN COMMENTARY'}</span><h2>Match events</h2></div><span>{match.commentary.length} EVENTS</span></div>{match.commentary.map((event, index) => <article className={`commentary-event ${event.team}`} key={event.eventId ?? `${event.minute}-${event.player}-${index}`}><span className="commentary-minute">{event.minute}'{event.second !== undefined && <small>{String(event.second).padStart(2, '0')}</small>}</span><span className={`commentary-type ${event.type.toLowerCase().replace(' ', '-')}`}>{event.type === 'Goal' ? '⚽' : event.type === 'Yellow Card' ? '▰' : event.type === 'Red Card' ? '▰' : event.type === 'Save' ? '✦' : event.type === 'Substitution' ? '↔' : '·'}</span><div><strong>{event.player}</strong><span>{event.detail}</span></div><i className="event-side">{event.team === 'home' ? 'HOME' : 'AWAY'}</i></article>)}</section> : <div className="match-unavailable"><span className="unavailable-icon">◷</span><strong>Commentary starts at kick-off</strong><span>This fixture has not been played yet.</span></div>}
       </>}
 
       {section === 'Match Stats' && <>

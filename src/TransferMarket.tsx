@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { getTransferMarketPlayers, playerClubName } from './data/mockData'
+import { club, getTransferMarketPlayers, playerClubName } from './data/mockData'
+import { useGame } from './state/gameStore'
+import { getAskingPrice } from './state/transfers'
 import type { Player } from './types/game'
 import Flag from './Flag'
 
-const transferMarketPlayers = getTransferMarketPlayers()
 const money = (amount: number) => amount > 0 ? `£${(amount / 1000000).toFixed(1)}m` : 'No clause'
 function positionGroup(player: Player) {
   if (player.position === 'GK') return 'GK'
@@ -24,7 +25,15 @@ export default function TransferMarket({ onSelectPlayer, onSelectCountry }: { on
   })
   const [query, setQuery] = useState('')
   const [position, setPosition] = useState('ALL')
-  const players = transferMarketPlayers.filter((player) => player.name.toLowerCase().includes(query.toLowerCase()) && (position === 'ALL' || positionGroup(player) === position))
+  const [affordableOnly, setAffordableOnly] = useState(false)
+  const [sort, setSort] = useState<'ovr' | 'value' | 'age'>('ovr')
+  useGame()
+  const transferMarketPlayers = getTransferMarketPlayers().filter((player) => player.contract.clubId !== club.id)
+  const sorters = { ovr: (a: Player, b: Player) => b.overall - a.overall, value: (a: Player, b: Player) => b.value - a.value, age: (a: Player, b: Player) => a.age - b.age }
+  const players = transferMarketPlayers
+    .filter((player) => player.name.toLowerCase().includes(query.toLowerCase()) && (position === 'ALL' || positionGroup(player) === position)
+      && (!affordableOnly || (player.contract.clubId ? getAskingPrice(player) : 0) <= club.finances.transferBudget))
+    .sort(sorters[sort])
 
   useEffect(() => {
     window.localStorage.setItem('fmapp-transfer-shortlist', JSON.stringify(shortlisted))
@@ -36,7 +45,7 @@ export default function TransferMarket({ onSelectPlayer, onSelectCountry }: { on
 
   return <div className="transfer-market">
     <div className="page-intro"><span className="eyebrow">SCOUTING & RECRUITMENT</span><h1>Transfer market</h1><p>{transferMarketPlayers.length} players available · {shortlisted.length} shortlisted</p></div>
-    <div className="transfer-market-tools"><label className="market-search"><span aria-hidden="true">⌕</span><input aria-label="Search transfer market" onChange={(event) => setQuery(event.target.value)} placeholder="Search players" value={query} /></label><select aria-label="Filter transfer market position" onChange={(event) => setPosition(event.target.value)} value={position}><option value="ALL">All positions</option><option value="GK">Goalkeepers</option><option value="DEF">Defenders</option><option value="MID">Midfielders</option><option value="FWD">Forwards</option></select></div>
+    <div className="transfer-market-tools"><label className="market-search"><span aria-hidden="true">⌕</span><input aria-label="Search transfer market" onChange={(event) => setQuery(event.target.value)} placeholder="Search players" value={query} /></label><select aria-label="Filter transfer market position" onChange={(event) => setPosition(event.target.value)} value={position}><option value="ALL">All positions</option><option value="GK">Goalkeepers</option><option value="DEF">Defenders</option><option value="MID">Midfielders</option><option value="FWD">Forwards</option></select><select aria-label="Sort transfer market" onChange={(event) => setSort(event.target.value as typeof sort)} value={sort}><option value="ovr">Sort: Rating</option><option value="value">Sort: Value</option><option value="age">Sort: Youngest</option></select><label className="market-affordable"><input checked={affordableOnly} onChange={(event) => setAffordableOnly(event.target.checked)} type="checkbox" /> Affordable</label></div>
     <div className="market-list-head"><span>PLAYER</span><span>AGE</span><span>POS</span><span>NAT</span><span>OVR</span><span>VALUE</span><span>CLAUSE</span><span aria-label="Shortlist">☆</span></div>
     <div className="market-player-list">{players.map((player) => {
       const nationality = player.personalInfo.nationalities[0]

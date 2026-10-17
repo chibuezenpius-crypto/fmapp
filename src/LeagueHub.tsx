@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { club, currentMatchday, leagueCompetitions, leagueHistory, leaguePlayerStats, leagueStandings, matchFixtures, totalMatchdays } from './data/mockData'
+import { club, currentMatchday, league, leagueCompetitions, leagueHistory, leaguePlayerStats, leagueStandings, totalMatchdays } from './data/mockData'
 import rawGlobalLeagues from './data/globalLeaguesAndTeams.json'
 import rawInternationalTournaments from './data/internationalTournaments.json'
 import LeagueClubSquad from './LeagueClubSquad'
-import type { Player, GlobalLeaguesDatabase, GlobalCountryLeague, InternationalTournament, InternationalTournamentsDatabase, LeagueCategory, LeagueCompetition, LeagueStanding, TournamentGroup } from './types/game'
+import type { MatchInfo, Player, GlobalLeaguesDatabase, GlobalCountryLeague, InternationalTournament, InternationalTournamentsDatabase, LeagueCategory, LeagueCompetition, LeagueStanding, TournamentGroup } from './types/game'
 import Flag from './Flag'
 import ClubBadge from './ClubBadge'
 import KnockoutBracket from './KnockoutBracket'
@@ -124,6 +124,8 @@ function LeagueTable({ competition, renderClub, onSelectClub }: { competition: L
 }
 
 interface LeagueHubProps {
+  matches: MatchInfo[]
+  standings: LeagueStanding[]
   selectedCompetitionId: string | null
   onSelectCompetition: (id: string) => void
   onSelectCountry: (country: string) => void
@@ -133,7 +135,7 @@ interface LeagueHubProps {
   onSelectMatch: (id: string) => void
 }
 
-export default function LeagueHub({ selectedCompetitionId, onSelectCompetition, onSelectCountry, selectedClubId, onSelectClub, onSelectPlayer, onSelectMatch }: LeagueHubProps) {
+export default function LeagueHub({ matches, standings, selectedCompetitionId, onSelectCompetition, onSelectCountry, selectedClubId, onSelectClub, onSelectPlayer, onSelectMatch }: LeagueHubProps) {
   const [category, setCategory] = useState<LeagueCategory>('Domestic Leagues')
   const [openRegion, setOpenRegion] = useState('Nigeria')
   const [section, setSection] = useState<LeagueSection>('Standings')
@@ -148,7 +150,12 @@ export default function LeagueHub({ selectedCompetitionId, onSelectCompetition, 
   const regions = [...new Set(browseItems.map((item) => item.country))]
   const selectedGlobalCountry = globalLeagues.countries.find((item) => item.id === selectedCompetitionId)
   const currentTournament = internationalTournaments.tournaments.find((item) => item.id === selectedCompetitionId)
-  const currentCompetition = selectedGlobalCountry ? adaptGlobalLeague(selectedGlobalCountry) : currentTournament ? adaptTournament(currentTournament) : leagueCompetitions.find((item) => item.id === selectedCompetitionId)
+  const baseCompetition = selectedGlobalCountry ? adaptGlobalLeague(selectedGlobalCountry) : currentTournament ? adaptTournament(currentTournament) : leagueCompetitions.find((item) => item.id === selectedCompetitionId)
+  const currentCompetition = baseCompetition?.id === league.id ? {
+    ...baseCompetition,
+    standings,
+    matchday: Math.max(baseCompetition.matchday, ...standings.map((standing) => standing.played)),
+  } : baseCompetition
   const isDomesticCup = !selectedGlobalCountry && !currentTournament && currentCompetition?.category === 'Domestic Leagues' && currentCompetition.totalMatchdays <= 8
   const players = currentCompetition?.playerStats[playerStat] ?? []
 
@@ -196,7 +203,7 @@ export default function LeagueHub({ selectedCompetitionId, onSelectCompetition, 
 
         {section === 'Team Stats' && <section className="league-data-panel"><div className="team-stats-header"><span>TEAM</span><span>POSS</span><span>GOALS</span><span>CS</span><span>CARDS</span></div>{currentCompetition.teamStats.map((team, index) => <article className="team-stat-row" key={team.clubId}><span>{index + 1}. {team.clubName}</span><span>{team.possession}%</span><span>{team.goals}</span><span>{team.cleanSheets}</span><span>{team.cards}</span></article>)}</section>}
 
-        {section === 'Fixtures' && <LeagueFixturesSection competitionName={currentCompetition.name} onSelectMatch={onSelectMatch} />}
+        {section === 'Fixtures' && <LeagueFixturesSection matches={matches} competitionName={currentCompetition.name} onSelectMatch={onSelectMatch} />}
 
         {section === 'Rules' && <section className="league-data-panel league-rules-list">{currentCompetition.rules.map((rule, index) => <article className="league-rule-row" key={rule}><span>{String(index + 1).padStart(2, '0')}</span><p>{rule}</p></article>)}</section>}
 
@@ -205,9 +212,9 @@ export default function LeagueHub({ selectedCompetitionId, onSelectCompetition, 
   </div>
 }
 
-function LeagueFixturesSection({ competitionName, onSelectMatch }: { competitionName: string; onSelectMatch: (id: string) => void }) {
-  const fixtures = matchFixtures.filter((m) => m.competition === competitionName)
-  const all = fixtures.length ? fixtures : matchFixtures
+function LeagueFixturesSection({ matches, competitionName, onSelectMatch }: { matches: MatchInfo[]; competitionName: string; onSelectMatch: (id: string) => void }) {
+  const fixtures = matches.filter((m) => m.competition === competitionName)
+  const all = fixtures.length ? fixtures : matches
   const sorted = [...all].sort((a, b) => `${a.date}${a.kickOff}`.localeCompare(`${b.date}${b.kickOff}`))
   const groups: { label: string; list: typeof sorted }[] = []
   const completed = sorted.filter((m) => m.status === 'Completed')

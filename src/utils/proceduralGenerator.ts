@@ -2,7 +2,7 @@ import rawNameDatabase from '../data/names/globalNameDatabase.json'
 import rawWorldCountries from '../data/worldCountries.json'
 import rawLeagues from '../data/globalLeaguesAndTeams.json'
 import rawCulture from '../data/playerCulture.json'
-import type { Player, PlayerAttributes, PlayerPersonalInfo, PlayerPosition, PlayerSeasonStats } from '../types/game'
+import type { Player, PlayerAttributes, PlayerPersonalInfo, PlayerPosition } from '../types/game'
 
 type Proficiency = PlayerPersonalInfo['languages'][number]['proficiency']
 type Random = () => number
@@ -401,7 +401,7 @@ function attributeWeight(position: PlayerPosition, key: AttributeKey) {
   return profile.key.includes(key) ? 3 : profile.secondary.includes(key) ? 1.5 : 0.4
 }
 
-/** Position-weighted average of all 24 attributes on the internal 1-99 scale. */
+/** Position-weighted average of all 24 attributes on the 1-100 scale. */
 function calculateOverall99(attributes: PlayerAttributes, position: PlayerPosition) {
   let total = 0
   let weights = 0
@@ -413,17 +413,11 @@ function calculateOverall99(attributes: PlayerAttributes, position: PlayerPositi
   return Math.round(total / weights)
 }
 
-export const MAX_ATTRIBUTE = 20
+export const MAX_ATTRIBUTE = 100
 
-/** Position-weighted overall rating from game-scale (1-20) attributes. */
+/** Position-weighted overall rating from attributes on the shared 1-100 scale. */
 export function calculateOverall(attributes: PlayerAttributes, position: PlayerPosition) {
-  const scaled = Object.fromEntries(attributeKeys.map((key) => [key, attributes[key] * 5])) as unknown as PlayerAttributes
-  return calculateOverall99(scaled, position)
-}
-
-/** Converts the internal 1-99 attribute scale to the game's 1-20 scale. */
-function toGameScale(attributes: PlayerAttributes): PlayerAttributes {
-  return Object.fromEntries(attributeKeys.map((key) => [key, clamp(Math.round(attributes[key] / 5), 1, MAX_ATTRIBUTE)])) as unknown as PlayerAttributes
+  return calculateOverall99(attributes, position)
 }
 
 function ageAdjustment(key: AttributeKey, age: number) {
@@ -439,7 +433,7 @@ function generateAttributes(position: PlayerPosition, age: number, targetOverall
   const noise = Object.fromEntries(attributeKeys.map((key) => [key, gaussian(random) * 3])) as Record<AttributeKey, number>
   const build = (base: number) => Object.fromEntries(attributeKeys.map((key) => {
     const offset = profile.key.includes(key) ? 7 : profile.secondary.includes(key) ? 1 : irrelevant
-    return [key, clamp(Math.round(base + offset + ageAdjustment(key, age) + noise[key]), 1, 99)]
+    return [key, clamp(Math.round(base + offset + ageAdjustment(key, age) + noise[key]), 1, MAX_ATTRIBUTE)]
   })) as unknown as PlayerAttributes
   let base = targetOverall
   let attributes = build(base)
@@ -516,28 +510,6 @@ function heightFor(position: PlayerPosition, random: Random) {
   return clamp(Math.round(mean + gaussian(random) * 5), 160, 205)
 }
 
-function generateSeasons(position: PlayerPosition, age: number, overall: number, clubName: string, today: Date, random: Random) {
-  const seasons: PlayerSeasonStats[] = []
-  const latestStartYear = today.getUTCMonth() >= 6 ? today.getUTCFullYear() - 1 : today.getUTCFullYear() - 2
-  const goalRate = position === 'ST (C)' ? 0.45 : position === 'AM (C)' ? 0.28 : position.startsWith('M') ? 0.12 : position === 'GK' ? 0 : 0.04
-  const assistRate = position === 'AM (C)' ? 0.28 : position.startsWith('M') || position === 'D (L)' || position === 'D (R)' ? 0.14 : 0.05
-  const count = clamp(age - 17, 0, 3)
-  for (let index = count - 1; index >= 0; index -= 1) {
-    const startYear = latestStartYear - index
-    const appearances = clamp(Math.round(14 + (overall - 50) * 0.6 + gaussian(random) * 4), 3, 38)
-    seasons.push({
-      season: `${startYear}/${String((startYear + 1) % 100).padStart(2, '0')}`,
-      clubName,
-      appearances,
-      goals: Math.max(0, Math.round(appearances * goalRate * between(random, 0.6, 1.4))),
-      assists: Math.max(0, Math.round(appearances * assistRate * between(random, 0.6, 1.4))),
-      cleanSheets: position === 'GK' ? Math.round(appearances * between(random, 0.2, 0.4)) : 0,
-      averageRating: Math.round((6.2 + (overall - 50) * 0.02 + between(random, -0.2, 0.2)) * 10) / 10,
-    })
-  }
-  return seasons
-}
-
 export function generatePlayer(options: PlayerGenerationOptions = {}): Player {
   const random = options.random ?? (options.seed !== undefined ? createRng(options.seed) : createRng(`${Date.now()}-${Math.random()}`))
   const today = parseDate(options.currentDate ?? DEFAULT_DATE)
@@ -564,23 +536,14 @@ export function generatePlayer(options: PlayerGenerationOptions = {}): Player {
     mixedHeritage: options.mixedHeritage,
     random,
   })
-  const rawAttributes = generateAttributes(position, age, overall, random)
-  const finalOverall = calculateOverall99(rawAttributes, position)
-  const attributes = toGameScale(rawAttributes)
+  const attributes = generateAttributes(position, age, overall, random)
+  const finalOverall = calculateOverall99(attributes, position)
   const potential = generatePotential(finalOverall, age, random)
   const personality = generatePersonality(age, finalOverall, random, options.teammateNames ?? [], options.personnelNames ?? [])
   const value = marketValue(finalOverall, potential, age)
   const clubName = club?.name ?? 'Free Agent'
   const contractStart = addMonths(today, -intBetween(random, 1, 36))
   const contractEnd = addMonths(today, intBetween(random, 6, 54))
-  const seasonStats = generateSeasons(position, age, finalOverall, clubName, today, random)
-  const careerTotals = seasonStats.reduce((totals, season) => ({
-    appearances: totals.appearances + season.appearances,
-    goals: totals.goals + season.goals,
-    assists: totals.assists + season.assists,
-    cleanSheets: totals.cleanSheets + season.cleanSheets,
-    trophies: totals.trophies,
-  }), { appearances: 0, goals: 0, assists: 0, cleanSheets: 0, trophies: 0 })
   const idSuffix = Array.from({ length: 3 }, () => Math.floor(unit(random) * 0xffffff).toString(16).padStart(6, '0')).join('')
 
   return {
@@ -621,8 +584,9 @@ export function generatePlayer(options: PlayerGenerationOptions = {}): Player {
       offerHistory: [],
     },
     transferHistory: [],
-    seasonStats,
-    careerTotals,
+    // A new save starts with no recorded career; stats accrue from simulated matches.
+    seasonStats: [],
+    careerTotals: { appearances: 0, goals: 0, assists: 0, cleanSheets: 0, trophies: 0 },
     relationships: personality.relationships,
     achievements: { trophies: [], individualAwards: [], seasonRecognitions: [] },
   }
