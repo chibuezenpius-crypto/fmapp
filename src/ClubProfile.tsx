@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { club, getClubBadge } from './data/mockData'
 import ClubBadge from './ClubBadge'
+import { getDate } from './state/gameStore'
+import { getInternationalDutyPlayers } from './simulation/calendarScheduler'
 import type { MatchInfo, Player } from './types/game'
 
 export type ClubSection = 'Overview' | 'Squad' | 'Tactics' | 'Staff' | 'Sponsorship' | 'Fixtures' | 'Facilities'
@@ -40,6 +42,7 @@ function PlayerButton({ player, onSelectPlayer, role, x, y }: { player: Player; 
 export default function ClubProfile({ section, selectedClubName, matches, onSectionChange, onSelectClub, onSelectPlayer, onSelectPersonnel, onSelectMatch }: ClubProfileProps) {
   const [positionFilter, setPositionFilter] = useState<PositionFilter>('ALL')
   const [sortMode, setSortMode] = useState<SortMode>('Value')
+  const onDuty = new Set(getInternationalDutyPlayers(club.squad, getDate()).map((player) => player.id))
   const [, refresh] = useState(0)
   const { trainingLevel, youthLevel, stadiumLevel } = club.facilities
   const balance = club.finances.balance
@@ -105,7 +108,7 @@ export default function ClubProfile({ section, selectedClubName, matches, onSect
       {section === 'Squad' && <>
         <div className="club-subpage-heading"><div><span className="eyebrow">{squad.length} PLAYERS SHOWN</span><h2>First team</h2></div><label className="club-sort">SORT BY<select aria-label="Sort squad" onChange={(event) => setSortMode(event.target.value as SortMode)} value={sortMode}><option>Value</option><option>Rating</option><option>Age</option></select></label></div>
         <div className="position-filters" aria-label="Filter positions">{(['ALL', 'GK', 'DEF', 'MID', 'FWD'] as const).map((filter) => <button aria-pressed={positionFilter === filter} className={positionFilter === filter ? 'position-filter active' : 'position-filter'} key={filter} onClick={() => setPositionFilter(filter)} type="button">{filter}</button>)}</div>
-        <div className="club-roster-list">{squad.map((player) => <button aria-label={`Open ${player.name} profile`} className="club-roster-row" key={player.id} onClick={() => onSelectPlayer(player)} type="button"><span className="roster-number">{String(player.shirtNumber).padStart(2, '0')}</span><span className="roster-player"><strong>{player.name}</strong><small>{player.position} · {player.age} yrs</small></span><span className="roster-stat"><strong>{player.overall}</strong><small>RAT</small></span><span className="roster-stat"><strong>{shortMoney(player.value)}</strong><small>VALUE</small></span></button>)}</div>
+        <div className="club-roster-list">{squad.map((player) => <button aria-label={`Open ${player.name} profile`} className="club-roster-row" key={player.id} onClick={() => onSelectPlayer(player)} type="button"><span className="roster-number">{String(player.shirtNumber).padStart(2, '0')}</span><span className="roster-player"><strong>{player.name}</strong><small>{player.position} · {player.age} yrs{onDuty.has(player.id) ? ' · ✈ ON INTERNATIONAL DUTY' : ''}</small></span><span className="roster-stat"><strong>{player.overall}</strong><small>RAT</small></span><span className="roster-stat"><strong>{shortMoney(player.value)}</strong><small>VALUE</small></span></button>)}</div>
       </>}
 
       {section === 'Tactics' && <>
@@ -138,7 +141,7 @@ export default function ClubProfile({ section, selectedClubName, matches, onSect
         <section className="club-finance-panel"><div className="club-panel-heading"><div><span className="eyebrow">REVENUE & SPEND</span><h2>Income streams</h2></div></div><div className="finance-line"><span>Sponsorship income <small>per season</small></span><strong>{shortMoney(club.finances.sponsorshipIncomeAnnual)}</strong></div><div className="finance-line"><span>Ticket sales <small>per home match</small></span><strong>{money(club.finances.ticketSalesPerHomeMatch)}</strong></div><div className="finance-line"><span>Weekly wages <small>of {money(club.finances.wageBudget)} budget</small></span><strong>{money(club.finances.weeklyWages)}</strong></div><div className="finance-line"><span>Monthly operations</span><strong>{money(club.finances.operationsPerMonth)}</strong></div></section>
       </>}
 
-      {section === 'Fixtures' && <ClubFixturesSection fixtures={matches} onSelectMatch={onSelectMatch} />}
+      {section === 'Fixtures' && <ClubFixturesSection fixtures={matches.filter((match) => match.homeClubId === club.id || match.awayClubId === club.id)} onSelectMatch={onSelectMatch} />}
 
       {section === 'Facilities' && <>
         <div className="club-subpage-heading"><div><span className="eyebrow">INVEST IN THE FUTURE</span><h2>Facilities</h2></div></div>

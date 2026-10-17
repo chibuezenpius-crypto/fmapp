@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { club, getClubBadge, getSquadHealth, getWageRoom, managerProfiles, refereeProfiles } from './data/mockData'
-import { advanceDay, clearMessage, describeDate, playMatch, useGame } from './state/gameStore'
+import { addDays, advanceDay, clearMessage, describeDate, playMatch, useGame } from './state/gameStore'
 import { computeConfidence } from './state/confidence'
 import { BoardOverview, FanOverview } from './ClubRelations'
 import ClubBadge from './ClubBadge'
@@ -59,6 +59,8 @@ function App() {
   const [clubReturnTab, setClubReturnTab] = useState<TabId>('Home')
   const headerDate = describeDate(game.date)
   const displayedMatches = game.matches
+  // The Matches tab lists the user's own matches plus everything around today, not every match of every league.
+  const matchesTabMatches = displayedMatches.filter((match) => match.homeClubId === club.id || match.awayClubId === club.id || (match.date >= addDays(game.date, -2) && match.date <= addDays(game.date, 3)))
   const standings = game.standings
   const nextFixture = game.nextFixture ?? displayedMatches[0]
   const position = game.ownStanding
@@ -156,7 +158,7 @@ function App() {
           {detailOpen ? <button aria-label={backLabel} className="header-back-button" onClick={goBack} type="button"><ArrowLeft aria-hidden="true" size={19} strokeWidth={2.2} /></button>
             : <ClubReference name={club.name} selectedClubName={selectedClubName} onSelect={setSelectedClubName} onOpen={openClubProfile} className="club-mark" ariaLabel={`${club.name} crest`}><ClubBadge badge={getClubBadge(club.id)} name={club.name} /></ClubReference>}
           <div className="identity">
-            <span className="eyebrow">MANAGER CAREER · 2026/27</span>
+            <span className="eyebrow">MANAGER CAREER · {game.seasonLabel}</span>
             <strong>{club.manager.name}</strong>
             <ClubReference name={club.name} selectedClubName={selectedClubName} onSelect={setSelectedClubName} onOpen={openClubProfile} className="club-name" />
           </div>
@@ -181,8 +183,8 @@ function App() {
             {activeTab === 'Academy' && <AcademyHub onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />}
             {activeTab === 'Tactics' && <TacticsHub />}
             {activeTab === 'Transfers' && <TransferMarket onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />}
-            {activeTab === 'League' && <LeagueHub matches={displayedMatches} standings={standings} selectedCompetitionId={selectedLeagueId} onSelectCompetition={setSelectedLeagueId} onSelectCountry={openCountryOverview} selectedClubId={selectedLeagueClubId} onSelectClub={setSelectedLeagueClubId} onSelectPlayer={selectPlayer} onSelectMatch={setSelectedMatchId} playerStats={game.playerStats} teamStats={game.teamStats} />}
-            {activeTab === 'Matches' && <MatchesList matches={displayedMatches} onSelectMatch={setSelectedMatchId} />}
+            {activeTab === 'League' && <LeagueHub seasonLabel={game.seasonLabel} history={game.history} matches={displayedMatches} standings={standings} selectedCompetitionId={selectedLeagueId} onSelectCompetition={setSelectedLeagueId} onSelectCountry={openCountryOverview} selectedClubId={selectedLeagueClubId} onSelectClub={setSelectedLeagueClubId} onSelectPlayer={selectPlayer} onSelectMatch={setSelectedMatchId} playerStats={game.playerStats} teamStats={game.teamStats} />}
+            {activeTab === 'Matches' && <MatchesList matches={matchesTabMatches} onSelectMatch={setSelectedMatchId} />}
           </>}
         </main>
 

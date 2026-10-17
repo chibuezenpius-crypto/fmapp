@@ -3,6 +3,8 @@ import { findGeneratedClub, getClubSquad } from './clubSquads'
 import { createRng, generatePlayerIdentity } from '../utils/proceduralGenerator'
 import { DEFAULT_SLOTS, fitPlayersToSlots } from '../utils/lineup'
 import { getCompetitionRules, describeRules } from './competitionRules'
+import { leagueMatchDate } from '../simulation/calendarScheduler'
+import { CLUB_WORLD_CUP_ID, CLUB_WORLD_CUP_NAME, CONTINENTAL_COMPETITIONS, DOMESTIC_CUPS, qualifyClubs, qualifyCupClubs, type TieSpec } from '../simulation/competitions'
 import type {
   Club, GlobalCountryLeague, GlobalLeagueTeam, GlobalLeaguesDatabase, League, LeagueCompetition, LeagueStanding,
   ManagerProfile, MatchInfo, MatchLineup, MatchLineupPlayer, Player, ProceduralClubBadge, RefereeProfile, SquadHealthMetrics,
@@ -156,7 +158,20 @@ export const refereeProfiles: RefereeProfile[] = [
 
 // ---------- Fixtures ----------
 const bestPlayer = new Map<MatchLineup, string>()
+const lineupCache = new Map<string, MatchLineup>()
+/** Other clubs' default lineups never change, so they are built once per club and side. */
 const lineupFor = (clubId: string, side: 'home' | 'away'): MatchLineup => {
+  if (clubId === club.id) return buildLineup(clubId, side)
+  const key = `${clubId}:${side}`
+  let lineup = lineupCache.get(key)
+  if (!lineup) {
+    lineup = buildLineup(clubId, side)
+    lineupCache.set(key, lineup)
+  }
+  return lineup
+}
+
+const buildLineup = (clubId: string, side: 'home' | 'away'): MatchLineup => {
   const players = clubId === club.id ? squad : getClubSquad(clubId)
   const ids = fitPlayersToSlots(DEFAULT_SLOTS, players)
   const starters = ids.map((id) => players.find((player) => player.id === id)!)
@@ -176,10 +191,10 @@ const lineupFor = (clubId: string, side: 'home' | 'away'): MatchLineup => {
 
 const keyPlayer = (lineup: MatchLineup) => bestPlayer.get(lineup) ?? lineup.startingXI[0].name
 
-const baseMatch = (id: string, matchday: number, date: string, kickOff: string, homeId: string, awayId: string, referee: string, weather: string): MatchInfo => {
+const baseMatch = (id: string, leagueId: string, competition: string, season: number, matchday: number, date: string, kickOff: string, homeId: string, awayId: string, referee: string, weather: string): MatchInfo => {
   const lineups = { home: lineupFor(homeId, 'home'), away: lineupFor(awayId, 'away') }
   return {
-    id, competition: league.name, matchday, date, kickOff,
+    id, leagueId, competition, season, matchday, date, kickOff,
     homeClubId: homeId, homeClubName: clubShortName(homeId), awayClubId: awayId, awayClubName: clubShortName(awayId),
     venue: homeId === club.id ? club.stadium.name : `${clubShortName(homeId)} Stadium`,
     referee, weather, status: 'Upcoming',
@@ -194,14 +209,7 @@ const baseMatch = (id: string, matchday: number, date: string, kickOff: string, 
 
 // ---------- Generated season fixtures ----------
 export const SEASON_START_DATE = '2026-08-01'
-const FIRST_MATCHDAY_DATE = '2026-08-08'
 const weatherPool = ['Clear, 28°C', 'Cloudy, 27°C', 'Humid, 26°C', 'Light rain, 24°C', 'Warm, 30°C', 'Overcast, 25°C']
-
-const addDaysIso = (date: string, days: number) => {
-  const value = new Date(`${date}T12:00:00Z`)
-  value.setUTCDate(value.getUTCDate() + days)
-  return value.toISOString().slice(0, 10)
-}
 
 /** Double round-robin (circle method): every club meets every other home and away. */
 function generateRoundRobin(clubIds: string[]): { homeId: string; awayId: string }[][] {
@@ -224,27 +232,53 @@ function generateRoundRobin(clubIds: string[]): { homeId: string; awayId: string
   return [...rounds, ...rounds.map((pairs) => pairs.map(({ homeId, awayId }) => ({ homeId: awayId, awayId: homeId })))]
 }
 
-const buildSeasonFixtures = (): MatchInfo[] => {
-  const rounds = generateRoundRobin(ownLeague.teams.map((team) => team.id).sort())
+const hashText = (text: string) => [...text].reduce((total, character) => (total * 31 + character.charCodeAt(0)) >>> 0, 7)
+
+/** Season-prefixed IDs keep every season's fixtures distinct. */
+const buildLeagueFixtures = (country: GlobalCountryLeague, season: number): MatchInfo[] => {
+  const rounds = generateRoundRobin(country.teams.map((team) => team.id).sort())
   return rounds.flatMap((pairs, roundIndex) => pairs.map(({ homeId, awayId }, pairIndex) => {
     const own = homeId === club.id || awayId === club.id
+    const seed = hashText(`${country.id}-${roundIndex}-${pairIndex}`)
     return baseMatch(
-      `${ownLeague.id}-md${String(roundIndex + 1).padStart(2, '0')}-${String(pairIndex + 1).padStart(2, '0')}`,
+      `y${season}-${country.id}-md${String(roundIndex + 1).padStart(2, '0')}-${String(pairIndex + 1).padStart(2, '0')}`,
+      country.id,
+      country.name,
+      season,
       roundIndex + 1,
-      addDaysIso(FIRST_MATCHDAY_DATE, roundIndex * 7),
+      leagueMatchDate(roundIndex + 1, !own && pairIndex % 2 === 1, season),
       own ? '15:00' : pairIndex % 2 === 0 ? '15:00' : '17:30',
       homeId,
       awayId,
-      refereeProfiles[(roundIndex + pairIndex) % refereeProfiles.length].name,
-      weatherPool[(roundIndex * 3 + pairIndex) % weatherPool.length],
+      refereeProfiles[seed % refereeProfiles.length].name,
+      weatherPool[(seed >>> 4) % weatherPool.length],
     )
   }))
 }
 
-export const matchFixtures: MatchInfo[] = buildSeasonFixtures()
-export const clubFixtures: MatchInfo[] = matchFixtures.filter((match) => match.homeClubId === club.id || match.awayClubId === club.id)
-club.nextMatchId = clubFixtures[0]?.id ?? ''
+const seasonFixtureCache = new Map<number, MatchInfo[]>()
 
+/** The domestic league fixtures of every league for a season, scheduled by the CalendarScheduler. Built on first request. */
+export function getSeasonLeagueFixtures(season: number): MatchInfo[] {
+  let fixtures = seasonFixtureCache.get(season)
+  if (!fixtures) {
+    fixtures = globalLeagues.flatMap((country) => buildLeagueFixtures(country, season))
+    seasonFixtureCache.set(season, fixtures)
+  }
+  return fixtures
+}
+
+/** Strictly the fixtures whose `leagueId` equals the given competition ID (never falls back to other competitions). */
+export const getFixturesByLeague = (leagueId: string, source: readonly MatchInfo[] = getSeasonLeagueFixtures(0)): MatchInfo[] =>
+  source.filter((match) => match.leagueId === leagueId)
+
+/** Builds a full MatchInfo (lineups from the generated 1-100 squads) for a cup or continental tie. */
+export const createTieFixture = (tie: TieSpec): MatchInfo => {
+  const seed = hashText(tie.id)
+  return baseMatch(tie.id, tie.leagueId, tie.competition, tie.season, tie.round, tie.date, '20:00', tie.homeId, tie.awayId, refereeProfiles[seed % refereeProfiles.length].name, weatherPool[seed % weatherPool.length])
+}
+
+club.nextMatchId = getSeasonLeagueFixtures(0).find((match) => match.homeClubId === club.id || match.awayClubId === club.id)?.id ?? ''
 export const managerProfiles: ManagerProfile[] = [
   ownManager,
   ...staffProfiles,
@@ -289,21 +323,26 @@ const competitionFromClubs = (id: string, name: string, country: string, categor
 const leagueTeams = (leagueId: string, from: number, to: number) =>
   [...globalLeagues.find((item) => item.id === leagueId)!.teams].sort((a, b) => a.standing.position - b.standing.position).slice(from, to)
 
-const cupTeams = (leagueId: string) => leagueTeams(leagueId, 0, 8)
-const topClubs = (leagueIds: string[], from: number, to: number) => leagueIds.flatMap((leagueId) => leagueTeams(leagueId, from, to))
+const continentalCompetitions = CONTINENTAL_COMPETITIONS.map((spec) => {
+  const entrants = qualifyClubs(spec)
+  const rounds = Math.ceil(Math.log2(entrants.length))
+  return competitionFromClubs(spec.id, spec.name, spec.region, 'Continental Competitions', entrants.map((entrant) => getTeam(entrant.clubId)!), rounds, [
+    `Qualification: the top ${spec.slotsPerLeague} clubs of each ${spec.region} league, ranked by the previous season's final table.`,
+    `${entrants.length} clubs enter a single-match knockout; the best-ranked clubs receive byes when the field is not a full bracket.`,
+    `Matches are played on ${spec.day}s, never during an international window.`,
+    'The champions and runners-up qualify for the VFA Club World Cup.',
+  ])
+})
 
-export const leagueCompetitions: LeagueCompetition[] = [
-  competitionFromClubs('nga-federation-cup', 'Federation Cup', 'Nigeria', 'Domestic Leagues', cupTeams('nga-top-division').filter((team) => team.id !== club.id).slice(0, 7).concat(ownTeam), 4, defaultCupRules),
-  competitionFromClubs('eng-fa-cup', 'FA Cup', 'England', 'Domestic Leagues', cupTeams('eng-top-division'), 4, defaultCupRules),
-  competitionFromClubs('esp-copa', 'Copa Nacional', 'Spain', 'Domestic Leagues', cupTeams('esp-top-division'), 4, defaultCupRules),
-  competitionFromClubs('por-taca', 'Taça Nacional', 'Portugal', 'Domestic Leagues', cupTeams('por-top-division'), 4, defaultCupRules),
-  competitionFromClubs('sco-cup', 'Scottish Cup', 'Scotland', 'Domestic Leagues', cupTeams('sco-top-division'), 4, defaultCupRules),
-  competitionFromClubs('irl-cup', 'FAI Cup', 'Ireland', 'Domestic Leagues', cupTeams('irl-top-division'), 4, defaultCupRules),
-  competitionFromClubs('continental-champions', 'Champions Cup', 'Europe', 'Continental Competitions', topClubs(['eng-top-division', 'esp-top-division', 'ger-top-division', 'ita-top-division'], 0, 4), 6, ['Top four clubs from each major league qualify.']),
-  competitionFromClubs('continental-league', 'Continental League', 'Europe', 'Continental Competitions', topClubs(['fra-top-division', 'por-top-division', 'ned-top-division', 'bel-top-division'], 0, 4), 6, ['Clubs finishing just outside the top spots qualify.']),
-  competitionFromClubs('continental-africa', 'African Champions League', 'Africa', 'Continental Competitions', topClubs(['nga-top-division', 'gha-top-division', 'egy-top-division', 'mar-top-division'], 0, 4), 6, ['Top four clubs from each qualifying league enter.']),
-]
+const clubWorldCup = competitionFromClubs(CLUB_WORLD_CUP_ID, CLUB_WORLD_CUP_NAME, 'World', 'Continental Competitions', [], 3, [
+  'Eight clubs: the champions and runners-up of the four continental competitions.',
+  'The field is confirmed once every continental final has been played.',
+  'Played in the summer window at the end of the season.',
+])
 
+const domesticCups = DOMESTIC_CUPS.map((spec) => competitionFromClubs(spec.id, spec.name, spec.country, 'Domestic Leagues', qualifyCupClubs(spec).map((entrant) => getTeam(entrant.clubId)!), 3, defaultCupRules))
+
+export const leagueCompetitions: LeagueCompetition[] = [...domesticCups, ...continentalCompetitions, clubWorldCup]
 // ---------- Transfer market (players from other clubs) ----------
 let marketCache: Player[] | null = null
 export function getTransferMarketPlayers(): Player[] {

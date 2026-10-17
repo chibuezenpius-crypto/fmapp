@@ -342,6 +342,10 @@ export interface MatchEvent {
 
 export interface MatchInfo {
   id: string
+  /** ID of the league or cup this match belongs to; the single key used to scope fixtures. */
+  leagueId: string
+  /** 0-based season the fixture belongs to. */
+  season: number
   competition: string
   matchday: number
   date: string

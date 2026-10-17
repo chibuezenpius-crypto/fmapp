@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { club, league, leagueCompetitions, leagueStandings, totalMatchdays } from './data/mockData'
+import { club, getFixturesByLeague, league, leagueCompetitions, leagueStandings, totalMatchdays } from './data/mockData'
+import { applySimulatedResults } from './simulation/season'
+import type { SeasonRecord } from './state/gameStore'
 import { describeRules, getCompetitionRules } from './data/competitionRules'
 import rawGlobalLeagues from './data/globalLeaguesAndTeams.json'
 import rawInternationalTournaments from './data/internationalTournaments.json'
@@ -128,15 +130,16 @@ interface LeagueHubProps {
   onSelectClub: (clubId: string) => void
   onSelectPlayer: (player: Player) => void
   onSelectMatch: (id: string) => void
+  seasonLabel: string
+  history: SeasonRecord[]
 }
 
-export default function LeagueHub({ matches, standings, playerStats, teamStats, selectedCompetitionId, onSelectCompetition, onSelectCountry, selectedClubId, onSelectClub, onSelectPlayer, onSelectMatch }: LeagueHubProps) {
+export default function LeagueHub({ seasonLabel, history, matches, standings, playerStats, teamStats, selectedCompetitionId, onSelectCompetition, onSelectCountry, selectedClubId, onSelectClub, onSelectPlayer, onSelectMatch }: LeagueHubProps) {
   const [category, setCategory] = useState<LeagueCategory>('Domestic Leagues')
   const [openRegion, setOpenRegion] = useState('Nigeria')
   const [section, setSection] = useState<LeagueSection>('Standings')
   const [playerStat, setPlayerStat] = useState<PlayerStatKey>('goals')
   const [tournamentStageId, setTournamentStageId] = useState('group-stage')
-  const [season, setSeason] = useState('2026/27')
   const categoryTournaments = internationalTournaments.tournaments.filter((item) => item.category === category)
   const [openConfederation, setOpenConfederation] = useState('')
   const browseItems = category === 'Domestic Leagues'
@@ -146,13 +149,19 @@ export default function LeagueHub({ matches, standings, playerStats, teamStats, 
   const selectedGlobalCountry = globalLeagues.countries.find((item) => item.id === selectedCompetitionId)
   const currentTournament = internationalTournaments.tournaments.find((item) => item.id === selectedCompetitionId)
   const baseCompetition = selectedGlobalCountry ? adaptGlobalLeague(selectedGlobalCountry) : currentTournament ? adaptTournament(currentTournament) : leagueCompetitions.find((item) => item.id === selectedCompetitionId)
-  const currentCompetition = baseCompetition?.id === league.id ? {
+  const leagueMatches = baseCompetition ? getFixturesByLeague(baseCompetition.id, matches) : []
+  const ownTable = baseCompetition?.id === league.id
+  const tableStandings = ownTable ? standings : selectedGlobalCountry && baseCompetition
+    ? applySimulatedResults(baseCompetition.standings, leagueMatches.filter((match) => match.status === 'Completed'), getCompetitionRules(baseCompetition.id))
+    : baseCompetition?.standings ?? []
+  const currentCompetition = baseCompetition && selectedGlobalCountry ? {
     ...baseCompetition,
-    standings,
-    playerStats,
-    teamStats,
-    matchday: Math.max(baseCompetition.matchday, ...standings.map((standing) => standing.played)),
-  } : baseCompetition
+    season: seasonLabel,
+    standings: tableStandings,
+    ...(ownTable ? { playerStats, teamStats } : {}),
+    matchday: Math.max(0, ...tableStandings.map((standing) => standing.played)),
+    history: history.map((record) => ({ season: record.label, champion: record.summaries[baseCompetition.id]?.champion ?? '', runnerUp: record.summaries[baseCompetition.id]?.runnerUp ?? '', points: record.summaries[baseCompetition.id]?.points ?? 0 })).reverse(),
+  } : baseCompetition ? { ...baseCompetition, season: seasonLabel } : baseCompetition
   const isDomesticCup = !selectedGlobalCountry && !currentTournament && currentCompetition?.category === 'Domestic Leagues' && currentCompetition.totalMatchdays <= 8
   const players = currentCompetition?.playerStats[playerStat] ?? []
 
@@ -186,7 +195,7 @@ export default function LeagueHub({ matches, standings, playerStats, teamStats, 
     </>}
 
     {currentCompetition && <section className="league-detail">
-        <div className="league-detail-heading"><div><span className="eyebrow">{currentCompetition.country.toUpperCase()} · {currentCompetition.category.toUpperCase()}</span><h2>{currentCompetition.name}</h2><p>Matchday {currentCompetition.matchday} of {currentCompetition.totalMatchdays}</p></div><label className="league-season-select">SEASON<select aria-label="League season" onChange={(event) => setSeason(event.target.value)} value={season}><option>2026/27</option><option>2025/26</option><option>2024/25</option></select></label></div>
+        <div className="league-detail-heading"><div><span className="eyebrow">{currentCompetition.country.toUpperCase()} · {currentCompetition.category.toUpperCase()}</span><h2>{currentCompetition.name}</h2><p>Matchday {currentCompetition.matchday} of {currentCompetition.totalMatchdays}</p></div><label className="league-season-select">SEASON<select aria-label="League season" disabled value={seasonLabel}><option>{seasonLabel}</option></select></label></div>
         <nav className="league-view-tabs" aria-label="League information sections">{leagueSections.map((item) => <button aria-current={section === item ? 'page' : undefined} className={section === item ? 'league-view-tab active' : 'league-view-tab'} key={item} onClick={() => setSection(item)} type="button">{item}</button>)}</nav>
 
         {section === 'Standings' && currentTournament ? <TournamentStages tournament={currentTournament} stageId={tournamentStageId} onStageChange={setTournamentStageId} onSelectCountry={onSelectCountry} /> : section === 'Standings' && isDomesticCup && currentCompetition ? <KnockoutBracket title={currentCompetition.name} season={currentCompetition.season} roundNames={['Round of 16', 'Quarter-finals', 'Semi-finals', 'Final']} participants={globalLeagues.countries.find((country) => country.countryName === currentCompetition.country)?.teams.map((team) => ({ code: team.id, name: team.name, badge: team.badge })) ?? []} /> : section === 'Standings' && currentCompetition && <LeagueTable competition={currentCompetition} onSelectClub={selectedGlobalCountry ? onSelectClub : undefined} renderClub={(clubId) => {
@@ -200,7 +209,7 @@ export default function LeagueHub({ matches, standings, playerStats, teamStats, 
 
         {section === 'Team Stats' && <section className="league-data-panel"><div className="team-stats-header"><span>TEAM</span><span>POSS</span><span>GOALS</span><span>CS</span><span>CARDS</span></div>{currentCompetition.teamStats.map((team, index) => <article className="team-stat-row" key={team.clubId}><span>{index + 1}. {team.clubName}</span><span>{team.possession}%</span><span>{team.goals}</span><span>{team.cleanSheets}</span><span>{team.cards}</span></article>)}</section>}
 
-        {section === 'Fixtures' && <LeagueFixturesSection matches={matches} competitionName={currentCompetition.name} onSelectMatch={onSelectMatch} />}
+        {section === 'Fixtures' && <LeagueFixturesSection matches={matches} leagueId={currentCompetition.id} onSelectMatch={onSelectMatch} />}
 
         {section === 'Rules' && <section className="league-data-panel league-rules-list">{currentCompetition.rules.map((rule, index) => <article className="league-rule-row" key={rule}><span>{String(index + 1).padStart(2, '0')}</span><p>{rule}</p></article>)}</section>}
 
@@ -209,10 +218,8 @@ export default function LeagueHub({ matches, standings, playerStats, teamStats, 
   </div>
 }
 
-function LeagueFixturesSection({ matches, competitionName, onSelectMatch }: { matches: MatchInfo[]; competitionName: string; onSelectMatch: (id: string) => void }) {
-  const fixtures = matches.filter((m) => m.competition === competitionName)
-  const all = fixtures.length ? fixtures : matches
-  const sorted = [...all].sort((a, b) => `${a.date}${a.kickOff}`.localeCompare(`${b.date}${b.kickOff}`))
+function LeagueFixturesSection({ matches, leagueId, onSelectMatch }: { matches: MatchInfo[]; leagueId: string; onSelectMatch: (id: string) => void }) {
+  const sorted = getFixturesByLeague(leagueId, matches).sort((a, b) => `${a.date}${a.kickOff}`.localeCompare(`${b.date}${b.kickOff}`))
   const groups: { label: string; list: typeof sorted }[] = []
   const completed = sorted.filter((m) => m.status === 'Completed')
   const live = sorted.filter((m) => m.status === 'Live')

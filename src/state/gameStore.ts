@@ -1,14 +1,18 @@
 import { useSyncExternalStore } from 'react'
-import { club, league, matchFixtures, ownLeagueRules, SEASON_START_DATE } from '../data/mockData'
+import rawGlobalLeagues from '../data/globalLeaguesAndTeams.json'
+import { club, createTieFixture, getSeasonLeagueFixtures, league, leagueStandings, ownLeagueRules, SEASON_START_DATE } from '../data/mockData'
+import { getCompetitionRules } from '../data/competitionRules'
 import { getClubSquad } from '../data/clubSquads'
-import type { LeagueCompetition, LeagueStanding, MatchInfo, Player } from '../types/game'
+import type { GlobalLeaguesDatabase, LeagueCompetition, LeagueStanding, MatchInfo, Player } from '../types/game'
 import { matchSeedFromId, simulateMatch, type MatchTactics } from '../simulation/matchEngine'
 import { clearSimulatedMatches, loadSimulatedMatches, saveSimulatedMatches } from '../simulation/persistence'
+import { deriveSeasonTies, type LeagueRankings, type ScoreLookup, type SeasonTies, type TieSpec } from '../simulation/competitions'
+import { clubStrength, quickResult } from '../simulation/quickResult'
 import { applySimulatedResults } from '../simulation/season'
 import { computePlayerStats, computeTeamStats } from '../simulation/stats'
 import { DEFAULT_SLOTS, fitPlayersToSlots } from '../utils/lineup'
 
-const DATE_KEY = 'fmapp-game-date-v2'
+const DATE_KEY = 'fmapp-game-date-v4'
 export const LEDGER_KEY = 'fmapp-transfer-ledger-v1'
 const TACTICS_KEY = 'fmapp-tactics'
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -104,8 +108,75 @@ function loadDate() {
   return saved && ISO_DATE.test(saved) && !Number.isNaN(parseDate(saved).getTime()) ? saved : SEASON_START_DATE
 }
 
-const loaded = loadSimulatedMatches(matchFixtures)
-let date = loaded.error ? SEASON_START_DATE : loadDate()
+export interface SeasonRecord {
+  season: number
+  label: string
+  /** League ID -> club IDs from champion downwards; seeds the next season's qualification. */
+  tables: LeagueRankings
+  summaries: Record<string, { champion: string; runnerUp: string; points: number }>
+}
+
+const HISTORY_KEY = 'fmapp-season-history-v1'
+const countries = (rawGlobalLeagues as unknown as GlobalLeaguesDatabase).countries
+export const seasonLabel = (season: number) => `${2026 + season}/${String((27 + season) % 100).padStart(2, '0')}`
+
+function loadHistory(): SeasonRecord[] {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(HISTORY_KEY) ?? '[]')
+    return Array.isArray(parsed) ? parsed.filter((item): item is SeasonRecord => typeof item === 'object' && item !== null && typeof item.season === 'number' && typeof item.tables === 'object') : []
+  } catch {
+    return []
+  }
+}
+
+let history: SeasonRecord[] = loadHistory()
+const currentSeason = () => history.length
+
+const involvesUser = (match: { homeClubId: string; awayClubId: string }) => match.homeClubId === club.id || match.awayClubId === club.id
+/** Fully simulated (events, commentary, saved): the user's own matches and the rest of the user's league. */
+const isFullSimulation = (match: MatchInfo) => match.leagueId === league.id || involvesUser(match)
+
+const tieFixtures = new Map<string, MatchInfo>()
+const tieFixture = (tie: TieSpec) => {
+  let fixture = tieFixtures.get(tie.id)
+  if (!fixture) {
+    fixture = createTieFixture(tie)
+    tieFixtures.set(tie.id, fixture)
+  }
+  return fixture
+}
+
+const backgroundResults = new Map<string, MatchInfo>()
+/** Quick deterministic result for matches that are not fully simulated; never saved because it is reproducible. */
+function backgroundResult(fixture: MatchInfo): MatchInfo {
+  let result = backgroundResults.get(fixture.id)
+  if (!result) {
+    result = quickResult(fixture, clubStrength(fixture.homeClubId, getClubSquad(fixture.homeClubId)), clubStrength(fixture.awayClubId, getClubSquad(fixture.awayClubId)))
+    backgroundResults.set(fixture.id, result)
+  }
+  return result
+}
+
+const scoreLookup = (done: Record<string, MatchInfo>, asOf: string): ScoreLookup => (tie) => {
+  const saved = done[tie.id]?.score
+  if (saved) return saved
+  if (tie.homeId === club.id || tie.awayId === club.id || tie.date > asOf) return undefined
+  return backgroundResult(tieFixture(tie)).score
+}
+
+/** Every fixture of the current season (all leagues, cups, continental ties) that exists given the results so far. */
+function seasonFixtures(done: Record<string, MatchInfo>, asOf: string): { fixtures: MatchInfo[]; ties: SeasonTies } {
+  const season = currentSeason()
+  const ties = deriveSeasonTies(season, season > 0 ? history[season - 1]?.tables : undefined, scoreLookup(done, asOf))
+  return { fixtures: [...getSeasonLeagueFixtures(season), ...ties.ties.map(tieFixture)], ties }
+}
+
+const resolveFixture = (fixture: MatchInfo, done: Record<string, MatchInfo>, asOf: string): MatchInfo =>
+  done[fixture.id] ?? (!isFullSimulation(fixture) && fixture.date <= asOf ? backgroundResult(fixture) : fixture)
+
+const savedDate = loadDate()
+const loaded = loadSimulatedMatches((done) => seasonFixtures(done, savedDate).fixtures)
+let date = loaded.error ? SEASON_START_DATE : savedDate
 let results: Record<string, MatchInfo> = loaded.matches
 let message = loaded.error
 let revision = 0
@@ -139,20 +210,24 @@ export interface GameView {
   playerStats: LeagueCompetition['playerStats']
   teamStats: LeagueCompetition['teamStats']
   message: string
+  season: number
+  seasonLabel: string
+  history: SeasonRecord[]
 }
 
 function buildView(): GameView {
-  const completed = Object.values(results)
-  const standings = applySimulatedResults(league.standings, completed, ownLeagueRules)
+  const resolved = seasonFixtures(results, date).fixtures.map((fixture) => resolveFixture(fixture, results, date))
+  const completed = resolved.filter((match) => match.status === 'Completed')
+  const leagueResults = completed.filter((match) => match.leagueId === league.id)
+  const standings = applySimulatedResults(league.standings, leagueResults, ownLeagueRules)
   const formByClub = new Map(standings.map((standing) => [standing.clubId, standing.form]))
   const meetings = new Map<string, MatchInfo[]>()
   for (const match of completed) {
     const key = [match.homeClubId, match.awayClubId].sort().join('|')
     meetings.set(key, [...(meetings.get(key) ?? []), match])
   }
-  const matches = matchFixtures.map((fixture): MatchInfo => {
-    const result = results[fixture.id]
-    if (result) return result
+  const matches = resolved.map((fixture): MatchInfo => {
+    if (fixture.status === 'Completed') return fixture
     const past = (meetings.get([fixture.homeClubId, fixture.awayClubId].sort().join('|')) ?? []).sort((a, b) => b.date.localeCompare(a.date))
     return {
       ...fixture,
@@ -166,6 +241,7 @@ function buildView(): GameView {
     }
   })
   const upcoming = matches.filter((match) => match.status === 'Upcoming' && (match.homeClubId === club.id || match.awayClubId === club.id))
+    .sort((first, second) => `${first.date}${first.kickOff}`.localeCompare(`${second.date}${second.kickOff}`))
   return {
     revision,
     date,
@@ -174,9 +250,12 @@ function buildView(): GameView {
     ownStanding: standings.find((standing) => standing.clubId === club.id),
     nextFixture: upcoming[0],
     upcoming,
-    playerStats: computePlayerStats(completed),
-    teamStats: computeTeamStats(standings, completed),
+    playerStats: computePlayerStats(leagueResults),
+    teamStats: computeTeamStats(standings, leagueResults),
     message,
+    season: currentSeason(),
+    seasonLabel: seasonLabel(currentSeason()),
+    history,
   }
 }
 
@@ -193,30 +272,58 @@ export const useGame = (): GameView => {
 }
 
 // ---------- Actions ----------
+/**
+ * Once the Club World Cup final is played the season is over: archive the final tables (they seed next season's
+ * qualification), drop the finished season's saved results, and let the next season's calendar generate itself.
+ */
+function rollOverSeason(): boolean {
+  const { fixtures, ties } = seasonFixtures(results, date)
+  if (!ties.complete) return false
+  const resolved = fixtures.map((fixture) => resolveFixture(fixture, results, date)).filter((match) => match.status === 'Completed')
+  const tables: LeagueRankings = {}
+  const summaries: SeasonRecord['summaries'] = {}
+  for (const country of countries) {
+    const rows = applySimulatedResults(leagueStandings(country), resolved.filter((match) => match.leagueId === country.id), getCompetitionRules(country.id))
+    tables[country.id] = rows.map((row) => row.clubId)
+    summaries[country.id] = { champion: rows[0].clubName, runnerUp: rows[1].clubName, points: rows[0].points }
+  }
+  history = [...history, { season: history.length, label: seasonLabel(history.length), tables, summaries }]
+  results = {}
+  return true
+}
+
 function commit(newResults: MatchInfo[], nextDate?: string) {
   results = { ...results, ...Object.fromEntries(newResults.map((result) => [result.id, result])) }
   if (nextDate) date = nextDate
+  let startedSeason = ''
+  while (rollOverSeason()) startedSeason = seasonLabel(currentSeason())
   try {
     saveSimulatedMatches(results, club.id)
+    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
     if (nextDate) window.localStorage.setItem(DATE_KEY, nextDate)
-    message = ''
+    message = startedSeason ? `The season is over. The ${startedSeason} calendar has been scheduled automatically.` : ''
   } catch (error) {
     message = error instanceof Error ? `Progress was applied, but it could not be saved: ${error.message}` : 'Progress was applied, but it could not be saved.'
   }
   notify()
 }
-
 const fail = (text: string, error: unknown) => {
   message = error instanceof Error ? `${text}: ${error.message}` : `${text}.`
   notify()
 }
 
-/** Moves the calendar to `targetDate` and plays every fixture that falls due on the way. */
+/** Moves the calendar to `targetDate` and plays every fixture that falls due on the way, including knockout rounds those results unlock. */
 function advanceTo(targetDate: string) {
   try {
-    const due = getGameView().matches.filter((match) => match.status === 'Upcoming' && match.date <= targetDate)
-      .sort((first, second) => first.date.localeCompare(second.date) || first.id.localeCompare(second.id))
-    commit(due.map(simulateFixture), targetDate)
+    const played: Record<string, MatchInfo> = {}
+    for (;;) {
+      const done = { ...results, ...played }
+      const due = seasonFixtures(done, targetDate).fixtures.filter((match) => !done[match.id] && isFullSimulation(match) && match.date <= targetDate)
+        .sort((first, second) => first.date.localeCompare(second.date) || first.id.localeCompare(second.id))
+      if (due.length === 0) break
+      for (const fixture of due) played[fixture.id] = simulateFixture(fixture)
+    }
+    commit(Object.values(played), targetDate)
   } catch (error) {
     fail('Could not advance', error)
   }

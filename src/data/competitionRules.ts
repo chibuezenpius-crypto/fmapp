@@ -1,5 +1,6 @@
 import rawGlobalLeagues from './globalLeaguesAndTeams.json'
 import rawInternationalTournaments from './internationalTournaments.json'
+import { CLUB_WORLD_CUP_ID, CONTINENTAL_IDS } from '../simulation/competitions'
 import type { GlobalLeaguesDatabase, InternationalTournamentsDatabase } from '../types/game'
 
 export type Tiebreaker = 'Goal difference' | 'Goals scored' | 'Wins'
@@ -78,8 +79,8 @@ for (const id of cupIds) {
   registry.set(id, { ...baseRules(id), format: 'Cup', relegationSlots: 0, continentalSlots: 1, extraTimeAndPenalties: true, pointsForWin: 0, pointsForDraw: 0 })
 }
 
-for (const id of ['continental-champions', 'continental-league', 'continental-africa']) {
-  registry.set(id, { ...baseRules(id), format: 'Groups and knockout', relegationSlots: 0, continentalSlots: 0, extraTimeAndPenalties: true, squadMax: 25, matchdaySquadSize: 23 })
+for (const id of [...CONTINENTAL_IDS, CLUB_WORLD_CUP_ID]) {
+  registry.set(id, { ...baseRules(id), format: 'Cup', relegationSlots: 0, continentalSlots: 0, extraTimeAndPenalties: true, pointsForWin: 0, pointsForDraw: 0, squadMax: 25, matchdaySquadSize: 23 })
 }
 
 for (const tournament of tournaments) {

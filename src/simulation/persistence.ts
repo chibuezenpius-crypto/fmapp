@@ -1,6 +1,6 @@
 import type { MatchCommentaryEvent, MatchEvent, MatchInfo, MatchLineup, MatchStats } from '../types/game'
 
-const STORAGE_KEY = 'fmapp-simulated-matches-v3'
+const STORAGE_KEY = 'fmapp-simulated-matches-v5'
 
 interface SavedMatchResult {
   id: string
@@ -81,22 +81,31 @@ function isSavedResult(value: unknown): value is SavedMatchResult {
     && isEventLog(value.eventLog, value.id)
 }
 
-export function loadSimulatedMatches(fixtures: readonly MatchInfo[]): { matches: Record<string, MatchInfo>; error: string } {
+/**
+ * `fixturesFor` returns every fixture that exists given the results restored so far, so that knockout rounds
+ * created from earlier results can be matched to their saved results too.
+ */
+export function loadSimulatedMatches(fixturesFor: (completed: Record<string, MatchInfo>) => readonly MatchInfo[]): { matches: Record<string, MatchInfo>; error: string } {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY)
     if (!stored) return { matches: {}, error: '' }
     const parsed: unknown = JSON.parse(stored)
-    if (!isRecord(parsed) || parsed.version !== 3 || !isRecord(parsed.matches)) {
+    if (!isRecord(parsed) || parsed.version !== 5 || !isRecord(parsed.matches)) {
       return { matches: {}, error: 'Saved match results have an unsupported format. Start a new game to replace this save.' }
     }
-    const fixtureById = new Map(fixtures.map((fixture) => [fixture.id, fixture]))
     const results: Record<string, MatchInfo> = {}
-    for (const [id, value] of Object.entries(parsed.matches)) {
-      const fixture = fixtureById.get(id)
-      if (!fixture || !isSavedResult(value) || value.id !== id) {
-        return { matches: {}, error: 'A saved match result is invalid. Start a new game to replace this save.' }
+    const pending = new Map(Object.entries(parsed.matches))
+    while (pending.size > 0) {
+      const restorable = fixturesFor(results).filter((fixture) => pending.has(fixture.id))
+      if (restorable.length === 0) return { matches: {}, error: 'A saved match result is invalid. Start a new game to replace this save.' }
+      for (const fixture of restorable) {
+        const value = pending.get(fixture.id)
+        if (!isSavedResult(value) || value.id !== fixture.id) {
+          return { matches: {}, error: 'A saved match result is invalid. Start a new game to replace this save.' }
+        }
+        results[fixture.id] = { ...fixture, ...value, status: 'Completed' }
+        pending.delete(fixture.id)
       }
-      results[id] = { ...fixture, ...value, status: 'Completed' }
     }
     return { matches: results, error: '' }
   } catch (error) {
@@ -129,7 +138,7 @@ export function saveSimulatedMatches(matches: Record<string, MatchInfo>, ownClub
       eventLog: own ? match.eventLog : match.eventLog.filter((event) => KEY_EVENT_TYPES.has(event.type)),
     }]
   }))
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 3, matches: saved }))
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 5, matches: saved }))
 }
 
 export function clearSimulatedMatches(): void {
