@@ -14,6 +14,8 @@ export interface CharacterTraits {
   professionalism: number
   workRate: number
   leadership: number
+  determination: number
+  morale: number
 }
 
 export interface Mentorship {
@@ -68,33 +70,42 @@ const traitAdjust: Record<string, Partial<CharacterTraits>> = {
   'Big Game Player': { professionalism: 4 },
 }
 
+const moraleBase: Record<Player['morale'], number> = { 'Very Good': 88, Good: 70, Okay: 50, Poor: 28 }
+
 export function characterTraits(player: Player): CharacterTraits {
   const base = baselines[player.personalInfo.personality] ?? { loyalty: 60, professionalism: 60 }
   const adjust = traitAdjust[player.personalInfo.characterTrait] ?? {}
   return {
     loyalty: clamp(base.loyalty + (adjust.loyalty ?? 0) + spread(`${player.id}-loyalty`, 8)),
     professionalism: clamp(base.professionalism + (adjust.professionalism ?? 0) + spread(`${player.id}-pro`, 8)),
-    workRate: clamp(player.attributes.workRate * 0.6 + player.attributes.determination * 0.4),
+    workRate: clamp(player.attributes.workRate),
     leadership: clamp(player.attributes.leadership),
+    determination: clamp(player.attributes.determination),
+    morale: clamp(moraleBase[player.morale] + (player.form - 5) * 3),
   }
 }
 
-/** How much weight a player carries in the dressing room. It comes from character, not from hobbies. */
+/** How much weight a player carries in the dressing room. It comes from character and standing, not from hobbies. */
 function influence(player: Player, traits: CharacterTraits, squad: Player[]): number {
   const experience = Math.min(1, Math.max(0, player.age - 18) / 12) * 100
   const best = Math.max(...squad.map((candidate) => candidate.overall), 1)
   const status = (player.overall / best) * 100
-  return traits.leadership * 0.3 + traits.professionalism * 0.2 + traits.loyalty * 0.15 + traits.workRate * 0.15 + experience * 0.1 + status * 0.1
+  const drive = (traits.determination + traits.workRate) / 2
+  return traits.leadership * 0.28 + traits.professionalism * 0.16 + traits.loyalty * 0.1 + drive * 0.14 + traits.morale * 0.06 + experience * 0.12 + status * 0.14
 }
 
 export function hierarchyOf(player: Player, squad: Player[]): HierarchyLevel {
   const members = squad.some((candidate) => candidate.id === player.id) ? squad : [...squad, player]
-  const ranked = members.map((member) => ({ id: member.id, value: influence(member, characterTraits(member), members) })).sort((first, second) => second.value - first.value)
-  const rank = ranked.findIndex((entry) => entry.id === player.id)
-  if (rank < Math.max(2, Math.round(members.length * 0.1))) return 'Team Leader'
-  if (rank < Math.ceil(members.length * 0.3)) return 'Influential'
-  if (rank < Math.ceil(members.length * 0.7)) return 'Core Player'
-  return 'Fringe'
+  const ranked = members.map((member) => ({ member, value: influence(member, characterTraits(member), members) })).sort((first, second) => second.value - first.value)
+  const rank = ranked.findIndex((entry) => entry.member.id === player.id)
+  const traits = characterTraits(player)
+  const share = rank / members.length
+  // Leaders must actually lead: top of the ranking with real leadership and respect in the room.
+  if (share < 0.17 && traits.leadership >= 50 && traits.professionalism >= 50 && player.age >= 22) return 'Team Leader'
+  if (share < 0.3 || (traits.leadership >= 72 && player.age >= 26)) return 'Influential'
+  // Fringe players are low in the ranking and have no character to make up for it.
+  if (share >= 0.7 && traits.leadership < 65 && traits.determination < 75) return 'Fringe'
+  return 'Core Player'
 }
 
 const clashes: [string, string][] = [
@@ -233,12 +244,16 @@ export function buildDressingRoom(player: Player, squad: Player[]): DressingRoom
   const members = squad.some((candidate) => candidate.id === player.id) ? squad : [...squad, player]
   const traits = new Map(members.map((member) => [member.id, characterTraits(member)]))
   const hierarchy = hierarchyOf(player, members)
+  const context = buildContext(members)
   const mine = traits.get(player.id) ?? characterTraits(player)
-  const sociable = (mine.loyalty + mine.professionalism + player.attributes.teamwork) / 3
-  const { positive, negative } = buildConnections(player, members, buildContext(members), traits)
+  // Players who cannot talk to most of the squad drift to the edge of the group.
+  const isolated = !speaks(player).includes(context.dominant) ? 8 : 0
+  const sociability = player.attributes.teamwork * 0.25 + player.personalInfo.teamOpinion * 0.25 + mine.loyalty * 0.15 + mine.professionalism * 0.1 + mine.morale * 0.15 + mine.workRate * 0.1 - isolated
+  const { positive, negative } = buildConnections(player, members, context, traits)
+  const group: SocialGroup = sociability >= 62 && (hierarchy !== 'Fringe' || sociability >= 72) ? 'Core Group' : 'Secondary Group'
   return {
     hierarchy,
-    group: hierarchy === 'Fringe' || sociable < 52 ? 'Secondary Group' : 'Core Group',
+    group,
     traits: mine,
     mentorship: buildMentorship(player, members, traits),
     positive,

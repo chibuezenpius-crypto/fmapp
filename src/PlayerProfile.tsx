@@ -77,7 +77,7 @@ function DressingRoomCard({ player, squad, onSelectPlayer }: { player: Player; s
         <span className="rounded-lg bg-[#dbe4fa] px-2 py-1 text-[10px] font-extrabold text-[#183a8b]">{info.characterTrait}</span>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5">
-        {([['Loyalty', view.traits.loyalty], ['Professionalism', view.traits.professionalism], ['Work rate', view.traits.workRate], ['Leadership', view.traits.leadership]] as const).map(([name, value]) => <div className="flex flex-col gap-1" key={name}>
+        {([['Loyalty', view.traits.loyalty], ['Professionalism', view.traits.professionalism], ['Work rate', view.traits.workRate], ['Leadership', view.traits.leadership], ['Determination', view.traits.determination], ['Morale', view.traits.morale]] as const).map(([name, value]) => <div className="flex flex-col gap-1" key={name}>
           <span className="flex items-baseline justify-between text-[10px] font-extrabold text-[#6376a4]"><span>{name.toUpperCase()}</span><span className="text-[#1b2847]">{value}</span></span>
           <span className="h-1.5 overflow-hidden rounded-full bg-[#e2e8f6]"><i className={`block h-full rounded-full ${value >= 70 ? 'bg-emerald-500' : value >= 45 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${value}%` }} /></span>
         </div>)}
