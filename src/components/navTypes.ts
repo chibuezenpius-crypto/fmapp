@@ -9,6 +9,8 @@ export interface NavActions {
   onNavigate: (tab: NavTab) => void
   onOpenClubSection: (section: ClubSection) => void
   onOpenConfidence: (view: ConfidenceTarget) => void
+  onOpenInbox: () => void
+  onOpenTraining: () => void
   onSelectMatch: (matchId: string) => void
   onSelectPlayer: (player: Player) => void
   onSelectCountry: (country: string) => void

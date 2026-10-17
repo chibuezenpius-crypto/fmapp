@@ -20,7 +20,7 @@ export default function DashboardCard({ title, kicker, actionLabel, onAction, ch
           {kicker && <span className={`text-[9px] font-bold tracking-[.12em] ${dark ? 'text-[#8fb4ff]' : 'text-[#6f84ad]'}`}>{kicker}</span>}
           <h2 className="truncate font-['Barlow_Condensed'] text-[21px] leading-tight font-bold">{title}</h2>
         </div>
-        {actionLabel && onAction && <button className={`shrink-0 cursor-pointer rounded-full border-0 px-3 py-1 text-[10px] font-bold ${dark ? 'bg-white/10 text-[#8fb4ff] hover:bg-white/20' : 'bg-[#e8eefc] text-[#0b4aa2] hover:bg-[#d5e1fa]'}`} onClick={onAction} type="button">{actionLabel}</button>}
+        {actionLabel && onAction && <button className={`shrink-0 cursor-pointer rounded-full border-0 px-3 py-1 text-[10px] font-bold ${dark ? 'bg-white/10 text-[#8fb4ff] hover:bg-white/20' : 'bg-[#e8eefc] text-[#0b4aa2] hover:bg-[#d5e1fa]'}`} onClick={onAction} type="button"><span className="text-[10px]">{actionLabel}</span></button>}
       </div>
       {children}
     </section>

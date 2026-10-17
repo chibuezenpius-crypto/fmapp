@@ -249,7 +249,7 @@ function TacticalPitch({ formation, slots, players, selectedSlot, onSelectSlot, 
   })}{preview && <svg aria-hidden="true" className={`tactical-arrow-overlay ${tacticalDNA.toLowerCase().replace(/[^a-z]+/g, '-')}`} preserveAspectRatio="none" viewBox="0 0 100 100"><defs><marker id="tactical-arrowhead" markerHeight="5" markerWidth="5" orient="auto" refX="4" refY="2.5"><path d="M0 0 5 2.5 0 5z" /></marker></defs>{arrows.map((arrow, index) => <polyline className={`movement-line ${arrow.kind}`} key={`${tacticalDNA}-${index}`} markerEnd="url(#tactical-arrowhead)" points={arrow.points} />)}</svg>}</div>
 }
 
-export default function TacticsHub() {
+export default function TacticsHub({ initialView = 'hub' }: { initialView?: 'hub' | 'training' }) {
   const [savedTactics] = useState(readSavedTactics)
   const [section, setSection] = useState<TacticsSection>('Overview')
   const [formation, setFormation] = useState(() => savedTactics?.formation && formations[savedTactics.formation] ? savedTactics.formation : '4-3-3')
@@ -307,7 +307,7 @@ export default function TacticsHub() {
   const condition = Math.round(average(filledStarters.map((player) => player.fitness)))
   const benchPlayers = benchIds.map((id) => club.squad.find((player) => player.id === id)).filter((player): player is Player => player !== undefined)
   const assistant = club.staff.find((member) => member.role === 'Assistant Manager')
-  const [view, setView] = useState<'hub' | 'familiarity' | 'training'>('hub')
+  const [view, setView] = useState<'hub' | 'familiarity' | 'training'>(initialView)
   const savedJson = JSON.stringify({ formation, lineup, bench: benchIds, roles, tacticalDNA, matchTempo, passingStyle, aggressionLevel, pitchWidth, attackFocus, defensiveLine, pressingIntensity, creativeFreedom, setPieceTakers, leadership })
 
   useEffect(() => { adoptSettings(settings) }, [settings])

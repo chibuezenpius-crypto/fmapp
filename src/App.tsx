@@ -1,9 +1,8 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
-import { club, getClubBadge, managerProfiles, refereeProfiles } from './data/mockData'
+import { club, managerProfiles, refereeProfiles } from './data/mockData'
 import { addDays, advanceDay, clearMessage, playMatch, useGame } from './state/gameStore'
 import { BoardOverview, FanOverview } from './ClubRelations'
-import ClubBadge from './ClubBadge'
 import PlayerProfile, { type ProfileSection } from './PlayerProfile'
 import ClubProfile, { type ClubSection } from './ClubProfile'
 import MatchCenter from './MatchCenter'
@@ -14,10 +13,10 @@ import CountryOverview from './CountryOverview'
 import TacticsHub from './TacticsHub'
 import AcademyHub from './AcademyHub'
 import MatchesList from './MatchesList'
-import AppHeader from './components/AppHeader'
+import AppHeader, { type PanelKind } from './components/AppHeader'
 import Dashboard from './components/Dashboard'
 import type { NavActions, NavTab } from './components/navTypes'
-import type { LeagueStanding, PersonnelProfile as PersonnelProfileData, Player } from './types/game'
+import type { PersonnelProfile as PersonnelProfileData, Player } from './types/game'
 import './App.css'
 
 const SCREEN_SIZES = [
@@ -30,7 +29,6 @@ const SCREEN_SIZES = [
 
 const tabs = [
   { id: 'Home', label: 'Home', icon: 'M3 10.5 12 3l9 7.5M5.5 9v11h13V9M9 20v-6h6v6' },
-  { id: 'Academy', label: 'Academy', icon: 'M22 10 12 5 2 10l10 5 10-5ZM6 12v5c3 2.5 9 2.5 12 0v-5M22 10v6' },
   { id: 'Club', label: 'Club', icon: 'M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 9h.01M15 9h.01M9 12h.01M15 12h.01' },
   { id: 'Tactics', label: 'Tactics', icon: 'M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11ZM9 12l2 2 4-4' },
   { id: 'Transfers', label: 'Transfers', icon: 'M7 7h14l-4-4M17 17H3l4 4M21 7l-4 4M3 17l4-4' },
@@ -57,18 +55,20 @@ function App() {
   const [screenSize, setScreenSize] = useState(SCREEN_SIZES[0])
   const [clubSection, setClubSection] = useState<ClubSection>('Overview')
   const [clubReturnTab, setClubReturnTab] = useState<TabId>('Home')
+  const [headerPanel, setHeaderPanel] = useState<PanelKind | null>(null)
+  const [tacticsView, setTacticsView] = useState<'hub' | 'training'>('hub')
   const displayedMatches = game.matches
   // The Matches tab lists the user's own matches plus everything around today, not every match of every league.
   const matchesTabMatches = displayedMatches.filter((match) => match.homeClubId === club.id || match.awayClubId === club.id || (match.date >= addDays(game.date, -2) && match.date <= addDays(game.date, 3)))
   const standings = game.standings
   const selectedMatch = displayedMatches.find((match) => match.id === selectedMatchId)
-  const detailOpen = selectedCountryName !== null || selectedPlayer !== null || selectedPersonnel !== null || relationsView !== null || selectedLeagueId !== null || selectedLeagueClubId !== null || activeTab === 'Club' || selectedMatch !== undefined
+  const detailOpen = activeTab === 'Academy' || selectedCountryName !== null || selectedPlayer !== null || selectedPersonnel !== null || relationsView !== null || selectedLeagueId !== null || selectedLeagueClubId !== null || activeTab === 'Club' || selectedMatch !== undefined
   const backLabel = selectedCountryName ? `Back to ${countryReturnLabel}` : selectedPlayer || selectedPersonnel ? (activeTab === 'Club' ? 'Back to club' : `Back to ${activeTab.toLowerCase()}`)
     : relationsView ? `Back to ${activeTab.toLowerCase()}`
     : selectedLeagueClubId ? 'Back to league table'
     : selectedLeagueId ? 'Back to leagues'
     : selectedMatch ? (activeTab === 'Club' ? 'Back to club' : `Back to ${activeTab.toLowerCase()}`)
-    : activeTab === 'Club' ? `Back to ${clubReturnTab.toLowerCase()}` : `Back to ${activeTab.toLowerCase()}`
+    : activeTab === 'Club' ? `Back to ${clubReturnTab.toLowerCase()}` : activeTab === 'Academy' ? 'Back to home' : `Back to ${activeTab.toLowerCase()}`
   const selectPlayer = (player: Player) => {
     setSelectedPlayer(player)
     setSelectedPersonnel(null)
@@ -120,12 +120,16 @@ function App() {
     setSelectedPlayer(null)
     setSelectedPersonnel(null)
     setRelationsView(null)
+    setHeaderPanel(null)
+    setTacticsView('hub')
     setActiveTab(tab)
   }
   const nav: NavActions = {
     onNavigate: selectTab,
     onOpenClubSection: openClubSection,
     onOpenConfidence: openConfidenceView,
+    onOpenInbox: () => setHeaderPanel('inbox'),
+    onOpenTraining: () => { selectTab('Tactics'); setTacticsView('training') },
     onSelectMatch: setSelectedMatchId,
     onSelectPlayer: selectPlayer,
     onSelectCountry: openCountryOverview,
@@ -163,6 +167,10 @@ function App() {
       setActiveTab(clubReturnTab)
       return
     }
+    if (activeTab === 'Academy') {
+      setActiveTab('Home')
+      return
+    }
     setSelectedMatchId(null)
   }
 
@@ -173,9 +181,8 @@ function App() {
       </div>
       <div className="app-shell" style={screenSize.width ? { width: `min(100%, ${screenSize.width}px)` } : { width: '100%' }}>
         <AppHeader expanded={!detailOpen} game={game} message={selectedMatch ? '' : game.message} nav={nav} onAdvanceDay={advanceDay} onClearMessage={clearMessage} onOpenClub={openClubProfile}
-          leading={detailOpen
-            ? <button aria-label={backLabel} className="header-back-button" onClick={goBack} type="button"><ArrowLeft aria-hidden="true" size={19} strokeWidth={2.2} /></button>
-            : <button aria-label={`${club.name} crest`} className="grid size-10 shrink-0 cursor-pointer place-items-center border-0 bg-transparent p-0 [&_.club-badge]:size-full" onClick={openClubProfile} type="button"><ClubBadge badge={getClubBadge(club.id)} name={club.name} /></button>} />
+          panel={headerPanel} onPanelChange={setHeaderPanel}
+          leading={<button aria-label={backLabel} className="header-back-button" onClick={goBack} type="button"><ArrowLeft aria-hidden="true" size={19} strokeWidth={2.2} /></button>} />
 
         <main className="main-content" key={selectedCountryName ? `country-${selectedCountryName}` : selectedPlayer ? 'profile' : selectedMatch ? `match-${selectedMatch.id}` : activeTab}>
           {selectedCountryName ? <CountryOverview country={selectedCountryName} onSelectCountry={openCountryOverview} />
@@ -189,9 +196,9 @@ function App() {
                 onSimulateMatch={() => playMatch(selectedMatch.id)} simulationError={game.message} />
               : activeTab === 'Club' ? <ClubProfile section={clubSection} selectedClubName={selectedClubName} matches={displayedMatches}
               onSectionChange={setClubSection} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} onSelectPersonnel={selectPersonnel} onSelectMatch={setSelectedMatchId} /> : <>
-            {activeTab === 'Home' && <Dashboard game={game} nav={nav} leagueSlot={<section className="content-section !mt-0" aria-label="League table preview"><SectionHeading kicker="THE RUN-IN" title="League table" detail="NEAR YOU" /><LeagueTable compact standings={standings} onSelectClub={setSelectedClubName} selectedClubName={selectedClubName} /></section>} />}
+            {activeTab === 'Home' && <Dashboard game={game} nav={nav} />}
             {activeTab === 'Academy' && <AcademyHub onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />}
-            {activeTab === 'Tactics' && <TacticsHub />}
+            {activeTab === 'Tactics' && <TacticsHub initialView={tacticsView} />}
             {activeTab === 'Transfers' && <TransferMarket onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />}
             {activeTab === 'League' && <LeagueHub seasonLabel={game.seasonLabel} history={game.history} matches={displayedMatches} standings={standings} selectedCompetitionId={selectedLeagueId} onSelectCompetition={setSelectedLeagueId} onSelectCountry={openCountryOverview} selectedClubId={selectedLeagueClubId} onSelectClub={setSelectedLeagueClubId} onSelectPlayer={selectPlayer} onSelectMatch={setSelectedMatchId} playerStats={game.playerStats} teamStats={game.teamStats} />}
             {activeTab === 'Matches' && <MatchesList matches={matchesTabMatches} onSelectMatch={setSelectedMatchId} />}
@@ -211,28 +218,6 @@ function App() {
       </div>
     </div>
   )
-}
-
-function ClubReference({ name, selectedClubName, onSelect, onOpen, className = '', ariaLabel, children }: { name: string; selectedClubName: string | null; onSelect: (name: string) => void; onOpen?: () => void; className?: string; ariaLabel?: string; children?: ReactNode }) {
-  return <button aria-label={ariaLabel} aria-pressed={selectedClubName === name} className={`entity-link ${className} ${selectedClubName === name ? 'selected' : ''}`} onClick={() => onOpen ? onOpen() : onSelect(name)} type="button">{children ?? name}</button>
-}
-
-function SectionHeading({ kicker, title, detail }: { kicker: string; title: string; detail?: string }) {
-  return <div className="section-heading"><div><span className="eyebrow">{kicker}</span><h2>{title}</h2></div>{detail && <span className="section-detail">{detail}</span>}</div>
-}
-
-function LeagueTable({ compact = false, standings, selectedClubName, onSelectClub }: { compact?: boolean; standings: LeagueStanding[]; selectedClubName: string | null; onSelectClub: (name: string) => void }) {
-  const ownPosition = standings.find((standing) => standing.clubId === club.id)?.position ?? 1
-  const start = Math.max(0, Math.min(ownPosition - 3, standings.length - 5))
-  const rows = compact ? standings.slice(start, start + 5) : standings
-  return <div className="table-wrap">
-    <div className="table-head"><span>CLUB</span><span>P</span><span>GD</span><span>PTS</span>{!compact && <span>FORM</span>}</div>
-    {rows.map((standing) => <div className={`table-row ${standing.clubId === club.id ? 'own-club' : ''}`} key={standing.clubId}>
-      <span className="table-club"><i>{String(standing.position).padStart(2, '0')}</i><ClubReference name={standing.clubName} selectedClubName={selectedClubName} onSelect={onSelectClub} /></span>
-      <span>{standing.played}</span><span>{standing.goalDifference > 0 ? `+${standing.goalDifference}` : standing.goalDifference}</span><strong>{standing.points}</strong>
-      {!compact && <span className="table-form">{standing.form.map((result, index) => <i className={`form-${result.toLowerCase()}`} key={`${standing.clubId}-${index}`} />)}</span>}
-    </div>)}
-  </div>
 }
 
 export default App
