@@ -1,5 +1,6 @@
 import { Star } from 'lucide-react'
 import type { Player, PlayerPosition } from './types/game'
+import { PLACEHOLDER_PORTRAIT } from './portrait'
 
 type PositionGroup = 'GK' | 'DEF' | 'MID' | 'ATT'
 
@@ -48,29 +49,52 @@ function MedicalCross() {
   </span>
 }
 
+export function PositionBadge({ position }: { position: PlayerPosition }) {
+  return <span className={`inline-flex h-7 w-9 shrink-0 items-center justify-center rounded-lg text-[11px] font-extrabold ${badgeStyles[groupOf(position)]}`}>{shortPosition(position)}</span>
+}
+
+export type SquadViewMode = 'Fitness' | 'Contract' | 'Morale' | 'Wages'
+
+const moraleTone: Record<Player['morale'], string> = {
+  'Very Good': 'bg-emerald-100 text-emerald-700',
+  Good: 'bg-green-100 text-green-700',
+  Okay: 'bg-amber-100 text-amber-700',
+  Poor: 'bg-red-100 text-red-700',
+}
+
+const contractLabel = (endDate: string) => new Intl.DateTimeFormat('en-GB', { month: 'short', year: 'numeric' }).format(new Date(`${endDate}T12:00:00`))
+const wageLabel = (wage: number) => `£${new Intl.NumberFormat('en-GB').format(wage)}`
+
+function Metric({ player, view }: { player: Player; view: SquadViewMode }) {
+  if (view === 'Fitness') return <FitnessRing value={player.fitness} />
+  if (view === 'Morale') return <span className={`rounded-lg px-2 py-1 text-[11px] font-extrabold ${moraleTone[player.morale]}`}>{player.morale}</span>
+  if (view === 'Contract') return <span className="flex flex-col items-end"><strong className="text-xs font-bold leading-none text-slate-800">{contractLabel(player.contract.endDate)}</strong><small className="mt-0.5 text-[9px] font-bold text-slate-500">EXPIRES</small></span>
+  return <span className="flex flex-col items-end"><strong className="text-xs font-bold leading-none text-slate-800">{wageLabel(player.contract.weeklyWage)}</strong><small className="mt-0.5 text-[9px] font-bold text-slate-500">PER WEEK</small></span>
+}
+
 export interface SquadPlayerRowProps {
   player: Player
   isStar: boolean
   isInjured: boolean
-  /** e.g. STARTER or SUB */
-  status?: string
+  view: SquadViewMode
   extraNote?: string
   onSelect: (player: Player) => void
 }
 
-export default function SquadPlayerRow({ player, isStar, isInjured, status, extraNote, onSelect }: SquadPlayerRowProps) {
+export default function SquadPlayerRow({ player, isStar, isInjured, view, extraNote, onSelect }: SquadPlayerRowProps) {
   const secondary = coverPositions[player.position].join(', ')
-  const details = [secondary, `${player.age} yrs`, status, extraNote].filter(Boolean).join(' • ')
-  return <button aria-label={`Open ${player.name} profile`} className={`flex w-full items-center gap-2.5 border-0 px-3 py-2 text-left transition-colors ${isInjured ? 'bg-red-50 shadow-[inset_3px_0_0_#f87171] hover:bg-red-100' : 'bg-transparent hover:bg-blue-50'}`} onClick={() => onSelect(player)} type="button">
+  const details = [secondary, `${player.age} yrs`, extraNote].filter(Boolean).join(' • ')
+  return <button aria-label={`Open ${player.name} profile`} className={`flex min-h-16 w-full items-center gap-2.5 border-x-0 border-b-0 border-t border-solid border-t-[#e2e8f6] px-3 py-2 first:border-t-0 text-left transition-colors ${isInjured ? 'bg-red-50 shadow-[inset_3px_0_0_#f87171] hover:bg-red-100' : 'bg-transparent hover:bg-blue-50'}`} onClick={() => onSelect(player)} type="button">
     <span className={`inline-flex h-7 w-9 shrink-0 items-center justify-center rounded-lg text-[11px] font-extrabold ${badgeStyles[groupOf(player.position)]}`}>{shortPosition(player.position)}</span>
+    <img alt="" className="size-9 shrink-0 rounded-full border border-[#cfd9f0] bg-[#d2defa] object-cover" src={PLACEHOLDER_PORTRAIT} />
     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
       <span className="flex min-w-0 items-center gap-1.5">
-        <strong className="truncate text-sm font-bold text-slate-900">{player.name}</strong>
+        <strong className="truncate text-sm font-bold text-[#1b2847]">{player.name}</strong>
         {isStar && <Star aria-label="Key player" className="size-3.5 shrink-0 fill-amber-400 text-amber-500" role="img" />}
         {isInjured && <MedicalCross />}
       </span>
-      <small className="truncate text-[11px] text-slate-500">{details}</small>
+      <small className="truncate text-[11px] text-[#6376a4]">{details}</small>
     </span>
-    <FitnessRing value={player.fitness} />
+    <span className="flex min-w-14 shrink-0 justify-end"><Metric player={player} view={view} /></span>
   </button>
 }

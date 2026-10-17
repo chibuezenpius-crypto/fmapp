@@ -6,6 +6,8 @@ import { useGame } from './state/gameStore'
 import { moveToReserves, promoteReserve, squadLocation } from './state/matchSquad'
 import { findGeneratedClub, getClubSquad } from './data/clubSquads'
 import Flag from './Flag'
+import { PositionBadge } from './SquadPlayerRow'
+import { buildDressingRoom, type Connection, type HierarchyLevel } from './utils/dressingRoom'
 
 export type ProfileSection = 'Overview' | 'Personal Info' | 'Contracts' | 'History' | 'Relationships' | 'Achievements'
 
@@ -36,8 +38,65 @@ function ClubReference({ name, selectedClubName, onSelectClub }: { name: string;
   return <button aria-pressed={selectedClubName === name} className={`entity-link ${selectedClubName === name ? 'selected' : ''}`} onClick={() => onSelectClub(name)} type="button">{name}</button>
 }
 
-function PlayerReference({ player, onSelectPlayer }: { player: Player; onSelectPlayer: (player: Player) => void }) {
-  return <button className="entity-link" onClick={() => onSelectPlayer(player)} type="button">{player.name}</button>
+
+const hierarchyTone: Record<HierarchyLevel, string> = {
+  'Team Leader': 'bg-amber-100 text-amber-700',
+  Influential: 'bg-blue-100 text-blue-700',
+  'Core Player': 'bg-emerald-100 text-emerald-700',
+  Fringe: 'bg-slate-100 text-slate-600',
+}
+
+function ConnectionList({ title, tone, connections, empty, onSelectPlayer }: { title: string; tone: 'positive' | 'negative'; connections: Connection[]; empty: string; onSelectPlayer: (player: Player) => void }) {
+  return <section>
+    <div className="profile-subheading"><h3>{title}</h3><span>{connections.length} {connections.length === 1 ? 'PLAYER' : 'PLAYERS'}</span></div>
+    <div className="overflow-hidden rounded-2xl border border-[#d0d9ee] bg-white shadow-sm">
+      {connections.length === 0 && <p className="m-0 px-3 py-4 text-center text-[11px] text-[#6376a4]">{empty}</p>}
+      {connections.map((connection) => <button aria-label={`Open ${connection.player.name} profile`} className="flex w-full items-center gap-2.5 border-x-0 border-b-0 border-t border-solid border-t-[#e2e8f6] bg-transparent px-3 py-2.5 text-left first:border-t-0 hover:bg-blue-50" key={connection.player.id} onClick={() => onSelectPlayer(connection.player)} type="button">
+        <PositionBadge position={connection.player.position} />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex min-w-0 items-center gap-2"><strong className="truncate text-sm font-bold text-[#1b2847]">{connection.player.name}</strong><span className={`shrink-0 rounded-lg px-1.5 py-0.5 text-[9px] font-extrabold ${tone === 'positive' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{connection.label}</span></span>
+          <small className="text-[11px] leading-snug text-[#6376a4]">{connection.reason}</small>
+        </span>
+      </button>)}
+    </div>
+  </section>
+}
+
+function DressingRoomCard({ player, squad, onSelectPlayer }: { player: Player; squad: Player[]; onSelectPlayer: (player: Player) => void }) {
+  const view = buildDressingRoom(player, squad)
+  const info = player.personalInfo
+  return <>
+    <section className="rounded-2xl border border-[#d0d9ee] bg-white p-3 shadow-sm">
+      <span className="eyebrow">DRESSING ROOM INFLUENCE</span>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1"><small className="text-[9px] font-extrabold text-[#6376a4]">HIERARCHY</small><span className={`w-fit rounded-lg px-2 py-1 text-xs font-extrabold ${hierarchyTone[view.hierarchy]}`}>{view.hierarchy}</span></div>
+        <div className="flex flex-col gap-1"><small className="text-[9px] font-extrabold text-[#6376a4]">SOCIAL GROUP</small><span className={`w-fit rounded-lg px-2 py-1 text-xs font-extrabold ${view.group === 'Core Group' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>{view.group}</span></div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        <span className="rounded-lg bg-[#dbe4fa] px-2 py-1 text-[10px] font-extrabold text-[#183a8b]">{info.personality}</span>
+        <span className="rounded-lg bg-[#dbe4fa] px-2 py-1 text-[10px] font-extrabold text-[#183a8b]">{info.characterTrait}</span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5">
+        {([['Loyalty', view.traits.loyalty], ['Professionalism', view.traits.professionalism], ['Work rate', view.traits.workRate], ['Leadership', view.traits.leadership]] as const).map(([name, value]) => <div className="flex flex-col gap-1" key={name}>
+          <span className="flex items-baseline justify-between text-[10px] font-extrabold text-[#6376a4]"><span>{name.toUpperCase()}</span><span className="text-[#1b2847]">{value}</span></span>
+          <span className="h-1.5 overflow-hidden rounded-full bg-[#e2e8f6]"><i className={`block h-full rounded-full ${value >= 70 ? 'bg-emerald-500' : value >= 45 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${value}%` }} /></span>
+        </div>)}
+      </div>
+    </section>
+    <section className="rounded-2xl border border-[#d0d9ee] bg-white p-3 shadow-sm">
+      <span className="eyebrow">MENTORSHIP</span>
+      <div className="mt-2 flex items-start gap-2.5">
+        <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-extrabold ${view.mentorship.role === 'None' ? 'bg-slate-100 text-slate-600' : 'bg-violet-100 text-violet-700'}`}>{view.mentorship.role === 'None' ? 'No link' : view.mentorship.role}</span>
+        <p className="m-0 text-[11px] leading-snug text-[#6376a4]">{view.mentorship.text}</p>
+      </div>
+      {view.mentorship.partner && <button className="mt-2 flex w-full items-center gap-2.5 rounded-xl border border-[#e2e8f6] bg-transparent px-2.5 py-2 text-left hover:bg-blue-50" onClick={() => view.mentorship.partner && onSelectPlayer(view.mentorship.partner)} type="button">
+        <PositionBadge position={view.mentorship.partner.position} />
+        <strong className="truncate text-sm font-bold text-[#1b2847]">{view.mentorship.partner.name}</strong>
+      </button>}
+    </section>
+    <ConnectionList connections={view.positive} empty="No close bonds in the squad yet." onSelectPlayer={onSelectPlayer} title="Positive connections" tone="positive" />
+    <ConnectionList connections={view.negative} empty="No conflicts in the dressing room." onSelectPlayer={onSelectPlayer} title="Conflicts" tone="negative" />
+  </>
 }
 
 const SHORTLIST_KEY = 'fmapp-transfer-shortlist'
@@ -204,11 +263,7 @@ export default function PlayerProfile({ player, section, selectedClubName, onSec
 
       {section === 'Relationships' && <>
         <section className="profile-card relationship-manager"><div><span className="eyebrow">MANAGER RELATIONSHIP</span><strong>Alex Morgan</strong><span>Trust and respect</span></div><strong className="relationship-score">{player.relationships.manager}<small> / 100</small></strong><div className="status-track"><i style={{ width: `${player.relationships.manager}%` }} /></div></section>
-        <section className="profile-section-block"><div className="profile-subheading"><h3>Teammates</h3><span>{player.relationships.teammates.length} CONNECTIONS</span></div>
-          <div className="relationship-list">{player.relationships.teammates.map((teammate) => { const squadMate = squad.find((candidate) => candidate.name === teammate.playerName); return <div className="relationship-row" key={teammate.playerName}><div className="relationship-avatar">{teammate.playerName.split(' ').map((part) => part[0]).join('')}</div><div className="relationship-person">{squadMate ? <PlayerReference player={squadMate} onSelectPlayer={onSelectPlayer} /> : <strong>{teammate.playerName}</strong>}<span>{teammate.note}</span></div><div className="relationship-meter"><i style={{ width: `${teammate.relationship}%` }} /></div><strong>{teammate.relationship}</strong></div>})}</div>
-        </section>
-        <div className="profile-card-grid"><section className="profile-card"><span className="eyebrow">FAVORITE PERSONNEL</span><div className="name-stack">{player.relationships.favoritePersonnel.map((name) => { const squadMate = squad.find((candidate) => candidate.name === name); return squadMate ? <PlayerReference key={name} player={squadMate} onSelectPlayer={onSelectPlayer} /> : <strong key={name}>{name}</strong> })}</div></section>
-          <section className="profile-card"><span className="eyebrow">DISLIKED PERSONNEL</span><div className="name-stack negative-stack">{player.relationships.dislikedPersonnel.map((name) => <strong key={name}>{name}</strong>)}</div></section></div>
+        <DressingRoomCard player={player} squad={squad} onSelectPlayer={onSelectPlayer} />
       </>}
 
       {section === 'Achievements' && <>

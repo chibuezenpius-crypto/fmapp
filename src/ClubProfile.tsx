@@ -9,13 +9,13 @@ import { ClubFinances, ClubSponsorship } from './ClubFinances'
 import { BoardOverview } from './ClubRelations'
 import { getInternationalDutyPlayers } from './simulation/calendarScheduler'
 import { isUnavailable } from './simulation/playerCondition'
-import SquadPlayerRow from './SquadPlayerRow'
+import SquadPlayerRow, { type SquadViewMode } from './SquadPlayerRow'
 import type { MatchInfo, Player } from './types/game'
 
 export type ClubSection = 'Overview' | 'Squad' | 'Tactics' | 'Staff' | 'Finances' | 'Sponsorship' | 'Board' | 'Fixtures' | 'Facilities'
 
 type PositionFilter = 'ALL' | 'GK' | 'DEF' | 'MID' | 'FWD'
-type SortMode = 'Value' | 'Rating' | 'Age'
+type SortMode = SquadViewMode
 type KitPattern = 'Solid' | 'Vertical stripes' | 'Hoops' | 'Sash' | 'Pinstripes'
 type KitPart = { primary: string; secondary: string; pattern: KitPattern }
 type KitDesign = { home: KitPart; away: KitPart }
@@ -26,6 +26,7 @@ const kitStorageKey = `fmapp-kits-${club.id}-v1`
 const sections: ClubSection[] = ['Overview', 'Squad', 'Tactics', 'Staff', 'Finances', 'Sponsorship', 'Board', 'Fixtures', 'Facilities']
 const money = (amount: number) => `£${new Intl.NumberFormat('en-GB').format(amount)}`
 const shortMoney = (amount: number) => `£${(amount / 1000000).toFixed(1)}m`
+const moraleRank: Record<Player['morale'], number> = { Poor: 0, Okay: 1, Good: 2, 'Very Good': 3 }
 const defaultKitDesign = (): KitDesign => ({
   home: { primary: club.colors.primary, secondary: club.colors.secondary, pattern: 'Vertical stripes' },
   away: { primary: '#bf6d53', secondary: '#ffffff', pattern: 'Solid' },
@@ -87,15 +88,13 @@ function PlayerButton({ player, onSelectPlayer, role, x, y }: { player: Player; 
 
 export default function ClubProfile({ section, selectedClubName, matches, onSectionChange, onSelectClub, onSelectPlayer, onSelectPersonnel, onSelectMatch }: ClubProfileProps) {
   const [positionFilter, setPositionFilter] = useState<PositionFilter>('ALL')
-  const [sortMode, setSortMode] = useState<SortMode>('Value')
+  const [sortMode, setSortMode] = useState<SortMode>('Fitness')
   const [kitEditor, setKitEditor] = useState(readKitDesign)
   const [squadView, setSquadView] = useState<'First team' | 'Reserves'>('First team')
   const [squadNotice, setSquadNotice] = useState('')
   const onDuty = new Set(getInternationalDutyPlayers(club.squad, getDate()).map((player) => player.id))
   const split = splitSquad(club.squad)
   const firstTeam = [...split.starters, ...split.bench]
-  const benchIds = new Set(split.bench.map((player) => player.id))
-  const startingIds = new Set(split.starters.map((player) => player.id))
   // A key player is among the club's three best, or rated 80 or higher.
   const starIds = new Set([...club.squad].sort((first, second) => second.overall - first.overall).filter((player, index) => index < 3 || player.overall >= 80).map((player) => player.id))
   const squad = (squadView === 'First team' ? firstTeam : split.reserves).filter((player) => {
@@ -105,9 +104,10 @@ export default function ClubProfile({ section, selectedClubName, matches, onSect
     if (positionFilter === 'MID') return player.position.startsWith('M') || player.position === 'DM'
     return player.position.startsWith('AM') || player.position.startsWith('ST')
   }).sort((first, second) => {
-    if (sortMode === 'Value') return second.value - first.value
-    if (sortMode === 'Rating') return second.overall - first.overall
-    return first.age - second.age
+    if (sortMode === 'Contract') return first.contract.endDate.localeCompare(second.contract.endDate)
+    if (sortMode === 'Wages') return second.contract.weeklyWage - first.contract.weeklyWage
+    if (sortMode === 'Morale') return moraleRank[first.morale] - moraleRank[second.morale]
+    return second.overall - first.overall
   })
 
   const updateKit = <K extends keyof KitPart>(kit: keyof KitDesign, key: K, value: KitPart[K]) => {
@@ -183,11 +183,12 @@ export default function ClubProfile({ section, selectedClubName, matches, onSect
 
       {section === 'Squad' && <>
         <div className="squad-view-tabs" role="tablist" aria-label="Squad groups">{(['First team', 'Reserves'] as const).map((view) => <button aria-selected={squadView === view} className={squadView === view ? 'squad-view-tab active' : 'squad-view-tab'} key={view} onClick={() => { setSquadView(view); setSquadNotice('') }} role="tab" type="button">{view}<small>{view === 'First team' ? firstTeam.length : split.reserves.length}</small></button>)}</div>
-        <div className="club-subpage-heading"><div><span className="eyebrow">{squad.length} PLAYERS SHOWN</span><h2>{squadView === 'First team' ? 'First team' : 'Reserves'}</h2></div><label className="club-sort">SORT BY<select aria-label="Sort squad" onChange={(event) => setSortMode(event.target.value as SortMode)} value={sortMode}><option>Value</option><option>Rating</option><option>Age</option></select></label></div>
+        <div className="club-subpage-heading"><div><span className="eyebrow">{squad.length} PLAYERS SHOWN</span><h2>{squadView === 'First team' ? 'First team' : 'Reserves'}</h2></div><label className="club-sort">VIEW<select aria-label="Squad view" onChange={(event) => setSortMode(event.target.value as SortMode)} value={sortMode}><option>Fitness</option><option>Contract</option><option>Morale</option><option>Wages</option></select></label></div>
         {squadView === 'Reserves' && <p className="swap-guidance">Reserves are outside the matchday squad. Open a player and choose Move to first team to bring him in.</p>}
         {squadNotice && <p className="club-action-notice" role="status">{squadNotice}</p>}
         <div className="position-filters" aria-label="Filter positions">{(['ALL', 'GK', 'DEF', 'MID', 'FWD'] as const).map((filter) => <button aria-pressed={positionFilter === filter} className={positionFilter === filter ? 'position-filter active' : 'position-filter'} key={filter} onClick={() => setPositionFilter(filter)} type="button">{filter}</button>)}</div>
-        <div className="club-roster-list">{squad.map((player) => <div className="club-roster-item" key={player.id}><SquadPlayerRow extraNote={onDuty.has(player.id) ? '✈ ON INTERNATIONAL DUTY' : undefined} isInjured={isUnavailable(player, getDate())} isStar={starIds.has(player.id)} onSelect={onSelectPlayer} player={player} status={squadView === 'First team' ? (startingIds.has(player.id) ? 'STARTER' : benchIds.has(player.id) ? 'SUB' : undefined) : undefined} /></div>)}{squad.length === 0 && <p className="empty-note">No players match this filter.</p>}</div>
+        <div className="market-list-head squad-list-head"><span>PLAYER</span><span>{sortMode.toUpperCase()}</span></div>
+        <div className="market-player-list">{squad.map((player) => <SquadPlayerRow extraNote={onDuty.has(player.id) ? '✈ ON INTERNATIONAL DUTY' : undefined} isInjured={isUnavailable(player, getDate())} isStar={starIds.has(player.id)} key={player.id} onSelect={onSelectPlayer} player={player} view={sortMode} />)}{squad.length === 0 && <p className="empty-note">No players match this filter.</p>}</div>
       </>}
 
       {section === 'Tactics' && <>

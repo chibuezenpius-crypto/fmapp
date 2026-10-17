@@ -1969,6 +1969,10 @@ button.match-pitch-player { cursor: pointer; }
 .squad-view-tab small{margin-left:4px;opacity:.7}
 .club-roster-item{display:flex;align-items:center;gap:6px}
 .club-roster-item>:first-child{flex:1;min-width:0}
+.squad-list-head { grid-template-columns: minmax(0, 1fr) auto; padding: 0 14px; }
+.squad-list-head > span:first-child { grid-column: auto; }
+.squad-list-head > span:last-child { color: #6376a3; font-size: 5px; }
+.market-player-list > button + button { border-top: 1px solid #e2e8f6; }
 .assistant-reco{display:flex;gap:10px;align-items:center;padding:10px;border-radius:12px;background:#fff;border:1px solid #d5dbe5}
 .assistant-reco img{width:40px;height:40px;border-radius:8px;object-fit:cover}
 .assistant-reco strong{display:block;font-size:12px}
