@@ -10,11 +10,52 @@ export type ClubSection = 'Overview' | 'Squad' | 'Tactics' | 'Staff' | 'Sponsors
 
 type PositionFilter = 'ALL' | 'GK' | 'DEF' | 'MID' | 'FWD'
 type SortMode = 'Value' | 'Rating' | 'Age'
+type KitPattern = 'Solid' | 'Vertical stripes' | 'Hoops' | 'Sash' | 'Pinstripes'
+type KitPart = { primary: string; secondary: string; pattern: KitPattern }
+type KitDesign = { home: KitPart; away: KitPart }
+
+const kitPatterns: KitPattern[] = ['Solid', 'Vertical stripes', 'Hoops', 'Sash', 'Pinstripes']
+const kitStorageKey = `fmapp-kits-${club.id}-v1`
 
 const sections: ClubSection[] = ['Overview', 'Squad', 'Tactics', 'Staff', 'Sponsorship', 'Fixtures', 'Facilities']
 const money = (amount: number) => `£${new Intl.NumberFormat('en-GB').format(amount)}`
 const shortMoney = (amount: number) => `£${(amount / 1000000).toFixed(1)}m`
 const displayDate = (date: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`))
+const defaultKitDesign = (): KitDesign => ({
+  home: { primary: club.colors.primary, secondary: club.colors.secondary, pattern: 'Vertical stripes' },
+  away: { primary: '#bf6d53', secondary: '#ffffff', pattern: 'Solid' },
+})
+
+function isKitPart(value: unknown): value is KitPart {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const part = value as Record<string, unknown>
+  return typeof part.primary === 'string' && /^#[\da-f]{6}$/i.test(part.primary)
+    && typeof part.secondary === 'string' && /^#[\da-f]{6}$/i.test(part.secondary)
+    && typeof part.pattern === 'string' && kitPatterns.includes(part.pattern as KitPattern)
+}
+
+function readKitDesign(): { design: KitDesign; notice: string } {
+  try {
+    const saved = window.localStorage.getItem(kitStorageKey)
+    if (!saved) return { design: defaultKitDesign(), notice: '' }
+    const parsed: unknown = JSON.parse(saved)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid format')
+    const value = parsed as Record<string, unknown>
+    if (!isKitPart(value.home) || !isKitPart(value.away)) throw new Error('invalid kit details')
+    return { design: { home: value.home, away: value.away }, notice: '' }
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'unknown storage error'
+    return { design: defaultKitDesign(), notice: `Saved kit designs could not be loaded (${detail}). Default kits are shown.` }
+  }
+}
+
+function kitBackground({ primary, secondary, pattern }: KitPart): string {
+  if (pattern === 'Vertical stripes') return `repeating-linear-gradient(90deg, ${primary} 0 8px, ${secondary} 8px 15px)`
+  if (pattern === 'Hoops') return `repeating-linear-gradient(0deg, ${primary} 0 7px, ${secondary} 7px 13px)`
+  if (pattern === 'Sash') return `linear-gradient(145deg, ${primary} 0 36%, ${secondary} 36% 58%, ${primary} 58% 100%)`
+  if (pattern === 'Pinstripes') return `repeating-linear-gradient(90deg, ${primary} 0 5px, ${secondary} 5px 7px, ${primary} 7px 11px)`
+  return primary
+}
 
 interface ClubProfileProps {
   section: ClubSection
@@ -43,6 +84,7 @@ export default function ClubProfile({ section, selectedClubName, matches, onSect
   const [positionFilter, setPositionFilter] = useState<PositionFilter>('ALL')
   const [sortMode, setSortMode] = useState<SortMode>('Value')
   const [facilityNotice, setFacilityNotice] = useState('')
+  const [kitEditor, setKitEditor] = useState(readKitDesign)
   const onDuty = new Set(getInternationalDutyPlayers(club.squad, getDate()).map((player) => player.id))
   const { trainingLevel, youthLevel, stadiumLevel } = club.facilities
   const balance = club.finances.balance
@@ -60,6 +102,20 @@ export default function ClubProfile({ section, selectedClubName, matches, onSect
 
   const upgradeFacility = (facility: 'training' | 'youth' | 'stadium') => {
     setFacilityNotice(upgradeClubFacility(facility))
+  }
+
+  const updateKit = <K extends keyof KitPart>(kit: keyof KitDesign, key: K, value: KitPart[K]) => {
+    const design: KitDesign = kit === 'home'
+      ? { ...kitEditor.design, home: { ...kitEditor.design.home, [key]: value } }
+      : { ...kitEditor.design, away: { ...kitEditor.design.away, [key]: value } }
+    let notice = `${kit === 'home' ? 'Home' : 'Away'} kit saved.`
+    try {
+      window.localStorage.setItem(kitStorageKey, JSON.stringify(design))
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'unknown storage error'
+      notice = `Kit updated for this session, but could not be saved (${detail}).`
+    }
+    setKitEditor({ design, notice })
   }
 
   const formation = [
@@ -92,7 +148,26 @@ export default function ClubProfile({ section, selectedClubName, matches, onSect
         <section className="club-manager-card"><div className="club-manager-avatar">{club.manager.name.split(' ').map((part) => part[0]).join('')}</div><div className="club-manager-info"><span className="eyebrow">FIRST TEAM MANAGER</span><strong>{club.manager.name}</strong><span>{club.manager.nationality} · Age {club.manager.age}</span></div><div className="manager-reputation"><StarRating rating={club.manager.reputation} /><small>REPUTATION</small></div></section>
         <section className="club-stadium-card"><div><span className="eyebrow">HOME GROUND</span><h2>{club.stadium.name}</h2><span>Founded {club.founded} · {club.nickname}</span></div><div className="stadium-capacity"><strong>{new Intl.NumberFormat('en-GB').format(club.stadium.capacity)}</strong><span>CAPACITY</span></div><div className="stadium-attendance"><span>AVG ATTENDANCE</span><strong>{new Intl.NumberFormat('en-GB').format(club.stadium.attendance)}</strong><div><i style={{ width: `${club.stadium.attendance / club.stadium.capacity * 100}%` }} /></div></div></section>
         <div className="club-overview-metrics"><article><span>TRANSFER BUDGET</span><strong>{shortMoney(club.finances.transferBudget)}</strong><small>Available now</small></article><article><span>WAGE BUDGET</span><strong>{money(club.finances.wageBudget)}<small> / wk</small></strong><small>{money(club.finances.wageBudget - club.finances.weeklyWages)} remaining</small></article><article><span>TEAM PRESTIGE</span><strong>{club.prestige}<small> / 100</small></strong><small>National reputation</small></article></div>
-        <section className="club-kits-panel"><div className="club-panel-heading"><div><span className="eyebrow">2026/27 MATCH KITS</span><h2>Club colours</h2></div></div><div className="club-kits-row"><div className="kit-preview home"><i /><i /><i /><strong>HOME</strong></div><div className="kit-preview away"><i /><i /><i /><strong>AWAY</strong></div><div className="club-kit-copy"><strong>{club.name} identity</strong><span>{club.colors.primary} and {club.colors.secondary}</span><span>{club.stadium.name} · {club.stadium.capacity.toLocaleString()} seats</span></div></div></section>
+        <section className="club-kits-panel">
+          <div className="club-panel-heading"><div><span className="eyebrow">2026/27 MATCH KITS</span><h2>Customize your kits</h2></div></div>
+          <p className="kit-customize-intro">Choose each kit's colors and pattern. Your designs are saved on this device.</p>
+          {(['home', 'away'] as const).map((kit) => {
+            const part = kitEditor.design[kit]
+            return <div className="club-kit-editor" key={kit}>
+              <div className="kit-preview" aria-label={`${kit} kit preview`} style={{ background: kitBackground(part) }}><strong>{kit.toUpperCase()}</strong></div>
+              <div className="kit-editor-fields">
+                <strong className="kit-editor-title">{kit === 'home' ? 'Home kit' : 'Away kit'}</strong>
+                <label className="kit-color-field">Main color<span><input aria-label={`${kit} kit main color`} onChange={(event) => updateKit(kit, 'primary', event.target.value)} type="color" value={part.primary} /><code>{part.primary.toUpperCase()}</code></span></label>
+                <label className="kit-color-field">Stripe color<span><input aria-label={`${kit} kit stripe color`} onChange={(event) => updateKit(kit, 'secondary', event.target.value)} type="color" value={part.secondary} /><code>{part.secondary.toUpperCase()}</code></span></label>
+                <label className="kit-pattern-field">Pattern<select aria-label={`${kit} kit pattern`} onChange={(event) => {
+                  const pattern = kitPatterns.find((option) => option === event.target.value)
+                  if (pattern) updateKit(kit, 'pattern', pattern)
+                }} value={part.pattern}>{kitPatterns.map((pattern) => <option key={pattern}>{pattern}</option>)}</select></label>
+              </div>
+            </div>
+          })}
+          {kitEditor.notice && <p className="kit-save-notice" role="status">{kitEditor.notice}</p>}
+        </section>
         <section className="club-overview-squad"><div className="club-panel-heading"><div><span className="eyebrow">FIRST TEAM</span><h2>Squad snapshot</h2></div><button className="club-text-action" onClick={() => onSectionChange('Squad')} type="button">VIEW SQUAD <span>→</span></button></div><div className="squad-snapshot-row">{club.squad.slice(6, 11).map((player) => <button aria-label={`Open ${player.name} profile`} className="snapshot-player" key={player.id} onClick={() => onSelectPlayer(player)} type="button"><span>{String(player.shirtNumber).padStart(2, '0')}</span><strong>{player.name.split(' ')[0]}</strong><small>{player.position}</small></button>)}</div></section>
         <div className="club-subpage-heading"><div><span className="eyebrow">{club.name.toUpperCase()} THROUGH THE YEARS</span><h2>Club history</h2></div></div>
         <section className="club-history-block"><div className="club-panel-heading"><div><span className="eyebrow">HONOURS</span><h2>Silverware</h2></div></div><div className="club-honours-list">{club.history.achievements.map((achievement) => <article className="club-honour-row" key={`${achievement.season}-${achievement.title}`}><span className="honour-season">{achievement.season}</span><div><strong>{achievement.title}</strong><span>{achievement.detail}</span></div><span className="honour-star">★</span></article>)}</div></section>
