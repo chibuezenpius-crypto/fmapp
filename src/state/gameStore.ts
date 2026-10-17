@@ -5,18 +5,20 @@ import { getCompetitionRules } from '../data/competitionRules'
 import { getClubSquad } from '../data/clubSquads'
 import type { GlobalLeaguesDatabase, LeagueCompetition, LeagueStanding, MatchInfo, Player } from '../types/game'
 import { matchSeedFromId, simulateMatch, type MatchTactics } from '../simulation/matchEngine'
-import { clearPlayerConditions, clearSimulatedMatches, loadPlayerConditions, loadSimulatedMatches, savePlayerConditions, saveSimulatedMatches } from '../simulation/persistence'
+import { loadPlayerConditions, loadSimulatedMatches, savePlayerConditions, saveSimulatedMatches } from '../simulation/persistence'
 import { CLUB_WORLD_CUP_ID, CONTINENTAL_IDS, DOMESTIC_CUPS, deriveSeasonTies, type LeagueRankings, type ScoreLookup, type SeasonTies, type TieSpec } from '../simulation/competitions'
 import { clubStrength, quickResult } from '../simulation/quickResult'
 import { applySimulatedResults } from '../simulation/season'
 import { computePlayerStats, computeTeamStats } from '../simulation/stats'
-import { DEFAULT_SLOTS, fitPlayersToSlots } from '../utils/lineup'
+import { fitPlayersToSlots } from '../utils/lineup'
+import { DEFAULT_FORMATION, formations } from '../utils/formations'
 import { applyMatchCondition, isUnavailable, recoverPlayerToDate, type PlayerConditionState } from '../simulation/playerCondition'
 import { validateSchedule } from '../simulation/calendarScheduler'
-import { SPONSORS_KEY, syncSponsors } from './sponsors'
+import { syncSponsors } from './sponsors'
 import { injuryDurationScale } from './facilities'
-import { syncTraining, TRAINING_KEY } from './training'
+import { syncTraining } from './training'
 import { normalizeBench, readSavedBenchIds } from './matchSquad'
+import { clearAllSaveData } from './saveData'
 
 const DATE_KEY = 'fmapp-game-date-v4'
 export const LEDGER_KEY = 'fmapp-transfer-ledger-v1'
@@ -42,40 +44,61 @@ export function describeDate(value: string) {
   }
 }
 
+export const addGameWarning = (text: string) => { if (text) warnings.add(text) }
+
+const warnings = new Set<string>()
+const aggressionValues: Record<string, number> = { Cautious: 25, Normal: 50, Hard: 80 }
+const lineShift: Record<string, number> = { 'Deep Block': -8, 'Mid Block': 0, 'High Line': 8 }
+const passingValues = ['Short', 'Mixed', 'Direct'] as const
+
+/** Reads the saved tactics. A corrupt or outdated save never blocks the calendar: it falls back to defaults and warns once. */
 function readMatchTactics(): MatchTactics {
+  const defaults: MatchTactics = { pressingIntensity: 55, tempo: 50, style: 'Gegenpress' }
   const saved = window.localStorage.getItem(TACTICS_KEY)
-  if (!saved) return { pressingIntensity: 55, tempo: 50, style: 'Gegenpress' }
+  if (!saved) return defaults
   let parsed: unknown
   try {
     parsed = JSON.parse(saved)
   } catch {
-    throw new Error('Saved tactics are unreadable. Open Tactics and save your setup again.')
+    warnings.add('Your saved tactics were unreadable, so default tactics were used. Open Tactics and save your setup again.')
+    return defaults
   }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Saved tactics have an invalid format.')
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    warnings.add('Your saved tactics have an invalid format, so default tactics were used.')
+    return defaults
+  }
   const values = parsed as Record<string, unknown>
-  const pressing = values.pressingIntensity ?? 'Standard'
-  const tempo = values.matchTempo ?? 'Balanced'
-  const style = values.tacticalDNA ?? 'Gegenpress'
   const pressingValues: Record<string, number> = { Low: 30, Standard: 55, High: 80 }
   const tempoValues: Record<string, number> = { Slow: 30, Balanced: 50, Fast: 75 }
-  if (typeof pressing !== 'string' || !(pressing in pressingValues)) throw new Error('Saved pressing intensity is invalid. Open Tactics and save your setup again.')
-  if (typeof tempo !== 'string' || !(tempo in tempoValues)) throw new Error('Saved match tempo is invalid. Open Tactics and save your setup again.')
-  if (typeof style !== 'string' || !tacticStyles.includes(style)) throw new Error('Saved tactical style is invalid. Open Tactics and save your setup again.')
-  const lineup = values.lineup
-  if (lineup !== undefined && (!Array.isArray(lineup) || !lineup.every((id) => typeof id === 'string'))) {
-    throw new Error('Saved lineup is invalid. Open Tactics and save your setup again.')
+  const pick = (value: unknown, table: Record<string, number>, fallback: number) => (typeof value === 'string' && value in table ? table[value] : fallback)
+  const style = typeof values.tacticalDNA === 'string' && tacticStyles.includes(values.tacticalDNA) ? values.tacticalDNA : defaults.style
+  const lineup = Array.isArray(values.lineup) && values.lineup.every((id) => typeof id === 'string') ? values.lineup as string[] : undefined
+  const passing = passingValues.find((option) => option === values.passingStyle)
+  const formation = typeof values.formation === 'string' && values.formation in formations ? values.formation : undefined
+  const line = typeof values.defensiveLine === 'string' ? lineShift[values.defensiveLine] ?? 0 : 0
+  return {
+    pressingIntensity: Math.min(100, Math.max(0, pick(values.pressingIntensity, pressingValues, 55) + line)),
+    tempo: pick(values.matchTempo, tempoValues, 50),
+    style,
+    aggression: pick(values.aggressionLevel, aggressionValues, 50),
+    ...(passing ? { passing } : {}),
+    ...(formation ? { formation } : {}),
+    ...(lineup ? { lineup } : {}),
   }
-  return { pressingIntensity: pressingValues[pressing], tempo: tempoValues[tempo], style, ...(Array.isArray(lineup) ? { lineup } : {}) }
 }
 
-function refreshMatchLineup(template: MatchInfo['lineups']['home'], squad: Player[], side: 'home' | 'away', preferredIds?: string[], date = getDate(), preferredBench?: string[]) {
-  const available = squad.filter((player) => !isUnavailable(player, date))
-  if (available.length < 11) throw new Error(`Club has only ${available.length} fit players available for ${date}.`)
+function refreshMatchLineup(template: MatchInfo['lineups']['home'], squad: Player[], side: 'home' | 'away', preferredIds?: string[], date = getDate(), preferredBench?: string[], formationName: string = DEFAULT_FORMATION, own = false) {
+  const slots = formations[formationName] ?? formations[DEFAULT_FORMATION]
+  const fit = squad.filter((player) => !isUnavailable(player, date))
+  // Too many injuries must never freeze the calendar: the least-injured players fill the gaps and the manager is warned.
+  const available = fit.length >= 11 ? fit : [...fit, ...squad.filter((player) => isUnavailable(player, date)).sort((first, second) => (first.injuryUntil ?? '').localeCompare(second.injuryUntil ?? ''))].slice(0, 11)
+  if (available.length < 11) throw new Error(`Club has only ${squad.length} players, fewer than the 11 needed for a match.`)
+  if (own && fit.length < 11) warnings.add(`Only ${fit.length} fit players were available, so injured players were forced into the matchday squad.`)
   const preferred = preferredIds?.length === 11 && new Set(preferredIds).size === 11 && preferredIds.every((id) => available.some((player) => player.id === id))
     ? preferredIds
-    : fitPlayersToSlots(DEFAULT_SLOTS, available)
+    : fitPlayersToSlots(slots, available)
   const starters = preferred.map((id) => available.find((player) => player.id === id)).filter((player): player is Player => player !== undefined)
-  const startingXI = DEFAULT_SLOTS.map((slot, index) => {
+  const startingXI = slots.map((slot, index) => {
     const player = available.find((candidate) => candidate.id === preferred[index]) ?? starters[index]
     if (!player) throw new Error(`Unable to fill the ${slot.label} position in the match lineup.`)
     return {
@@ -92,7 +115,7 @@ function refreshMatchLineup(template: MatchInfo['lineups']['home'], squad: Playe
   const substitutes = normalizeBench(preferredBench, [...selectedIds].filter((id): id is string => typeof id === 'string'), available)
     .map((id) => available.find((player) => player.id === id)).filter((player): player is Player => player !== undefined)
     .map((player, index) => ({ id: `${player.id}-sub-${index}`, playerId: player.id, name: player.name, shirtNumber: player.shirtNumber, position: player.position, x: 0, y: 0 }))
-  return { ...template, formation: '4-3-3', startingXI, substitutes }
+  return { ...template, formation: formationName in formations ? formationName : DEFAULT_FORMATION, startingXI, substitutes }
 }
 
 export function simulateFixture(fixture: MatchInfo): MatchInfo {
@@ -100,8 +123,10 @@ export function simulateFixture(fixture: MatchInfo): MatchInfo {
   const homeSquad = fixture.homeClubId === club.id ? club.squad : getClubSquad(fixture.homeClubId)
   const awaySquad = fixture.awayClubId === club.id ? club.squad : getClubSquad(fixture.awayClubId)
   for (const player of [...homeSquad, ...awaySquad]) recoverPlayerToDate(player, fixture.date, playerConditions)
-  const homeLineup = refreshMatchLineup(fixture.lineups.home, homeSquad, 'home', fixture.homeClubId === club.id ? tactics.lineup : undefined, fixture.date, fixture.homeClubId === club.id ? readSavedBenchIds() : undefined)
-  const awayLineup = refreshMatchLineup(fixture.lineups.away, awaySquad, 'away', fixture.awayClubId === club.id ? tactics.lineup : undefined, fixture.date, fixture.awayClubId === club.id ? readSavedBenchIds() : undefined)
+  const homeOwn = fixture.homeClubId === club.id
+  const awayOwn = fixture.awayClubId === club.id
+  const homeLineup = refreshMatchLineup(fixture.lineups.home, homeSquad, 'home', homeOwn ? tactics.lineup : undefined, fixture.date, homeOwn ? readSavedBenchIds() : undefined, homeOwn ? tactics.formation : undefined, homeOwn)
+  const awayLineup = refreshMatchLineup(fixture.lineups.away, awaySquad, 'away', awayOwn ? tactics.lineup : undefined, fixture.date, awayOwn ? readSavedBenchIds() : undefined, awayOwn ? tactics.formation : undefined, awayOwn)
   const maxSubstitutions = getCompetitionRules(fixture.leagueId).maxSubstitutions
   const result = simulateMatch({
     match: { ...fixture, lineups: { home: homeLineup, away: awayLineup }, formation: { home: homeLineup.formation, away: awayLineup.formation } },
@@ -367,20 +392,34 @@ function rollOverSeason(): boolean {
   return true
 }
 
+type RolloverHandler = (season: number) => void
+type DayHandler = (fromDate: string, toDate: string, played: MatchInfo[]) => void
+const rolloverHandlers: RolloverHandler[] = []
+const dayHandlers: DayHandler[] = []
+/** Modules that depend on this store (transfers, economy) register here, which avoids a circular import. */
+export const onSeasonRollover = (handler: RolloverHandler) => { rolloverHandlers.push(handler) }
+export const onDayAdvance = (handler: DayHandler) => { dayHandlers.push(handler) }
+
 function commit(newResults: MatchInfo[], nextDate?: string) {
   results = { ...results, ...Object.fromEntries(newResults.map((result) => [result.id, result])) }
+  const previousDate = date
   if (nextDate) date = nextDate
+  if (nextDate) for (const handler of dayHandlers) handler(previousDate, nextDate, newResults)
   if (nextDate) syncSponsors(nextDate)
   if (nextDate) syncTraining(nextDate, newResults.filter(involvesUser).length)
   if (nextDate) for (const player of club.squad) recoverPlayerToDate(player, nextDate, playerConditions)
   let startedSeason = ''
-  while (rollOverSeason()) startedSeason = seasonLabel(currentSeason())
+  while (rollOverSeason()) {
+    startedSeason = seasonLabel(currentSeason())
+    for (const handler of rolloverHandlers) handler(currentSeason())
+  }
   try {
     saveSimulatedMatches(results, club.id)
     savePlayerConditions(playerConditions)
     window.localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
     if (nextDate) window.localStorage.setItem(DATE_KEY, nextDate)
-    message = startedSeason ? `The season is over. The ${startedSeason} calendar has been scheduled automatically.` : ''
+    message = [startedSeason ? `The season is over. The ${startedSeason} calendar has been scheduled automatically.` : '', ...warnings].filter(Boolean).join(' ')
+    warnings.clear()
   } catch (error) {
     message = error instanceof Error ? `Progress was applied, but it could not be saved: ${error.message}` : 'Progress was applied, but it could not be saved.'
   }
@@ -434,12 +473,8 @@ export function clearMessage() {
 
 /** Wipes the save (results, calendar, transfer ledger) and restarts from a fresh season. */
 export function resetGame() {
-  clearSimulatedMatches()
-  clearPlayerConditions()
-  window.localStorage.removeItem(DATE_KEY)
-  window.localStorage.removeItem(LEDGER_KEY)
-  window.localStorage.removeItem(SPONSORS_KEY)
-  window.localStorage.removeItem(TRAINING_KEY)
-  window.localStorage.removeItem(HISTORY_KEY)
+  clearAllSaveData()
   window.location.reload()
 }
+
+export const advanceDays = (days: number) => advanceTo(addDays(date, days))

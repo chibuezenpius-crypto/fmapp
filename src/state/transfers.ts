@@ -1,8 +1,11 @@
 import { club, getFFPWageLimit, getTransferMarketPlayers, getWageBudgetLimit, isOwnPlayer, ownLeagueRules, playerClubName, removeFromList, reorderClubSquad, SQUAD_MAX, SQUAD_MIN } from '../data/mockData'
-import { getClubSquad } from '../data/clubSquads'
-import { createRng } from '../utils/proceduralGenerator'
+import { getClubSquad, getCachedSquads } from '../data/clubSquads'
+import { createRng, generatePlayer } from '../utils/proceduralGenerator'
 import type { Player } from '../types/game'
-import { getDate, LEDGER_KEY, notify, reportGameMessage } from './gameStore'
+import { addGameWarning, getDate, LEDGER_KEY, notify, onSeasonRollover, reportGameMessage } from './gameStore'
+import { catchUpPlayers, markPlayersCurrent, seasonStartYear } from './progression'
+import { readSeasonsElapsed } from './saveData'
+import './economy'
 import { allFacilitiesMaxed, FACILITY_INFO, FACILITY_LEVEL_KEY, FACILITY_UPGRADE_COSTS, isFacilityUpgrade, STADIUM_UPGRADE_GROWTH, type FacilityUpgrade } from './facilities'
 
 export interface BidTerms {
@@ -66,12 +69,15 @@ export function getWageDemand(player: Player): number {
 }
 
 // ---------- Ledger ----------
+let ledgerCache: { raw: string; entries: LedgerEntry[] } | null = null
 function readLedger(): LedgerEntry[] {
   const saved = window.localStorage.getItem(LEDGER_KEY)
   if (!saved) return []
+  if (ledgerCache?.raw === saved) return ledgerCache.entries
   try {
     const parsed: unknown = JSON.parse(saved)
     if (!Array.isArray(parsed) || !parsed.every(isLedgerEntry)) throw new Error('The transfer ledger has an invalid format.')
+    ledgerCache = { raw: saved, entries: parsed }
     return parsed
   } catch (error) {
     throw new Error(error instanceof Error ? `Could not read the transfer ledger: ${error.message}` : 'Could not read the transfer ledger.')
@@ -171,6 +177,13 @@ export function getBoardRequests(): BoardRequest[] {
   } catch {
     return []
   }
+}
+
+/** Money the board handed over recently makes it less patient: up to 20 points off board confidence for 120 days. */
+export function boardGoodwillPenalty(today: string): number {
+  const limit = Date.parse(`${today}T12:00:00Z`) - 120 * 86_400_000
+  const recent = getBoardRequests().filter((request) => Date.parse(`${request.date}T12:00:00Z`) >= limit).reduce((sum, request) => sum + request.granted, 0)
+  return Math.min(20, Math.round(recent / ORIGINAL_TRANSFER_BUDGET * 12))
 }
 
 export function boardCooldownDaysLeft(): number {
@@ -313,6 +326,52 @@ export function renewContract(player: Player, years: number, raisePercent: numbe
   notify()
   return { status: 'accepted', message: `${player.name} signed a ${years}-year deal on £${wage.toLocaleString('en-GB')}/wk.` }
 }
+
+// ---------- Season rollover: ageing, expiring contracts and a fresh free-agent pool ----------
+const FREE_AGENTS_PER_SEASON = 12
+
+function restockFreeAgents(season: number) {
+  const market = getTransferMarketPlayers()
+  const fresh = Array.from({ length: FREE_AGENTS_PER_SEASON }, (_, index) => generatePlayer({ seed: `free-agents:${season}:${index}`, currentDate: `${seasonStartYear(season)}-08-01`, ageRange: [19, 34] }))
+  markPlayersCurrent(fresh, season)
+  for (const player of fresh) if (!market.some((candidate) => candidate.id === player.id)) market.push(player)
+}
+
+function handleRollover(season: number) {
+  for (const squad of getCachedSquads()) catchUpPlayers(squad, season, true)
+  catchUpPlayers(club.squad, season, false)
+  catchUpPlayers(getTransferMarketPlayers(), season, false)
+  restockFreeAgents(season)
+
+  const start = `${seasonStartYear(season)}-08-01`
+  const expiring = club.squad.filter((player) => player.contract.endDate < start).sort((first, second) => second.overall - first.overall)
+  if (expiring.length === 0) return
+  const date = getDate()
+  const kept: string[] = []
+  const left: string[] = []
+  let size = club.squad.length
+  // The three best expiring players, and anyone needed to keep the minimum squad, are extended a year on the same wage.
+  expiring.forEach((player, index) => {
+    if (index < 3 || size <= SQUAD_MIN) {
+      const endDate = `${seasonStartYear(season) + 1}-06-30`
+      if (!record({ type: 'renew', playerId: player.id, wage: player.contract.weeklyWage, endDate, date })) {
+        applyRenew(player, player.contract.weeklyWage, endDate)
+        kept.push(player.name)
+      }
+    } else if (!record({ type: 'release', playerId: player.id, date })) {
+      applyRelease(player)
+      size -= 1
+      left.push(player.name)
+    }
+  })
+  addGameWarning([
+    kept.length ? `${kept.join(', ')} had expiring contracts and were extended by a year.` : '',
+    left.length ? `${left.join(', ')} left as free agents when their contracts expired.` : '',
+  ].filter(Boolean).join(' '))
+}
+
+onSeasonRollover(handleRollover)
+for (let season = 1; season <= readSeasonsElapsed(); season += 1) restockFreeAgents(season)
 
 // ---------- Restore a saved game ----------
 function restoreTransfers() {

@@ -1,6 +1,7 @@
 import { club, getSquadHealth, getTeam, getWageLimit, ownLeagueRules, SQUAD_MAX, SQUAD_MIN } from '../data/mockData'
 import type { ClubConfidenceData, ClubConfidenceItem } from '../types/game'
 import type { GameView } from './gameStore'
+import { boardGoodwillPenalty } from './transfers'
 
 const clamp = (value: number) => Math.round(Math.min(100, Math.max(5, value)))
 const statusFor = (value: number): ClubConfidenceItem['status'] =>
@@ -49,7 +50,7 @@ export function computeConfidence(view: GameView): ClubConfidenceData {
   const overspend = club.finances.weeklyWages > getWageLimit()
   const placeDelta = played ? expectedPosition() - (own?.position ?? expectedPosition()) : 0
 
-  const board = clamp(70 + placeDelta * 2.5 - (overspend ? 12 : 0))
+  const board = clamp(70 + placeDelta * 2.5 - (overspend ? 12 : 0) - boardGoodwillPenalty(view.date))
   const fan = clamp(65 + formScore * 5 + (played ? (pointsPerGame - 1.4) * 8 : 0))
   const manager = clamp(62 + (played ? (pointsPerGame - 1.4) * 22 : 0) + formScore * 2)
   const morale = getSquadHealth(view.date).moralePercentage

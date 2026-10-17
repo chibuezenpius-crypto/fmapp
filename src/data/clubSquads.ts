@@ -1,6 +1,8 @@
 import rawGlobalLeagues from './globalLeaguesAndTeams.json'
 import { createRng, generatePlayer } from '../utils/proceduralGenerator'
 import type { GlobalLeaguesDatabase, Player, PlayerPosition } from '../types/game'
+import { catchUpPlayers } from '../state/progression'
+import { readCareer, readSeasonsElapsed } from '../state/saveData'
 
 const leagues = (rawGlobalLeagues as unknown as GlobalLeaguesDatabase).countries
 
@@ -49,5 +51,9 @@ export function getClubSquad(clubId: string): Player[] {
     return generatePlayer({ seed: `${clubId}:${index}`, clubId, position: slot.position, shirtNumber: slot.shirt, targetOVR: Math.max(40, Math.min(90, targetOVR)) })
   })
   squadCache.set(clubId, squad)
+  catchUpPlayers(squad, readSeasonsElapsed(), clubId !== readCareer().clubId)
   return squad
 }
+
+/** Every squad generated so far, for season-wide updates such as ageing. */
+export const getCachedSquads = () => [...squadCache.values()]

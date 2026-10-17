@@ -3,6 +3,7 @@ import { Activity, ChevronRight, Gauge, Users } from 'lucide-react'
 import type { Player } from './types/game'
 import { club } from './data/mockData'
 import { fitPlayersToSlots } from './utils/lineup'
+import { formations, type TacticSlot } from './utils/formations'
 import { PLACEHOLDER_PORTRAIT } from './portrait'
 import { useGame } from './state/gameStore'
 import { BENCH_SIZE, normalizeBench } from './state/matchSquad'
@@ -12,64 +13,8 @@ import { FamiliarityView, TrainingView } from './TacticsFamiliarity'
 
 const sections = ['Overview', 'Formation', 'Style', 'Tactic', 'Player Roles', 'Set Pieces', 'Captains & Leadership'] as const
 type TacticsSection = (typeof sections)[number]
-type TacticSlot = { label: string; position: string; x: number; y: number; role: string }
 type AssignmentKey = 'leftCorner' | 'rightCorner' | 'shortFreeKick' | 'longFreeKick' | 'penaltyOne' | 'penaltyTwo' | 'penaltyThree'
 type LeadershipKey = 'captain' | 'viceOne' | 'viceTwo' | 'viceThree'
-
-const formations: Record<string, TacticSlot[]> = {
-  '4-3-3': [
-    { label: 'GK', position: 'GK', x: 50, y: 90, role: 'Sweeper Keeper' },
-    { label: 'RB', position: 'D (R)', x: 85, y: 75, role: 'Wing Back' },
-    { label: 'RCB', position: 'D (C)', x: 62, y: 77, role: 'Ball Playing Defender' },
-    { label: 'LCB', position: 'D (C)', x: 38, y: 77, role: 'Ball Playing Defender' },
-    { label: 'LB', position: 'D (L)', x: 15, y: 75, role: 'Wing Back' },
-    { label: 'DM', position: 'DM', x: 50, y: 61, role: 'Deep Lying Playmaker' },
-    { label: 'RCM', position: 'M (C)', x: 65, y: 50, role: 'Box-to-Box Midfielder' },
-    { label: 'LCM', position: 'M (C)', x: 35, y: 50, role: 'Advanced Playmaker' },
-    { label: 'RW', position: 'M (R)', x: 83, y: 34, role: 'Winger' },
-    { label: 'ST', position: 'ST (C)', x: 50, y: 27, role: 'Advanced Forward' },
-    { label: 'LW', position: 'M (L)', x: 17, y: 34, role: 'Inside Forward' },
-  ],
-  '4-2-3-1': [
-    { label: 'GK', position: 'GK', x: 50, y: 90, role: 'Sweeper Keeper' },
-    { label: 'RB', position: 'D (R)', x: 85, y: 75, role: 'Wing Back' },
-    { label: 'RCB', position: 'D (C)', x: 62, y: 77, role: 'Ball Playing Defender' },
-    { label: 'LCB', position: 'D (C)', x: 38, y: 77, role: 'Central Defender' },
-    { label: 'LB', position: 'D (L)', x: 15, y: 75, role: 'Wing Back' },
-    { label: 'DMR', position: 'DM', x: 62, y: 60, role: 'Ball Winning Midfielder' },
-    { label: 'DML', position: 'DM', x: 38, y: 60, role: 'Deep Lying Playmaker' },
-    { label: 'AMR', position: 'M (R)', x: 82, y: 39, role: 'Winger' },
-    { label: 'AMC', position: 'AM (C)', x: 50, y: 45, role: 'Attacking Midfielder' },
-    { label: 'AML', position: 'M (L)', x: 18, y: 39, role: 'Inside Forward' },
-    { label: 'ST', position: 'ST (C)', x: 50, y: 24, role: 'Advanced Forward' },
-  ],
-  '3-5-2': [
-    { label: 'GK', position: 'GK', x: 50, y: 90, role: 'Sweeper Keeper' },
-    { label: 'RCB', position: 'D (C)', x: 75, y: 75, role: 'Wide Centre Back' },
-    { label: 'CB', position: 'D (C)', x: 50, y: 78, role: 'Ball Playing Defender' },
-    { label: 'LCB', position: 'D (C)', x: 25, y: 75, role: 'Wide Centre Back' },
-    { label: 'RWB', position: 'M (R)', x: 88, y: 52, role: 'Wing Back' },
-    { label: 'RCM', position: 'M (C)', x: 67, y: 54, role: 'Box-to-Box Midfielder' },
-    { label: 'DM', position: 'DM', x: 50, y: 61, role: 'Deep Lying Playmaker' },
-    { label: 'LCM', position: 'M (C)', x: 33, y: 54, role: 'Advanced Playmaker' },
-    { label: 'LWB', position: 'M (L)', x: 12, y: 52, role: 'Wing Back' },
-    { label: 'RST', position: 'ST (C)', x: 62, y: 29, role: 'Pressing Forward' },
-    { label: 'LST', position: 'ST (C)', x: 38, y: 29, role: 'Advanced Forward' },
-  ],
-  '4-4-2': [
-    { label: 'GK', position: 'GK', x: 50, y: 90, role: 'Goalkeeper' },
-    { label: 'RB', position: 'D (R)', x: 85, y: 75, role: 'Full Back' },
-    { label: 'RCB', position: 'D (C)', x: 62, y: 77, role: 'Central Defender' },
-    { label: 'LCB', position: 'D (C)', x: 38, y: 77, role: 'Central Defender' },
-    { label: 'LB', position: 'D (L)', x: 15, y: 75, role: 'Full Back' },
-    { label: 'RM', position: 'M (R)', x: 84, y: 50, role: 'Winger' },
-    { label: 'RCM', position: 'M (C)', x: 61, y: 55, role: 'Box-to-Box Midfielder' },
-    { label: 'LCM', position: 'M (C)', x: 39, y: 55, role: 'Deep Lying Playmaker' },
-    { label: 'LM', position: 'M (L)', x: 16, y: 50, role: 'Winger' },
-    { label: 'RST', position: 'ST (C)', x: 62, y: 29, role: 'Target Forward' },
-    { label: 'LST', position: 'ST (C)', x: 38, y: 29, role: 'Advanced Forward' },
-  ],
-}
 
 const roleOptions: Record<string, string[]> = {
   GK: ['Sweeper Keeper', 'Goalkeeper', 'Defend'],

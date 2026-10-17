@@ -1,23 +1,29 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { club, managerProfiles, refereeProfiles } from './data/mockData'
 import { addDays, advanceDay, clearMessage, playMatch, useGame } from './state/gameStore'
-import { BoardOverview, FanOverview } from './ClubRelations'
-import PlayerProfile, { type ProfileSection } from './PlayerProfile'
-import ClubProfile, { type ClubSection } from './ClubProfile'
-import MatchCenter from './MatchCenter'
-import LeagueHub from './LeagueHub'
-import TransferMarket from './TransferMarket'
-import PersonnelProfile from './PersonnelProfile'
-import CountryOverview from './CountryOverview'
-import TacticsHub from './TacticsHub'
-import AcademyHub from './AcademyHub'
-import MatchesList from './MatchesList'
+import './state/transfers'
+import type { ProfileSection } from './PlayerProfile'
+import type { ClubSection } from './ClubProfile'
 import AppHeader, { type PanelKind } from './components/AppHeader'
 import Dashboard from './components/Dashboard'
 import type { NavActions, NavTab } from './components/navTypes'
 import type { PersonnelProfile as PersonnelProfileData, Player } from './types/game'
 import './App.css'
+
+// Screens load on first visit so the opening page stays light.
+const BoardOverview = lazy(() => import('./ClubRelations').then((module) => ({ default: module.BoardOverview })))
+const FanOverview = lazy(() => import('./ClubRelations').then((module) => ({ default: module.FanOverview })))
+const PlayerProfile = lazy(() => import('./PlayerProfile'))
+const ClubProfile = lazy(() => import('./ClubProfile'))
+const MatchCenter = lazy(() => import('./MatchCenter'))
+const LeagueHub = lazy(() => import('./LeagueHub'))
+const TransferMarket = lazy(() => import('./TransferMarket'))
+const PersonnelProfile = lazy(() => import('./PersonnelProfile'))
+const CountryOverview = lazy(() => import('./CountryOverview'))
+const TacticsHub = lazy(() => import('./TacticsHub'))
+const AcademyHub = lazy(() => import('./AcademyHub'))
+const MatchesList = lazy(() => import('./MatchesList'))
 
 const SCREEN_SIZES = [
   { label: 'Mobile', width: 480 },
@@ -176,15 +182,16 @@ function App() {
 
   return (
     <div className="app-backdrop">
-      <div className="screen-size-switcher" role="group" aria-label="Screen size">
+      {import.meta.env.DEV && <div className="screen-size-switcher" role="group" aria-label="Screen size">
         {SCREEN_SIZES.map((size) => <button aria-pressed={screenSize.label === size.label} key={size.label} onClick={() => setScreenSize(size)} type="button">{size.label}<small>{size.width ? `${size.width}px` : 'Full'}</small></button>)}
-      </div>
-      <div className="app-shell" style={screenSize.width ? { width: `min(100%, ${screenSize.width}px)` } : { width: '100%' }}>
+      </div>}
+      <div className="app-shell" style={import.meta.env.DEV && screenSize.width ? { width: `min(100%, ${screenSize.width}px)` } : { width: '100%' }}>
         <AppHeader expanded={!detailOpen} game={game} message={selectedMatch ? '' : game.message} nav={nav} onAdvanceDay={advanceDay} onClearMessage={clearMessage} onOpenClub={openClubProfile}
           panel={headerPanel} onPanelChange={setHeaderPanel}
           leading={<button aria-label={backLabel} className="header-back-button" onClick={goBack} type="button"><ArrowLeft aria-hidden="true" size={19} strokeWidth={2.2} /></button>} />
 
         <main className="main-content" key={selectedCountryName ? `country-${selectedCountryName}` : selectedPlayer ? 'profile' : selectedMatch ? `match-${selectedMatch.id}` : activeTab}>
+          <Suspense fallback={<p className="empty-note" role="status">Loading…</p>}>
           {selectedCountryName ? <CountryOverview country={selectedCountryName} onSelectCountry={openCountryOverview} />
             : selectedPlayer ? <PlayerProfile player={selectedPlayer} section={profileSection} selectedClubName={selectedClubName}
             onSectionChange={setProfileSection} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} onSelectCountry={openCountryOverview} />
@@ -203,6 +210,7 @@ function App() {
             {activeTab === 'League' && <LeagueHub seasonLabel={game.seasonLabel} history={game.history} matches={displayedMatches} standings={standings} selectedCompetitionId={selectedLeagueId} onSelectCompetition={setSelectedLeagueId} onSelectCountry={openCountryOverview} selectedClubId={selectedLeagueClubId} onSelectClub={setSelectedLeagueClubId} onSelectPlayer={selectPlayer} onSelectMatch={setSelectedMatchId} playerStats={game.playerStats} teamStats={game.teamStats} />}
             {activeTab === 'Matches' && <MatchesList matches={matchesTabMatches} onSelectMatch={setSelectedMatchId} />}
           </>}
+          </Suspense>
         </main>
 
         <nav className="bottom-nav" aria-label="Main navigation">

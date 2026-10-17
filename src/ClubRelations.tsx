@@ -3,8 +3,9 @@ import { ArrowLeft, Users } from 'lucide-react'
 import { BOARD_REQUEST_PERCENTS, boardCooldownDaysLeft, boardRequestAmount, getBoardRequests, requestBoardFunds, type BoardFundingReason } from './state/transfers'
 import { club, getWageLimit, league } from './data/mockData'
 import { computeConfidence, getBoardObjectives } from './state/confidence'
-import { financialHealth } from './state/dashboard'
-import { resetGame, useGame } from './state/gameStore'
+import { financialHealth, managerProgress } from './state/dashboard'
+import { useGame } from './state/gameStore'
+import { writeCareer } from './state/saveData'
 import { createRng, generatePlayerIdentity } from './utils/proceduralGenerator'
 import { PLACEHOLDER_PORTRAIT } from './portrait'
 import type { ClubConfidenceItem } from './types/game'
@@ -35,6 +36,12 @@ function BoardMeeting({ confidence, onBack, onDecision }: { confidence: number; 
   const [percent, setPercent] = useState(BOARD_REQUEST_PERCENTS[1])
   const [confirmResign, setConfirmResign] = useState(false)
   const [error, setError] = useState('')
+  const game = useGame()
+  const level = managerProgress(game).level
+  const resign = () => {
+    writeCareer({ clubId: club.id, status: 'unemployed', level, previousClubId: club.id, resignedOn: game.date })
+    window.location.reload()
+  }
   const history = getBoardRequests().slice().reverse()
   const wait = boardCooldownDaysLeft()
   const money = (value: number) => `£${(value / 1_000_000).toFixed(2)}m`
@@ -67,11 +74,11 @@ function BoardMeeting({ confidence, onBack, onDecision }: { confidence: number; 
       </section>
     </>}
     {agenda === 'Resign' && <section className="fin-panel">
-      <p className="board-meeting-intro">Resigning ends your time at {club.name}. Your save is wiped and you start a new career from scratch. This cannot be undone.</p>
+      <p className="board-meeting-intro">Resigning ends your time at {club.name}. You leave the club and become unemployed; your save stays, and clubs will send you job offers based on your experience (level {level}). This cannot be undone.</p>
       {!confirmResign
         ? <button className="board-meeting-submit danger" onClick={() => setConfirmResign(true)} type="button">Resign as manager</button>
-        : <><p className="board-result rejected" role="alert">Are you sure you want to resign and lose all progress?</p>
-          <div className="board-choice-row"><button className="board-choice" onClick={() => setConfirmResign(false)} type="button"><strong>Stay</strong></button><button className="board-meeting-submit danger" onClick={resetGame} type="button">Confirm resignation</button></div></>}
+        : <><p className="board-result rejected" role="alert">Are you sure you want to leave {club.name}?</p>
+          <div className="board-choice-row"><button className="board-choice" onClick={() => setConfirmResign(false)} type="button"><strong>Stay</strong></button><button className="board-meeting-submit danger" onClick={resign} type="button">Confirm resignation</button></div></>}
     </section>}
   </div>
 }

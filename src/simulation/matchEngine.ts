@@ -5,8 +5,13 @@ export interface MatchTactics {
   pressingIntensity: number
   tempo: number
   style: string
+  /** 'Short' keeps the ball and loses distance, 'Direct' gains distance and loses accuracy. */
+  passing?: 'Short' | 'Mixed' | 'Direct'
+  /** 0 = very cautious, 100 = very aggressive; more aggression means more tackles but also more fouls. */
+  aggression?: number
   maxSubstitutions?: number
   lineup?: string[]
+  formation?: string
 }
 
 export interface MatchSimulationInput {
@@ -53,6 +58,8 @@ interface RuntimeTeam {
   pressing: number
   tempo: number
   style: string
+  passing: 'Short' | 'Mixed' | 'Direct'
+  aggression: number
 }
 
 interface Point {
@@ -118,6 +125,8 @@ function buildTeam(
     pressing: clamp((tactics.pressingIntensity ?? 55) + (style === 'Gegenpress' ? 8 : style === 'Park the Bus' ? 6 : style === 'Counter-Attack' ? -8 : 0), 0, 100),
     tempo: clamp(tactics.tempo ?? 50, 0, 100),
     style,
+    passing: tactics.passing ?? 'Mixed',
+    aggression: clamp(tactics.aggression ?? 50, 0, 100),
   }
 }
 
@@ -272,7 +281,7 @@ function simulateHalf(
       const time = baseTime + clock + duration * (action + 1) / (actionCount + 1)
       const marker = nearest(point, defending)
       const pressure = clamp(1 - distance(point, marker) / 15, 0, 1) * (0.4 + defending.pressing / 100)
-      const foulChance = 0.025 + pressure * 0.065
+      const foulChance = 0.025 + pressure * 0.065 + (defending.aggression - 50) * 0.0004
       if (random() < foulChance) {
         emit(events, matchId, time, 'Foul', defending, marker, point, 'foul-committed', { target: carrier.player.name, targetId: carrier.player.id })
         const cardRoll = random()
@@ -321,9 +330,10 @@ function simulateHalf(
         const receiver = selectReceiver(attacking, carrier, direction, random)
         const passingSkill = effective(carrier, 'passing', time) * 0.65 + effective(carrier, 'decisions', time) * 0.2 + effective(receiver, 'firstTouch', time) * 0.15
         const styleBonus = attacking.style === 'Tiki-Taka' ? 0.045 : attacking.style === 'Direct Passing' ? -0.015 : 0
-        const probability = clamp(0.81 + (passingSkill - 65) * 0.003 - pressure * 0.12 + relationshipBonus(carrier.player, receiver.player) + styleBonus, 0.35, 0.96)
+        const passingBonus = attacking.passing === 'Short' ? 0.03 : attacking.passing === 'Direct' ? -0.04 : 0
+        const probability = clamp(0.81 + (passingSkill - 65) * 0.003 - pressure * 0.12 + relationshipBonus(carrier.player, receiver.player) + styleBonus + passingBonus, 0.35, 0.96)
         const complete = random() < probability
-        const progress = randomInt(random, 3, 12) * (attacking.tempo > 70 ? 1.12 : 1)
+        const progress = randomInt(random, 3, 12) * (attacking.tempo > 70 ? 1.12 : 1) * (attacking.passing === 'Short' ? 0.9 : attacking.passing === 'Direct' ? 1.15 : 1)
         const end = clampPoint({ x: point.x + direction * progress, y: point.y + randomInt(random, -8, 8) })
         const offside = complete && isOffside(end, defending, direction)
         emit(events, matchId, time, 'Pass', attacking, carrier, end, offside ? 'offside' : complete ? 'complete' : 'intercepted', { target: receiver.player.name, targetId: receiver.player.id, data: { probability: Math.round(probability * 100), distance: Math.round(distance(point, end)) } })

@@ -10,7 +10,8 @@ import type {
   ManagerProfile, MatchInfo, MatchLineup, MatchLineupPlayer, Player, ProceduralClubBadge, RefereeProfile, SquadHealthMetrics,
 } from '../types/game'
 
-export const DEFAULT_CLUB_ID = 'nga-06'
+import { clubPrestige } from '../state/career'
+import { DEFAULT_CLUB_ID, readCareer } from '../state/saveData'
 
 const globalLeagues = (rawGlobalLeagues as unknown as GlobalLeaguesDatabase).countries
 const teamIndex = new Map<string, { team: GlobalLeagueTeam; league: GlobalCountryLeague }>()
@@ -20,9 +21,12 @@ export const getTeam = (clubId: string) => teamIndex.get(clubId)?.team
 export const getClubBadge = (clubId: string): ProceduralClubBadge => getTeam(clubId)?.badge ?? { viewBox: '0 0 48 56', shape: 'shield', initials: '?', primaryColor: '#335', secondaryColor: '#ccd' }
 export const getClubIdByName = (name: string) => [...teamIndex.values()].find((entry) => entry.team.name === name)?.team.id
 
-const ownEntry = teamIndex.get(DEFAULT_CLUB_ID)!
+/** The club the manager currently works for; a career change reloads the app with a different id. */
+const ownClubId = teamIndex.has(readCareer().clubId) ? readCareer().clubId : DEFAULT_CLUB_ID
+const ownEntry = teamIndex.get(ownClubId)!
 const ownTeam = ownEntry.team
 const ownLeague = ownEntry.league
+const isDefaultClub = ownClubId === DEFAULT_CLUB_ID
 
 const emptyStanding = (team: GlobalLeagueTeam, position: number): LeagueStanding => ({
   position, clubId: team.id, clubName: team.name, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0, form: [],
@@ -45,7 +49,7 @@ const startersFirst = (players: Player[]) => {
 // Starters come first in a fixed order so index-based views (club pitch) stay stable.
 const orderedSquad = (clubId: string) => startersFirst(getClubSquad(clubId))
 
-export const squad: Player[] = orderedSquad(DEFAULT_CLUB_ID)
+export const squad: Player[] = orderedSquad(ownClubId)
 
 /** Re-sorts the live club roster in place after a signing or departure. */
 export function reorderClubSquad() {
@@ -55,30 +59,55 @@ export function reorderClubSquad() {
 
 const weeklyWages = squad.reduce((sum, player) => sum + player.contract.weeklyWage, 0)
 
+/** The default club keeps its hand-tuned prestige of 58. */
+const ownPrestige = isDefaultClub ? 58 : clubPrestige(ownEntry.league.countryCode, ownEntry.league.teams.length, ownTeam.standing.position)
+const scale = (ownPrestige / 58) ** 2.2
+const scaled = (value: number, step = 1000) => Math.round(value * scale / step) * step
+const firstWord = ownTeam.name.split(' ')[0]
+const lastWord = ownTeam.name.split(' ').slice(-1)[0]
+
+// Staff: the default club keeps its hand-written backroom team, every other club gets one generated from its own country.
+type StaffSeed = [id: string, role: string, name: string, age: number, nationality: string, formation: string, personality: string, language: string]
+const defaultStaffSeeds: StaffSeed[] = [
+  ['ngozi-okafor', 'Assistant Manager', 'Ngozi Okafor', 41, 'Nigerian', '4-2-3-1', 'Collaborative Mentor', 'English'],
+  ['chukwudi-eze', 'First Team Coach', 'Chukwudi Eze', 52, 'Nigerian', '4-4-2', 'Calm Organizer', 'English'],
+  ['luis-ortega', 'Technical Coach', 'Luis Ortega', 39, 'Spanish', '4-3-3', 'Technical Innovator', 'Spanish'],
+  ['adaeze-obi', 'Chief Scout', 'Adaeze Obi', 38, 'Nigerian', '4-2-3-1', 'Analytical Scout', 'English'],
+  ['owen-ellis', 'Head Physio', 'Owen Ellis', 36, 'Welsh', '4-3-3', 'Player Advocate', 'English'],
+]
+const staffSeeds: StaffSeed[] = isDefaultClub
+  ? defaultStaffSeeds
+  : defaultStaffSeeds.map(([, role, , age, , formation, personality], index): StaffSeed => {
+    const identity = generatePlayerIdentity({ birthCountryCode: ownEntry.league.countryCode, random: createRng(`${ownClubId}:staff:${index}`) })
+    return [`${ownClubId}-staff-${index}`, role, identity.name, age, identity.birthCountry, formation, personality, identity.languages[0]?.name ?? 'English']
+  })
+
 export const club: Club = {
   id: ownTeam.id,
   name: ownTeam.name,
-  nickname: 'The Bridgemen',
-  shortName: 'ONC',
+  nickname: isDefaultClub ? 'The Bridgemen' : `The ${lastWord}`,
+  shortName: isDefaultClub ? 'ONC' : ownTeam.name.replace(/[^A-Za-z ]/g, '').split(' ').map((word) => word[0]).join('').slice(0, 3).toUpperCase().padEnd(3, 'C'),
   founded: ownTeam.founded,
   colors: ownTeam.colors,
-  prestige: 58,
+  prestige: ownPrestige,
   manager: { name: 'Emeka Nwosu', nationality: 'Nigerian', age: 46, reputation: 3 },
-  stadium: { name: 'Niger Bridge Arena', capacity: 22400, attendance: 17850 },
-  finances: { transferBudget: 3500000, wageBudget: Math.round(weeklyWages * 1.25 / 500) * 500, weeklyWages, balance: 6200000, sponsorshipIncomeAnnual: 2600000, ticketSalesPerHomeMatch: 214000, operationsPerMonth: 640000 },
-  sponsors: [
-    { name: 'Anambra Breweries', valueAnnual: 1500000, category: 'Front of shirt', endDate: '2028-06-30' },
-    { name: 'Bridgehead Bank', valueAnnual: 700000, category: 'Official partner', endDate: '2027-06-30' },
-    { name: 'Kestrel Sports', valueAnnual: 400000, category: 'Kit supplier', endDate: '2029-06-30' },
-  ],
+  stadium: isDefaultClub ? { name: 'Niger Bridge Arena', capacity: 22400, attendance: 17850 } : { name: `${firstWord} Stadium`, capacity: Math.round(22400 * scale ** 0.7 / 100) * 100, attendance: Math.round(17850 * scale ** 0.7 / 50) * 50 },
+  finances: { transferBudget: scaled(3500000, 50000), wageBudget: Math.round(weeklyWages * 1.25 / 500) * 500, weeklyWages, balance: scaled(6200000, 50000), sponsorshipIncomeAnnual: scaled(2600000, 50000), ticketSalesPerHomeMatch: scaled(214000, 1000), operationsPerMonth: scaled(640000, 5000) },
+  sponsors: isDefaultClub
+    ? [
+      { name: 'Anambra Breweries', valueAnnual: 1500000, category: 'Front of shirt', endDate: '2028-06-30' },
+      { name: 'Bridgehead Bank', valueAnnual: 700000, category: 'Official partner', endDate: '2027-06-30' },
+      { name: 'Kestrel Sports', valueAnnual: 400000, category: 'Kit supplier', endDate: '2029-06-30' },
+    ]
+    : [
+      { name: `${firstWord} Breweries`, valueAnnual: scaled(1500000, 50000), category: 'Front of shirt', endDate: '2028-06-30' },
+      { name: `${firstWord} Savings Bank`, valueAnnual: scaled(700000, 50000), category: 'Official partner', endDate: '2027-06-30' },
+      { name: 'Kestrel Sports', valueAnnual: scaled(400000, 50000), category: 'Kit supplier', endDate: '2029-06-30' },
+    ],
   facilities: { trainingLevel: 3, youthLevel: 3, stadiumLevel: 3, medicalLevel: 3, analysisLevel: 2, scoutingLevel: 3, maxLevel: 5 },
   staff: [
     { id: 'staff-manager', name: 'Emeka Nwosu', role: 'Manager', nationality: 'Nigerian', age: 46, profileId: 'emeka-nwosu' },
-    { id: 'staff-assistant', name: 'Ngozi Okafor', role: 'Assistant Manager', nationality: 'Nigerian', age: 41, profileId: 'ngozi-okafor' },
-    { id: 'staff-coach-1', name: 'Chukwudi Eze', role: 'First Team Coach', nationality: 'Nigerian', age: 52, profileId: 'chukwudi-eze' },
-    { id: 'staff-coach-2', name: 'Luis Ortega', role: 'Technical Coach', nationality: 'Spanish', age: 39, profileId: 'luis-ortega' },
-    { id: 'staff-scout', name: 'Adaeze Obi', role: 'Chief Scout', nationality: 'Nigerian', age: 38, profileId: 'adaeze-obi' },
-    { id: 'staff-physio', name: 'Owen Ellis', role: 'Head Physio', nationality: 'Welsh', age: 36, profileId: 'owen-ellis' },
+    ...staffSeeds.map(([id, role, name, age, nationality], index) => ({ id: ['staff-assistant', 'staff-coach-1', 'staff-coach-2', 'staff-scout', 'staff-physio'][index], name, role, nationality, age, profileId: id })),
   ],
   history: { achievements: [], records: [], pastSeasonPositions: [] },
   formation: '4-3-3',
@@ -138,13 +167,7 @@ const ownManager: ManagerProfile = {
   seasonRecords: [],
 }
 
-const staffProfiles: ManagerProfile[] = ([
-  ['ngozi-okafor', 'Ngozi Okafor', 41, 'Nigerian', '4-2-3-1', 'Collaborative Mentor', 'English'],
-  ['chukwudi-eze', 'Chukwudi Eze', 52, 'Nigerian', '4-4-2', 'Calm Organizer', 'English'],
-  ['luis-ortega', 'Luis Ortega', 39, 'Spanish', '4-3-3', 'Technical Innovator', 'Spanish'],
-  ['adaeze-obi', 'Adaeze Obi', 38, 'Nigerian', '4-2-3-1', 'Analytical Scout', 'English'],
-  ['owen-ellis', 'Owen Ellis', 36, 'Welsh', '4-3-3', 'Player Advocate', 'English'],
-] as const).map(([id, name, age, nationality, formation, personality, language]) => ({
+const staffProfiles: ManagerProfile[] = staffSeeds.map(([id, , name, age, nationality, formation, personality, language]) => ({
   id, name, age: Number(age), nationality, languages: [{ name: language, proficiency: 'Native' as const }],
   attributes: { tacticalKnowledge: 13, manManagement: 14, discipline: 13 }, personality, preferredFormation: formation,
   tacticalDNA: [{ label: 'Passing', value: 'Balanced' }, { label: 'Pressing', value: 'Mid block' }, { label: 'Tempo', value: 'Measured' }],
