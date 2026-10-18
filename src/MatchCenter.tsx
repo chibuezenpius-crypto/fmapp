@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { buildLiveFeed } from './simulation/commentary/liveFeed'
 import { club, getClubBadge } from './data/mockData'
 import { getClubSquad } from './data/clubSquads'
 import ClubBadge from './ClubBadge'
@@ -17,7 +18,6 @@ interface MatchCenterProps {
   onOpenClub: () => void
   onSelectPlayer: (player: Player) => void
   onSelectPersonnel: (idOrName: string) => void
-  onSimulateMatch: () => void
   simulationError: string
 }
 
@@ -53,9 +53,15 @@ function StatBar({ label, home, away, suffix = '' }: { label: string; home: numb
   </div>
 }
 
-export default function MatchCenter({ match, selectedClubName, onSelectClub, onOpenClub, onSelectPlayer, onSelectPersonnel, onSimulateMatch, simulationError }: MatchCenterProps) {
+export default function MatchCenter({ match, selectedClubName, onSelectClub, onOpenClub, onSelectPlayer, onSelectPersonnel, simulationError }: MatchCenterProps) {
   const [section, setSection] = useState<MatchSection>('Overview')
   const isPlayed = match.status === 'Completed'
+  const isLive = match.status === 'Live'
+  // Finished matches replay the same minute-by-minute feed that was shown live, when the full event log is available.
+  const commentaryFeed = useMemo(
+    () => isPlayed && match.eventLog?.some((event) => event.type === 'Possession') ? buildLiveFeed(match) : match.commentary,
+    [isPlayed, match],
+  )
 
   const changeSection = (nextSection: MatchSection) => {
     setSection(nextSection)
@@ -63,7 +69,7 @@ export default function MatchCenter({ match, selectedClubName, onSelectClub, onO
 
   return <div className="match-center">
     <header className="match-center-banner">
-      <div className="match-center-topline"><span>{match.competition.toUpperCase()} · MATCHDAY {match.matchday}</span><span className={`match-status ${match.status.toLowerCase()}`}>{match.status === 'Completed' ? 'FULL TIME' : 'UPCOMING'}</span></div>
+      <div className="match-center-topline"><span>{match.competition.toUpperCase()} · MATCHDAY {match.matchday}</span><span className={`match-status ${match.status.toLowerCase()}`}>{isLive ? `LIVE ${match.liveMinute ?? 0}'` : match.status === 'Completed' ? 'FULL TIME' : 'UPCOMING'}</span></div>
       <div className="match-center-teams">
         <div className="match-center-team home"><span className="match-team-crest"><ClubBadge badge={getClubBadge(match.homeClubId)} name={match.homeClubName} /></span><ClubReference name={match.homeClubName} selectedClubName={selectedClubName} onSelectClub={onSelectClub} onOpenClub={onOpenClub} /></div>
         <div className="match-center-score">{match.score ? <><strong>{match.score.home}</strong><i>:</i><strong>{match.score.away}</strong></> : <><strong>{new Date(`${match.date}T12:00:00`).getDate()}</strong><i>VS</i><strong>{new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(new Date(`${match.date}T12:00:00`)).toUpperCase()}</strong></>}</div>
@@ -73,15 +79,13 @@ export default function MatchCenter({ match, selectedClubName, onSelectClub, onO
     </header>
 
     <nav className="match-tabs" aria-label="Match information sections">
-      {sections.map((item) => <button aria-current={section === item ? 'page' : undefined} className={section === item ? 'match-tab active' : 'match-tab'} disabled={item === 'Commentary' && !isPlayed} key={item} onClick={() => changeSection(item)} type="button">{item}</button>)}
+      {sections.map((item) => <button aria-current={section === item ? 'page' : undefined} className={section === item ? 'match-tab active' : 'match-tab'} disabled={item === 'Commentary' && !isPlayed && !isLive} key={item} onClick={() => changeSection(item)} type="button">{item}</button>)}
     </nav>
 
     <div className="match-center-content" key={section}>
       {simulationError && <p className="match-storage-error" role="alert">{simulationError}</p>}
-      {!isPlayed && section === 'Overview' && <section className="match-simulation-action">
-        <div><strong>Ready for kick-off?</strong><span>Your starting XI, tactical style, pressing and tempo shape this seeded simulation.</span></div>
-        <button onClick={onSimulateMatch} type="button">Simulate Match</button>
-      </section>}
+      {!isPlayed && !isLive && section === 'Overview' && <p className="match-seed-note">Not started. Matches kick off live when you advance the day.</p>}
+      {isLive && <p className="match-seed-note">LIVE · {match.liveMinute ?? 0}' · follow the Commentary tab</p>}
       {isPlayed && match.simulationSeed !== undefined && <p className="match-seed-note">SIMULATED RESULT · SEED {match.simulationSeed} · {match.eventLog?.length ?? match.commentary.length} EVENTS</p>}
       {section === 'Overview' && <>
         <section className="match-overview-venue"><div className="match-venue-icon">⌂</div><div><span className="eyebrow">VENUE</span><strong>{match.venue}</strong><span>{match.weather}</span></div><div className="venue-capacity"><span>CAPACITY</span><strong>{club.stadium.capacity.toLocaleString('en-GB')}</strong></div></section>
@@ -109,11 +113,11 @@ export default function MatchCenter({ match, selectedClubName, onSelectClub, onO
       </>}
 
       {section === 'Commentary' && <>
-        {isPlayed ? <section className="commentary-list"><div className="match-section-heading"><div><span className="eyebrow">{match.simulationSeed === undefined ? 'FULL-TIME REPORT' : 'EVENT-DRIVEN COMMENTARY'}</span><h2>Match events</h2></div><span>{match.commentary.length} EVENTS</span></div>{match.commentary.map((event, index) => <article className={`commentary-event ${event.team}`} key={event.eventId ?? `${event.minute}-${event.player}-${index}`}><span className="commentary-minute">{event.minute}'{event.second !== undefined && <small>{String(event.second).padStart(2, '0')}</small>}</span><span className={`commentary-type ${event.type.toLowerCase().replace(' ', '-')}`}>{event.type === 'Goal' ? '⚽' : event.type === 'Yellow Card' ? '▰' : event.type === 'Red Card' ? '▰' : event.type === 'Save' ? '✦' : event.type === 'Substitution' ? '↔' : event.type === 'Injury' ? '✚' : event.type === 'Kick Off' || event.type === 'Half Time' || event.type === 'Full Time' ? '◷' : '·'}</span><div><strong>{event.player}</strong><span>{event.detail}</span></div><i className="event-side">{event.team === 'home' ? 'HOME' : 'AWAY'}</i></article>)}</section> : <div className="match-unavailable"><span className="unavailable-icon">◷</span><strong>Commentary starts at kick-off</strong><span>This fixture has not been played yet.</span></div>}
+        {isPlayed || isLive ? <section className="commentary-list"><div className="match-section-heading"><div><span className="eyebrow">{isLive ? `LIVE · ${match.liveMinute ?? 0}'` : match.simulationSeed === undefined ? 'FULL-TIME REPORT' : 'EVENT-DRIVEN COMMENTARY'}</span><h2>{isLive ? 'Live commentary' : 'Match events'}</h2></div><span>{commentaryFeed.length} {isLive ? 'LINES' : 'EVENTS'}</span></div>{[...commentaryFeed].reverse().map((event, index) => <article className={`commentary-event ${event.team}`} key={event.eventId ?? `${event.minute}-${event.player}-${index}`}><span className="commentary-minute">{event.minute}'{event.second !== undefined && <small>{String(event.second).padStart(2, '0')}</small>}</span><span className={`commentary-type ${event.type.toLowerCase().replace(' ', '-')}`}>{event.type === 'Goal' ? '⚽' : event.type === 'Yellow Card' ? '▰' : event.type === 'Red Card' ? '▰' : event.type === 'Save' ? '✦' : event.type === 'Substitution' ? '↔' : event.type === 'Injury' ? '✚' : event.type === 'Kick Off' || event.type === 'Half Time' || event.type === 'Full Time' ? '◷' : '·'}</span><div><strong>{event.player}</strong><span>{event.detail}</span></div><i className="event-side">{event.team === 'home' ? 'HOME' : 'AWAY'}</i></article>)}</section> : <div className="match-unavailable"><span className="unavailable-icon">◷</span><strong>Commentary starts at kick-off</strong><span>This fixture has not been played yet.</span></div>}
       </>}
 
       {section === 'Match Stats' && <>
-        {match.stats ? <section className="match-stats-panel"><div className="match-section-heading"><div><span className="eyebrow">FULL-TIME DATA</span><h2>Match statistics</h2></div><span>{match.score?.home} - {match.score?.away}</span></div><div className="stats-team-labels"><ClubReference name={match.homeClubName} selectedClubName={selectedClubName} onSelectClub={onSelectClub} onOpenClub={onOpenClub} /><span>STAT</span><ClubReference name={match.awayClubName} selectedClubName={selectedClubName} onSelectClub={onSelectClub} onOpenClub={onOpenClub} /></div><StatBar label="Possession" home={match.stats.possession.home} away={match.stats.possession.away} suffix="%" /><StatBar label="Total shots" home={match.stats.shots.home} away={match.stats.shots.away} /><StatBar label="Shots on target" home={match.stats.shotsOnTarget.home} away={match.stats.shotsOnTarget.away} /><StatBar label="Pass accuracy" home={match.stats.passAccuracy.home} away={match.stats.passAccuracy.away} suffix="%" /><StatBar label="Fouls committed" home={match.stats.fouls.home} away={match.stats.fouls.away} /></section> : <div className="match-unavailable"><span className="unavailable-icon">◷</span><strong>Stats available after the match</strong><span>Match data will appear here at full time.</span></div>}
+        {match.stats ? <section className="match-stats-panel"><div className="match-section-heading"><div><span className="eyebrow">{isLive ? 'LIVE DATA' : 'FULL-TIME DATA'}</span><h2>Match statistics</h2></div><span>{match.score?.home} - {match.score?.away}</span></div><div className="stats-team-labels"><ClubReference name={match.homeClubName} selectedClubName={selectedClubName} onSelectClub={onSelectClub} onOpenClub={onOpenClub} /><span>STAT</span><ClubReference name={match.awayClubName} selectedClubName={selectedClubName} onSelectClub={onSelectClub} onOpenClub={onOpenClub} /></div><StatBar label="Possession" home={match.stats.possession.home} away={match.stats.possession.away} suffix="%" /><StatBar label="Total shots" home={match.stats.shots.home} away={match.stats.shots.away} /><StatBar label="Shots on target" home={match.stats.shotsOnTarget.home} away={match.stats.shotsOnTarget.away} /><StatBar label="Pass accuracy" home={match.stats.passAccuracy.home} away={match.stats.passAccuracy.away} suffix="%" /><StatBar label="Fouls committed" home={match.stats.fouls.home} away={match.stats.fouls.away} /></section> : <div className="match-unavailable"><span className="unavailable-icon">◷</span><strong>Stats available after the match</strong><span>Match data will appear here at full time.</span></div>}
       </>}
     </div>
   </div>

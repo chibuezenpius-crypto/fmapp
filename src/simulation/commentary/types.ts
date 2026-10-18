@@ -19,8 +19,13 @@ export type CommentaryKey =
   | 'substitution'
   | 'half_time'
   | 'full_time'
+  | 'possession'
+  | 'build_up'
+  | 'attacking_pass'
+  | 'quiet_spell'
+  | 'shot_long_range'
 
-export type TemplatePlaceholder = 'playerName' | 'teamName' | 'opponentName' | 'targetName' | 'zone' | 'minute'
+export type TemplatePlaceholder = 'playerName' | 'teamName' | 'opponentName' | 'targetName' | 'zone' | 'minute' | 'distance'
 
 /** Club names needed to turn a `MatchEvent` team side into readable text. */
 export interface CommentaryContext {

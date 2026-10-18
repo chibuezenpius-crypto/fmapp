@@ -8,22 +8,36 @@ export interface CommentaryGeneratorOptions {
   templates?: CommentaryTemplates
   // Pass a seeded source so the same match always produces the same commentary.
   random?: RandomSource
+  /** Also narrate routine play (passes, possession) so every minute of a live match has something to say. */
+  minor?: boolean
 }
 
 const PITCH_LENGTH = 105
 const FIRST_HALF_SECONDS = 2700
 const LONG_RANGE_METRES = 22
-const PLACEHOLDER_PATTERN = /\{(playerName|teamName|opponentName|targetName|zone|minute)\}/g
+const PLACEHOLDER_PATTERN = /\{(playerName|teamName|opponentName|targetName|zone|minute|distance)\}/g
 
-/** Maps a simulation event onto a template pool; null means the event is not worth a line. */
-function commentaryKeyFor(event: MatchEvent, zone: string): CommentaryKey | null {
+/**
+ * Maps a simulation event onto a template pool; null means the event is not worth a line.
+ * `minor` also narrates routine play (passes, spells of possession) for the minute-by-minute live feed.
+ */
+function commentaryKeyFor(event: MatchEvent, zone: string, minor: boolean): CommentaryKey | null {
   const dangerZone = zone === 'the final third' || zone === 'the penalty area'
+  if (minor) {
+    if (event.type === 'Possession') return 'possession'
+    if (event.type === 'Pass') {
+      if (event.outcome !== 'complete') return null
+      return dangerZone ? 'attacking_pass' : zone === 'midfield' ? 'build_up' : null
+    }
+  }
   switch (event.type) {
     case 'Kick Off': return 'kick_off'
     case 'Goal': return Number(event.data?.distance ?? 0) >= LONG_RANGE_METRES ? 'goal_long_range' : 'goal'
     case 'Save': return 'save'
     case 'Miss': return 'shot_off_target'
-    case 'Shot': return event.outcome === 'on-target' ? 'shot_on_target' : null
+    case 'Shot':
+      if (event.outcome !== 'on-target') return null
+      return Number(event.data?.distance ?? 0) >= LONG_RANGE_METRES ? 'shot_long_range' : 'shot_on_target'
     case 'Foul': return 'foul'
     case 'Yellow Card': return 'yellow_card'
     case 'Red Card': return event.outcome === 'second-yellow' ? 'second_yellow' : 'red_card'
@@ -66,6 +80,7 @@ function placeholderValues(event: MatchEvent, context: CommentaryContext): Parti
     targetName: event.target,
     zone: zoneFor(event),
     minute: String(Math.floor(event.elapsedSeconds / 60)),
+    distance: event.data?.distance === undefined ? undefined : String(event.data.distance),
   }
 }
 
@@ -80,9 +95,9 @@ export function createCommentaryGenerator(options: CommentaryGeneratorOptions = 
   const lastTemplateByKey = new Map<CommentaryKey, string>()
 
   /** Returns commentary text for a logged event, or null when the event should not be narrated. */
-  return function generateCommentary(event: MatchEvent, context: CommentaryContext): string | null {
+  return function generateCommentary(event: MatchEvent, context: CommentaryContext, keyOverride?: CommentaryKey): string | null {
     const values = placeholderValues(event, context)
-    const key = commentaryKeyFor(event, values.zone ?? '')
+    const key = keyOverride ?? commentaryKeyFor(event, values.zone ?? '', options.minor === true)
     if (!key) return null
 
     const pool = templates[key]

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { club, managerProfiles, refereeProfiles } from './data/mockData'
-import { addDays, advanceDay, clearMessage, playMatch, useGame } from './state/gameStore'
+import { addDays, advanceDay, clearMessage, useGame, useWithLive } from './state/gameStore'
 import './state/transfers'
 import type { ProfileSection } from './PlayerProfile'
 import type { ClubSection } from './ClubProfile'
@@ -63,7 +63,7 @@ function App() {
   const [clubReturnTab, setClubReturnTab] = useState<TabId>('Home')
   const [headerPanel, setHeaderPanel] = useState<PanelKind | null>(null)
   const [tacticsView, setTacticsView] = useState<'hub' | 'training'>('hub')
-  const displayedMatches = game.matches
+  const displayedMatches = useWithLive(game.matches)
   // The Matches tab lists the user's own matches plus everything around today, not every match of every league.
   const matchesTabMatches = displayedMatches.filter((match) => match.homeClubId === club.id || match.awayClubId === club.id || (match.date >= addDays(game.date, -2) && match.date <= addDays(game.date, 3)))
   const standings = game.standings
@@ -200,7 +200,7 @@ function App() {
             : relationsView === 'Fans' ? <FanOverview />
             : selectedMatch ? <MatchCenter match={selectedMatch} selectedClubName={selectedClubName}
                 onSelectClub={setSelectedClubName} onOpenClub={openClubProfile} onSelectPlayer={selectPlayer} onSelectPersonnel={selectPersonnel}
-                onSimulateMatch={() => playMatch(selectedMatch.id)} simulationError={game.message} />
+                simulationError={game.message} />
               : activeTab === 'Club' ? <ClubProfile section={clubSection} selectedClubName={selectedClubName} matches={displayedMatches}
               onSectionChange={setClubSection} onSelectClub={setSelectedClubName} onSelectPlayer={selectPlayer} onSelectPersonnel={selectPersonnel} onSelectMatch={setSelectedMatchId} /> : <>
             {activeTab === 'Home' && <Dashboard game={game} nav={nav} />}

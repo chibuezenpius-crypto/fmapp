@@ -4,7 +4,7 @@ import { getSeasonLeagueFixtures } from '../../data/mockData'
 import { simulateMatch } from '../matchEngine'
 import { commentaryTemplates } from './templates'
 
-const ALLOWED_PLACEHOLDERS = new Set(['playerName', 'teamName', 'opponentName', 'targetName', 'zone', 'minute'])
+const ALLOWED_PLACEHOLDERS = new Set(['playerName', 'teamName', 'opponentName', 'targetName', 'zone', 'minute', 'distance'])
 
 describe('commentary templates', () => {
   it('gives every situation at least 10 usable lines, even when no target player exists', () => {

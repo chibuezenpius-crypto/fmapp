@@ -1,10 +1,11 @@
-import { useSyncExternalStore } from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
 import rawGlobalLeagues from '../data/globalLeaguesAndTeams.json'
 import { clearOldSeasonFixtureCaches, club, createTieFixture, getSeasonLeagueFixtures, league, leagueStandings, ownLeagueRules, SEASON_START_DATE } from '../data/mockData'
 import { getCompetitionRules } from '../data/competitionRules'
 import { getClubSquad } from '../data/clubSquads'
 import type { GlobalLeaguesDatabase, LeagueCompetition, LeagueStanding, MatchInfo, Player } from '../types/game'
-import { matchSeedFromId, simulateMatch, type MatchTactics } from '../simulation/matchEngine'
+import { matchSeedFromId, simulateMatch, calculateStats, type MatchTactics } from '../simulation/matchEngine'
+import { buildLiveFeed, LIVE_MS_PER_MINUTE, type LiveCommentaryEntry } from '../simulation/commentary/liveFeed'
 import { loadPlayerConditions, loadSimulatedMatches, savePlayerConditions, saveSimulatedMatches } from '../simulation/persistence'
 import { CLUB_WORLD_CUP_ID, CONTINENTAL_IDS, DOMESTIC_CUPS, deriveSeasonTies, type LeagueRankings, type ScoreLookup, type SeasonTies, type TieSpec } from '../simulation/competitions'
 import { clubStrength, quickResult } from '../simulation/quickResult'
@@ -431,15 +432,30 @@ const fail = (text: string, error: unknown) => {
 }
 
 /** Moves the calendar to `targetDate` and plays every fixture that falls due on the way, including knockout rounds those results unlock. */
-function advanceTo(targetDate: string) {
+function advanceTo(targetDate: string, live = true, seed: Record<string, MatchInfo> = {}) {
+  if (pendingLive) {
+    message = 'Matches are in progress. Wait for full time before advancing.'
+    notify()
+    return
+  }
   try {
-    const played: Record<string, MatchInfo> = {}
+    const played: Record<string, MatchInfo> = { ...seed }
+    const liveFixtures: MatchInfo[] = []
     for (;;) {
       const done = { ...results, ...played }
       const due = seasonFixtures(done, targetDate).fixtures.filter((match) => !done[match.id] && isFullSimulation(match) && match.date <= targetDate)
         .sort((first, second) => first.date.localeCompare(second.date) || first.id.localeCompare(second.id))
-      if (due.length === 0) break
-      for (const fixture of due) played[fixture.id] = simulateFixture(fixture)
+      // Matches on the target day are played out live; anything earlier (multi-day jumps) is simulated instantly.
+      const instant = due.filter((match) => !live || match.date < targetDate)
+      if (instant.length === 0) {
+        liveFixtures.push(...due)
+        break
+      }
+      for (const fixture of instant) played[fixture.id] = simulateFixture(fixture)
+    }
+    if (liveFixtures.length > 0) {
+      startLiveMatches(liveFixtures, targetDate, played)
+      return
     }
     commit(Object.values(played), targetDate)
   } catch (error) {
@@ -459,10 +475,107 @@ export function advanceToNextMatch() {
   advanceTo(next.date > date ? next.date : addDays(date, 1))
 }
 
-export function playMatch(matchId: string) {
-  const fixture = getGameView().matches.find((match) => match.id === matchId)
-  if (!fixture || fixture.status !== 'Upcoming') return
-  advanceTo(fixture.date > date ? fixture.date : date)
+// ---------- Live matches ----------
+// The match is simulated once up front; the live view then reveals it on a clock of one real second per match minute.
+interface LiveSession {
+  result: MatchInfo
+  feed: LiveCommentaryEntry[]
+  startedAt: number
+  endMinute: number
+}
+
+const liveSessions = new Map<string, LiveSession>()
+const liveListeners = new Set<() => void>()
+let liveRevision = 0
+let liveSignature = ''
+let liveTimer: ReturnType<typeof setInterval> | undefined
+let pendingLive: { targetDate: string; played: Record<string, MatchInfo> } | null = null
+
+const liveMinuteOf = (session: LiveSession) => Math.min(session.endMinute, (Date.now() - session.startedAt) / LIVE_MS_PER_MINUTE)
+
+function notifyLive() {
+  liveRevision += 1
+  liveListeners.forEach((listener) => listener())
+}
+
+function liveStateSignature() {
+  return [...liveSessions].map(([id, session]) => {
+    const minute = liveMinuteOf(session)
+    return `${id}:${Math.floor(minute)}:${session.feed.filter((entry) => entry.at <= minute).length}`
+  }).join('|')
+}
+
+function tickLive() {
+  if ([...liveSessions.values()].every((session) => liveMinuteOf(session) >= session.endMinute)) {
+    finishLive()
+    return
+  }
+  const signature = liveStateSignature()
+  if (signature !== liveSignature) {
+    liveSignature = signature
+    notifyLive()
+  }
+}
+
+/** Starts every match of the day at once; the calendar only moves on (and results are saved) once all reach full time. */
+function startLiveMatches(fixtures: MatchInfo[], targetDate: string, played: Record<string, MatchInfo>) {
+  const startedAt = Date.now()
+  for (const fixture of fixtures) {
+    const result = simulateFixture(fixture)
+    const endMinute = Math.floor((result.eventLog?.[result.eventLog.length - 1]?.elapsedSeconds ?? 5400) / 60)
+    liveSessions.set(fixture.id, { result, feed: buildLiveFeed(result), startedAt, endMinute })
+  }
+  pendingLive = { targetDate, played }
+  message = ''
+  liveTimer ??= setInterval(tickLive, 200)
+  liveSignature = ''
+  notify()
+  notifyLive()
+}
+
+function finishLive() {
+  const pending = pendingLive
+  if (!pending) return
+  const seed = { ...pending.played }
+  for (const [id, session] of liveSessions) seed[id] = session.result
+  liveSessions.clear()
+  pendingLive = null
+  if (liveTimer !== undefined) clearInterval(liveTimer)
+  liveTimer = undefined
+  notifyLive()
+  advanceTo(pending.targetDate, false, seed)
+}
+
+/** What a running live match shows right now: score, stats and commentary revealed so far. */
+export function liveSnapshot(fixture: MatchInfo): MatchInfo {
+  const session = liveSessions.get(fixture.id)
+  if (!session) return fixture
+  const minute = liveMinuteOf(session)
+  const commentary = session.feed.filter((entry) => entry.at <= minute)
+  const seen = (session.result.eventLog ?? []).filter((event) => event.elapsedSeconds / 60 <= minute)
+  return {
+    ...fixture,
+    status: 'Live',
+    liveMinute: Math.floor(minute),
+    score: {
+      home: commentary.filter((entry) => entry.type === 'Goal' && entry.team === 'home').length,
+      away: commentary.filter((entry) => entry.type === 'Goal' && entry.team === 'away').length,
+    },
+    commentary,
+    stats: calculateStats(seen),
+  }
+}
+
+const subscribeLive = (listener: () => void) => {
+  liveListeners.add(listener)
+  return () => { liveListeners.delete(listener) }
+}
+
+/** Swaps in the live view of any match that is currently being watched; re-renders as the clock moves. */
+export function useWithLive(matches: MatchInfo[]): MatchInfo[] {
+  const revisionSeen = useSyncExternalStore(subscribeLive, () => liveRevision)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => liveSessions.size === 0 ? matches : matches.map(liveSnapshot), [matches, revisionSeen])
 }
 
 export function clearMessage() {
@@ -478,3 +591,4 @@ export function resetGame() {
 }
 
 export const advanceDays = (days: number) => advanceTo(addDays(date, days))
+export const isLiveInProgress = () => pendingLive !== null

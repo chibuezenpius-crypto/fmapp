@@ -374,6 +374,8 @@ export interface MatchInfo {
   commentary: MatchCommentaryEvent[]
   stats?: MatchStats
   simulationSeed?: number
+  /** Set while the match is being watched live. */
+  liveMinute?: number
   eventLog?: MatchEvent[]
 }
 

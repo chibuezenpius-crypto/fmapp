@@ -224,7 +224,7 @@ function toCommentaryEvent(event: MatchEvent, detail: string): MatchCommentaryEv
   }
 }
 
-function calculateStats(events: MatchEvent[]): MatchStats {
+export function calculateStats(events: MatchEvent[]): MatchStats {
   const homePossession = events.filter((event) => event.type === 'Possession' && event.team === 'home').reduce((sum, event) => sum + Number(event.data?.durationSeconds ?? 0), 0)
   const awayPossession = events.filter((event) => event.type === 'Possession' && event.team === 'away').reduce((sum, event) => sum + Number(event.data?.durationSeconds ?? 0), 0)
   const possessionTotal = Math.max(1, homePossession + awayPossession)

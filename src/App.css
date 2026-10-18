@@ -2027,3 +2027,12 @@ button.match-pitch-player { cursor: pointer; }
 
 .crest-fill .club-badge { width: 100%; height: 100%; }
 }
+
+/* Mobile fixes: pinned bottom nav and text wrapping */
+.bottom-nav { position: fixed; bottom: 0; left: 50%; width: min(100%, 480px); transform: translateX(-50%); box-sizing: border-box; }
+.main-content { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+.main-content, .main-content * { overflow-wrap: anywhere; }
+.main-content :is(h1, h2, h3, h4, p, span, strong, small, b, em, li, td, th, label, a) { word-break: break-word; }
+.main-content img, .main-content svg, .main-content table { max-width: 100%; }
+.main-content table { table-layout: fixed; }
+@media (max-width: 560px) { .app-backdrop { padding: 0; } .app-shell { border-radius: 0; } }
