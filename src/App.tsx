@@ -185,7 +185,8 @@ function App() {
       {import.meta.env.DEV && <div className="screen-size-switcher" role="group" aria-label="Screen size">
         {SCREEN_SIZES.map((size) => <button aria-pressed={screenSize.label === size.label} key={size.label} onClick={() => setScreenSize(size)} type="button">{size.label}<small>{size.width ? `${size.width}px` : 'Full'}</small></button>)}
       </div>}
-      <div className="app-shell" style={import.meta.env.DEV && screenSize.width ? { width: `min(100%, ${screenSize.width}px)` } : { width: '100%' }}>
+      <div className="mobile-container max-w-[430px] mx-auto min-h-[100dvh] overflow-hidden flex flex-col w-full">
+        <div className="app-shell" style={import.meta.env.DEV && screenSize.width ? { width: '100%' } : { width: '100%' }}>
         <AppHeader expanded={!detailOpen} game={game} message={selectedMatch ? '' : game.message} nav={nav} onAdvanceDay={advanceDay} onClearMessage={clearMessage} onOpenClub={openClubProfile}
           panel={headerPanel} onPanelChange={setHeaderPanel}
           leading={<button aria-label={backLabel} className="header-back-button" onClick={goBack} type="button"><ArrowLeft aria-hidden="true" size={19} strokeWidth={2.2} /></button>} />
@@ -224,6 +225,7 @@ function App() {
           ))}
         </nav>
       </div>
+    </div>
     </div>
   )
 }

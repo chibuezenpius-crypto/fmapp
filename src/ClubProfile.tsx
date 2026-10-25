@@ -240,6 +240,7 @@ function ClubFixturesSection({ fixtures, onSelectMatch }: { fixtures: MatchInfo[
           <header className="club-fixtures-group-header">
             <i className="fixture-club-crest">{label.slice(0, 1)}</i>
             <strong>{label}</strong>
+            <span className="club-fixture-comp-pill">{list[0]?.competition ?? ''}</span>
             <span>{list.length}</span>
           </header>
           {list.map((match) => {
@@ -249,7 +250,6 @@ function ClubFixturesSection({ fixtures, onSelectMatch }: { fixtures: MatchInfo[
             const awayOwn = match.awayClubId === club.id
             return (
               <div className={`club-fixture-row ${match.status.toLowerCase()}`} key={match.id}>
-                <span className="club-fixture-competition">{match.competition}</span>
                 <button
                   aria-label={`Open ${match.homeClubName} vs ${match.awayClubName} match details`}
                   className="club-fixture-row-main"
